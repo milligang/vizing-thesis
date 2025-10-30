@@ -7,13 +7,14 @@ This is a key theorem for edge colorings in graphs; hence, the purpose of this r
 - basics.v: Lemmas and theorems proven over the course of the project, especially when we were familiazing ourselves with the library, which are not directly related to the proof of Vizing's Theorem
 - edge_coloring.v: Definition of edge-coloring in ssreflect
   
-## Requirements 📋
+## Requirements
 
 The code in this repository requires the dependencies of package [_graph-theory 0.8_](https://github.com/coq-community/graph-theory):
 Coq 8.11+, MathComp 1.10+, finmap, hierarchy builder 0.10.
 
 In our case, we use Rocq version 9.0.0 compiled with OCaml 4.14.2. 
 
-## Authors and contact information ✒️
+## Authors and contact information
 
-- Milligan Grinstead ([**@milligang**](https://github.com/milligang)), mail: milligan.grinstead@gmail.com
+- Milligan Grinstead ([**@milligang**](https://github.com/milligang))
+
