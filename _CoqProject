@@ -1,0 +1,8 @@
+-R theories/ MyCode
+-arg "-w all"
+# include everything under "theories"
+vizings
+-I src/
+# include everything under "src", e.g. baz.mlg bazaux.ml and qux_plugin.mlpack
+src
+-generate-meta-for-package my-package
