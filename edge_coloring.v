@@ -9,74 +9,58 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
 Section ColorFun.
-Variable (G : sgraph).
 
-(* An edge coloring function assigns edges (sets of vertices) to colors *)
-Definition edge_coloring (ColorSet : finType) := {set G} -> ColorSet.
+(* An edge coloring function assigns edges in E(G) to colors *)
+Definition edge_coloring (G : sgraph) (ColorType : finType) : Type := {set G} -> ColorType.
 
 (* A proper edge coloring is an edge coloring 
   where no two adjacent edges have the same color *)
-Definition is_proper_edge_coloring (ColorSet : finType) (coloring : edge_coloring ColorSet) : Prop := 
-  {in E(G)&, forall (e1 e2 : {set G}) (x:G), x \in e1 -> x \in e2 -> coloring e1 != coloring e2}.
+Definition is_proper_edge_coloring {G : sgraph}
+                                   {ColorType : finType} 
+                                   (coloring : edge_coloring G ColorType) : Prop := 
+  forall (e1 e2 : {set G}) (x:G), 
+  e1 \in E(G) -> e2 \in E(G) -> e1 != e2 -> x \in e1 -> x \in e2 -> coloring e1 != coloring e2.
 
-Definition proper_edge_coloring (ColorSet : finType) := 
-  {coloring : edge_coloring ColorSet | is_proper_edge_coloring coloring}.
+Definition proper_edge_coloring (G : sgraph) (ColorType : finType) : Type :=
+  { c : edge_coloring G ColorType | is_proper_edge_coloring c }.
+
+(* the image under a coloring c of the set of edges E *)
+Definition coloring_image {G : sgraph}
+                          {ColorType : finType}
+                          (E : {set {set G}})
+                          (c : proper_edge_coloring G ColorType) : {set ColorType} := 
+  [set sval c e | e in E].
+Notation "c [ E ]" := (coloring_image E c) (at level 50).
 
 (* A k-edge-coloring is a proper coloring which uses at most k colors *)
-Definition k_edge_coloring (k : nat) := proper_edge_coloring 'I_k.
+Definition k_edge_coloring (G : sgraph) (ColorType : finType) (k : nat) : Type := 
+  { c : proper_edge_coloring G ColorType | #|c[E(G)]| = k }.
 
 (* G is k-colorable if a k-edge-coloring exists *)
-Definition k_colorable (k : nat) : Prop := 
-  inhabited (k_edge_coloring k).
+Definition k_edge_colorable (G : sgraph) (ColorType : finType) (k : nat) : Prop := 
+  inhabited (k_edge_coloring G ColorType k).
 
 (* The chromatic index chi is the smallest k such that G is k-colorable *)
-Definition is_chromatic_index (chi : nat) : Prop :=
-  k_colorable chi /\ forall k, k < chi -> ~ k_colorable k.
+Definition is_chromatic_index (G : sgraph) (chi : nat) : Prop :=
+  k_edge_colorable G 'I_chi chi /\ forall k, k < chi -> ~ k_edge_colorable G 'I_k k.
 
-(**** NOT CHECKED BELOW ****)
-(** Extend a coloring when adding an edge *)
-Definition extend_coloring (G : sgraph) (ColorSet : finType) 
-  (chi : edge_coloring_fun G ColorSet) (x y : G) (c : ColorSet) 
-  : edge_coloring_fun (add_edge x y) ColorSet :=
-  fun e => if e == [set x; y] then c else chi e.
+(* injective coloring: each edge is a color *)
+Definition inj_edge_coloring {G : sgraph} : edge_coloring G {set G} :=
+  fun e => e.
 
-(** Switch two colors in a coloring *)
-Definition switch_colors (G : sgraph) (Color : finType)
-  (chi : edge_coloring_fun G Color) (c1 c2 : Color)
-  : edge_coloring_fun G Color :=
-  fun e => if chi e == c1 then c2 
-           else if chi e == c2 then c1 
-           else chi e.
+Definition proper_inj_coloring {G : sgraph} : proper_edge_coloring G {set G}.
+Proof.
+  exists inj_edge_coloring => e1 e2 x _ _ _ _ _ //.
+Defined.
 
-(** Switch colors only on a subset of edges *)
-Definition switch_colors_on (G : sgraph) (Color : finType)
-  (chi : edge_coloring_fun G Color) (S : {set {set G}}) (c1 c2 : Color)
-  : edge_coloring_fun G Color :=
-  fun e => if e \in S then 
-             (if chi e == c1 then c2 
-              else if chi e == c2 then c1 
-              else chi e)
-           else chi e.
-
-(** Recolor a specific edge *)
-Definition recolor_edge (G : sgraph) (Color : finType)
-  (chi : edge_coloring_fun G Color) (e : {set G}) (c : Color)
-  : edge_coloring_fun G Color :=
-  fun e' => if e' == e then c else chi e'.
-
-(** The set of colors used by a coloring *)
-Definition colors_used (G : sgraph) (Color : finType)
-  (chi : edge_coloring_fun G Color) : {set Color} :=
-  chi @: E(G).
-
-(** The set of colors used at a vertex (colors of incident edges) *)
-Definition colors_at_vertex (G : sgraph) (Color : finType)
-  (chi : edge_coloring_fun G Color) (v : G) : {set Color} :=
-  [set chi e | e in E(G) & v \in e].
-
-(** Find an available color at a vertex *)
-Definition available_color (G : sgraph) (Color : finType)
-  (chi : edge_coloring_fun G Color) (v : G) : option Color :=
-  pick [pred c | c \notin colors_at_vertex chi v].
-
-End ColorFun.
+Lemma inj_image (G : sgraph) : proper_inj_coloring[E(G)] = E(G). 
+Proof.
+  rewrite /coloring_image.
+  apply/setP => e.
+  apply/imsetP/idP. (* imsetP: prop->bool for set, idP: split into both directions *)
+  - move=> [e' He' ->].
+    rewrite /proper_inj_coloring /inj_edge_coloring /=.
+    by [].
+  - move=> He.
+    exists e => //.
+Qed.
