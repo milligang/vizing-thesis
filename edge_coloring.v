@@ -1,6 +1,7 @@
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
+
 From Coq Require Import Setoid CMorphisms Relation_Definitions.
 From HB Require Import structures.
-Set Warnings "-notation-overridden, -notation-incompatible-prefix".
 From mathcomp Require Import all_ssreflect.
 From GraphTheory Require Import edone preliminaries bij digraph sgraph connectivity.
 
@@ -15,6 +16,7 @@ Definition edge_coloring (G : sgraph) (ColorType : finType) : Type := {set G} ->
 
 (* A proper edge coloring is an edge coloring 
   where no two adjacent edges have the same color *)
+(* Could do x in e1 instead *)
 Definition is_proper_edge_coloring {G : sgraph}
                                    {ColorType : finType} 
                                    (coloring : edge_coloring G ColorType) : Prop := 
@@ -29,31 +31,38 @@ Definition coloring_image {G : sgraph}
                           {ColorType : finType}
                           (E : {set {set G}})
                           (c : proper_edge_coloring G ColorType) : {set ColorType} := 
-  [set sval c e | e in E].
+  [set (sval c) e | e in E].
 Notation "c [ E ]" := (coloring_image E c) (at level 50).
 
-(* A k-edge-coloring is a proper coloring which uses at most k colors *)
-Definition k_edge_coloring (G : sgraph) (ColorType : finType) (k : nat) : Type := 
-  { c : proper_edge_coloring G ColorType | #|c[E(G)]| = k }.
+(* Given vertex, would like to have some notation for edges at v
+  [set [set v; w] | w \in N(v)]
+*)
 
-(* G is k-colorable if a k-edge-coloring exists *)
-Definition k_edge_colorable (G : sgraph) (ColorType : finType) (k : nat) : Prop := 
-  inhabited (k_edge_coloring G ColorType k).
+(* A k-edge-coloring is a proper coloring which uses at most k colors *)
+Definition k_edge_coloring (G : sgraph) (k : nat) : Type := 
+  { ColorType : finType &
+    { c : proper_edge_coloring G ColorType | #|c[E(G)]| = k } }.
+
+(* G is k-colorable if a k-edge-coloring exists. *)
+Definition k_edge_colorable (G : sgraph) (k : nat) : Prop := 
+  inhabited (k_edge_coloring G k).
 
 (* The chromatic index chi is the smallest k such that G is k-colorable *)
 Definition is_chromatic_index (G : sgraph) (chi : nat) : Prop :=
-  k_edge_colorable G 'I_chi chi /\ forall k, k < chi -> ~ k_edge_colorable G 'I_k k.
+  k_edge_colorable G chi /\ forall k, k < chi -> ~ k_edge_colorable G k.
 
+(* ----  Trivial Colorings ---- *)
 (* injective coloring: each edge is a color *)
 Definition inj_edge_coloring {G : sgraph} : edge_coloring G {set G} :=
   fun e => e.
 
+(* injective coloring is a proper coloring *)
 Definition proper_inj_coloring {G : sgraph} : proper_edge_coloring G {set G}.
 Proof.
   exists inj_edge_coloring => e1 e2 x _ _ _ _ _ //.
 Defined.
 
-Lemma inj_image (G : sgraph) : proper_inj_coloring[E(G)] = E(G). 
+Lemma inj_image {G : sgraph} : proper_inj_coloring[E(G)] = E(G). 
 Proof.
   rewrite /coloring_image.
   apply/setP => e.
@@ -63,4 +72,17 @@ Proof.
     by [].
   - move=> He.
     exists e => //.
+Qed.
+
+(* injective coloring is a k-edge-coloring with k = #|E(G)| *)
+Definition inj_k_coloring {G : sgraph} : k_edge_coloring G #|E(G)|.
+Proof.
+  exists {set G}, proper_inj_coloring. by rewrite inj_image.
+Defined.
+
+(* Thus, all graphs have a k-edge-coloring with k = #|E(G)|*)
+Lemma inj_chrom (G : sgraph) :
+  k_edge_colorable G #|E(G)|.
+Proof.
+  constructor. exact inj_k_coloring.
 Qed.
