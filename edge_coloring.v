@@ -1,16 +1,15 @@
-Set Warnings "-notation-overridden, -notation-incompatible-prefix".
-
-From Coq Require Import Setoid CMorphisms Relation_Definitions.
 From HB Require Import structures.
 From mathcomp Require Import all_ssreflect.
 From GraphTheory Require Import edone preliminaries bij digraph sgraph connectivity.
+From Coq Require Import Setoid CMorphisms Relation_Definitions.
+
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
-Section ColorFun.
-
+(* ---- Edge Coloring Functional Definition ---- *)
 (* An edge coloring function assigns edges in E(G) to colors *)
 Definition edge_coloring (G : sgraph) (ColorType : finType) : Type := {set G} -> ColorType.
 
@@ -20,8 +19,9 @@ Definition edge_coloring (G : sgraph) (ColorType : finType) : Type := {set G} ->
 Definition is_proper_edge_coloring {G : sgraph}
                                    {ColorType : finType} 
                                    (coloring : edge_coloring G ColorType) : Prop := 
-  forall (e1 e2 : {set G}) (x:G), 
-  e1 \in E(G) -> e2 \in E(G) -> e1 != e2 -> x \in e1 -> x \in e2 -> coloring e1 != coloring e2.
+  forall (e1 e2 : {set G}), 
+  e1 \in E(G) -> e2 \in E(G) -> e1 != e2 -> 
+  (exists x, x \in e1 /\ x \in e2) -> coloring e1 != coloring e2.
 
 Definition proper_edge_coloring (G : sgraph) (ColorType : finType) : Type :=
   { c : edge_coloring G ColorType | is_proper_edge_coloring c }.
@@ -38,10 +38,11 @@ Notation "c [ E ]" := (coloring_image E c) (at level 50).
   [set [set v; w] | w \in N(v)]
 *)
 
+(* ---- Chromatic Index ---- *)
 (* A k-edge-coloring is a proper coloring which uses at most k colors *)
 Definition k_edge_coloring (G : sgraph) (k : nat) : Type := 
   { ColorType : finType &
-    { c : proper_edge_coloring G ColorType | #|c[E(G)]| = k } }.
+    { c : proper_edge_coloring G ColorType | #|c[E(G)]| <= k } }.
 
 (* G is k-colorable if a k-edge-coloring exists. *)
 Definition k_edge_colorable (G : sgraph) (k : nat) : Prop := 
@@ -51,7 +52,20 @@ Definition k_edge_colorable (G : sgraph) (k : nat) : Prop :=
 Definition is_chromatic_index (G : sgraph) (chi : nat) : Prop :=
   k_edge_colorable G chi /\ forall k, k < chi -> ~ k_edge_colorable G k.
 
-(* ----  Trivial Colorings ---- *)
+(*  Any valid k-edge-colorable upper bounds chi *)
+Lemma chromatic_index_le (G : sgraph) (chi k : nat) :
+  is_chromatic_index G chi ->
+  k_edge_colorable G k ->
+  chi <= k.
+Proof.
+  move=> [Hchi_color Hchi_min] Hk.
+  rewrite leqNgt.
+  apply/negP => Hlt.
+  have Hneg : ~ k_edge_colorable G k := Hchi_min _ Hlt.
+  exact: Hneg Hk.
+Qed.
+
+(* ----  One-to-one Coloring ---- *)
 (* injective coloring: each edge is a color *)
 Definition inj_edge_coloring {G : sgraph} : edge_coloring G {set G} :=
   fun e => e.
@@ -59,7 +73,9 @@ Definition inj_edge_coloring {G : sgraph} : edge_coloring G {set G} :=
 (* injective coloring is a proper coloring *)
 Definition proper_inj_coloring {G : sgraph} : proper_edge_coloring G {set G}.
 Proof.
-  exists inj_edge_coloring => e1 e2 x _ _ _ _ _ //.
+  exists inj_edge_coloring.
+  move=> e1 e2 _ _ ne _.
+  exact ne.
 Defined.
 
 Lemma inj_image {G : sgraph} : proper_inj_coloring[E(G)] = E(G). 
@@ -86,3 +102,13 @@ Lemma inj_chrom (G : sgraph) :
 Proof.
   constructor. exact inj_k_coloring.
 Qed.
+
+(* If chi is a chromatic index of G, then chi <= |E(G)| *)
+Corollary chromatic_index_le_edges (G : sgraph) (chi : nat) :
+  is_chromatic_index G chi -> chi <= #|E(G)|.
+Proof.
+  move=> Hchi. 
+  apply (chromatic_index_le Hchi (inj_chrom G)).
+Qed.
+
+
