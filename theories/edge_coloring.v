@@ -1,13 +1,15 @@
 From HB Require Import structures.
 From mathcomp Require Import all_ssreflect.
+From Stdlib Require Import Setoid CMorphisms Relation_Definitions.
 From GraphTheory Require Import edone preliminaries bij digraph sgraph connectivity.
-From Coq Require Import Setoid CMorphisms Relation_Definitions.
+Require Import aux.
 
 Set Warnings "-notation-overridden, -notation-incompatible-prefix".
 
 Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
+
 
 (* ---- Edge Coloring Functional Definition ---- *)
 (* An edge coloring function assigns edges in E(G) to colors *)
@@ -34,10 +36,6 @@ Definition coloring_image {G : sgraph}
   [set (sval c) e | e in E].
 Notation "c [ E ]" := (coloring_image E c) (at level 50).
 
-(* Given vertex, would like to have some notation for edges at v
-  [set [set v; w] | w \in N(v)]
-*)
-
 (* ---- Chromatic Index ---- *)
 (* A k-edge-coloring is a proper coloring which uses at most k colors *)
 Definition k_edge_coloring (G : sgraph) (k : nat) : Type := 
@@ -53,7 +51,7 @@ Definition is_chromatic_index (G : sgraph) (chi : nat) : Prop :=
   k_edge_colorable G chi /\ forall k, k < chi -> ~ k_edge_colorable G k.
 
 (*  Any valid k-edge-colorable upper bounds chi *)
-Lemma chromatic_index_le (G : sgraph) (chi k : nat) :
+Lemma chromatic_index_upper_bound (G : sgraph) (chi k : nat) :
   is_chromatic_index G chi ->
   k_edge_colorable G k ->
   chi <= k.
@@ -82,7 +80,7 @@ Lemma inj_image {G : sgraph} : proper_inj_coloring[E(G)] = E(G).
 Proof.
   rewrite /coloring_image.
   apply/setP => e.
-  apply/imsetP/idP. (* imsetP: prop->bool for set, idP: split into both directions *)
+  apply/imsetP/idP.
   - move=> [e' He' ->].
     rewrite /proper_inj_coloring /inj_edge_coloring /=.
     by [].
@@ -108,7 +106,12 @@ Corollary chromatic_index_le_edges (G : sgraph) (chi : nat) :
   is_chromatic_index G chi -> chi <= #|E(G)|.
 Proof.
   move=> Hchi. 
-  apply (chromatic_index_le Hchi (inj_chrom G)).
+  apply (chromatic_index_upper_bound Hchi (inj_chrom G)).
 Qed.
+
+(* Absent Set *)
+Definition absent_set {G : sgraph} {ColorType: finType} 
+  (v : G) (c : proper_edge_coloring G ColorType) :=
+  [set col in c[E(G)] | col \notin c[E{v}]].
 
 

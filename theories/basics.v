@@ -1,6 +1,6 @@
 Set Warnings "-notation-overridden, -notation-incompatible-prefix". (* to ignore warnings due to the import of ssreflect *)
 From mathcomp Require Import all_ssreflect.
-From Coq Require Import RelationClasses.
+From Stdlib Require Import RelationClasses.
 From GraphTheory Require Import digraph sgraph dom.
 Require Import Stdlib.Logic.Classical_Prop.
 

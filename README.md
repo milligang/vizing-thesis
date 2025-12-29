@@ -5,6 +5,7 @@ This is a key theorem for edge colorings in graphs; hence, the purpose of this r
 
 ## Files and folders 
 - basics.v: Lemmas and theorems proven over the course of the project, especially when we were familiazing ourselves with the library, which are not directly related to the proof of Vizing's Theorem
+- aux.v: Structures helpful for the proof of Vizing's Theorem but not directly involved and have independent applications, such as a set of edges adjacent to a vertex.
 - edge_coloring.v: Definition of edge-coloring in ssreflect
   
 ## Requirements
