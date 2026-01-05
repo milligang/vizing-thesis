@@ -134,9 +134,9 @@ Proof.
   apply (chromatic_index_upper_bound Hchi (inj_chrom G)).
 Qed.
 
-(* Absent Set *)
+(* ----  Absent Set ---- *)
 Definition absent_set {G : sgraph} {ColorType: finType} 
-  (v : G) (c : proper_edge_coloring G ColorType) :=
+  (v : G) (c : edge_coloring G ColorType) :=
   setD (c[E(G)]) (c[E{v}]).
 
 Proposition exists_absent_color (G : sgraph) :
@@ -151,3 +151,32 @@ Proof.
             (leq_ltn_trans (max_colors_at_vertex v c)) 
             // addn1 ltnSn.
 Qed.
+
+(* ---- Fans ---- *)
+Section Fan.
+Variable (ColorType : finType) (G : sgraph).
+Implicit Types (v w : G) (e : {set G}) (f : seq G) (c : edge_coloring G ColorType).
+
+(* 1. For all w in the fan centered at v, w is in the neighborhood of v *)
+Definition fan_prop_neigh v f := all (fun w => w \in N(v)) f.
+
+(* 2. if w0 is the first item in fan f centered at v under coloring c,
+  (v, w0) is a distinct color from the rest of the edges in the graph *)
+Definition fan_prop_w0 e c := 
+  forall (h : {set G}), h \in E(G) -> e != h -> c e != c h.
+
+(* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
+  the color of (v, w_{i+1} is absent at w_i) *)
+Definition fan_prop_absent e w c := 
+  (c e) \in (absent_set w c).
+
+Definition fan v wk f c := 
+  uniq (wk::f) /\ 
+  fan_prop_neigh v (wk::f) /\
+  fan_prop_w0 [set v; (last wk f)] c /\
+  path (
+    fun x2 x1 => fan_prop_absent [set v; x2] x1 c
+  ) wk f.
+
+(* Lemma sub_in_fan *)
+End Fan.
