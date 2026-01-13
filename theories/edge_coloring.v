@@ -101,14 +101,12 @@ Proof.
   exact ne.
 Defined.
 
-Lemma inj_image {G : sgraph} : proper_inj_coloring[E(G)] = E(G). 
+Lemma inj_im {G : sgraph} : proper_inj_coloring[E(G)] = E(G). 
 Proof.
-  rewrite /coloring_image.
   apply/setP => e.
   apply/imsetP/idP.
   - move=> [e' He' ->].
-    rewrite /proper_inj_coloring /inj_edge_coloring /=.
-    by [].
+    by rewrite /proper_inj_coloring /inj_edge_coloring /=.
   - move=> He.
     exists e => //.
 Qed.
@@ -116,7 +114,7 @@ Qed.
 (* injective coloring is a k-edge-coloring with k = #|E(G)| *)
 Definition inj_k_coloring {G : sgraph} : k_edge_coloring G #|E(G)|.
 Proof.
-  exists {set G}, proper_inj_coloring. by rewrite inj_image.
+  exists {set G}, proper_inj_coloring. by rewrite inj_im.
 Defined.
 
 (* Thus, all graphs have a k-edge-coloring with k = #|E(G)|*)
@@ -154,7 +152,7 @@ Qed.
 
 (* ---- Fans ---- *)
 Section Fan.
-Variable (ColorType : finType) (G : sgraph).
+Variable (G : sgraph) (ColorType : finType).
 Implicit Types (v w : G) (e : {set G}) (f : seq G) (c : edge_coloring G ColorType).
 
 (* 1. For all w in the fan centered at v, w is in the neighborhood of v *)
@@ -163,20 +161,169 @@ Definition fan_prop_neigh v f := all (fun w => w \in N(v)) f.
 (* 2. if w0 is the first item in fan f centered at v under coloring c,
   (v, w0) is a distinct color from the rest of the edges in the graph *)
 Definition fan_prop_w0 e c := 
-  forall (h : {set G}), h \in E(G) -> e != h -> c e != c h.
+  [forall (h : {set G} | (h \in E(G)) && (e != h)), c e != c h].
 
 (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
   the color of (v, w_{i+1} is absent at w_i) *)
 Definition fan_prop_absent e w c := 
   (c e) \in (absent_set w c).
 
-Definition fan v wk f c := 
-  uniq (wk::f) /\ 
-  fan_prop_neigh v (wk::f) /\
-  fan_prop_w0 [set v; (last wk f)] c /\
+Definition fan v wk c f := 
+  uniq (wk::f) && 
+  fan_prop_neigh v (wk::f) &&
+  fan_prop_w0 [set v; (last wk f)] c &&
   path (
     fun x2 x1 => fan_prop_absent [set v; x2] x1 c
   ) wk f.
 
-(* Lemma sub_in_fan *)
+(* Definition maximal_fan v c := *)
+
+
 End Fan.
+
+Section Pack.
+Variables (G : sgraph) (ColorType : finType).
+Implicit Types (v w : G) (c : edge_coloring G ColorType).
+
+Section FanDef.
+  Variables (v w : G) (c : edge_coloring G ColorType).
+
+  Record Fan : predArgType := { fval : seq G; _ : fan v w c fval }.
+
+  HB.instance Definition _ := [isSub for fval].
+  HB.instance Definition _ := [Countable of Fan by <:].
+
+End FanDef.
+End Pack.
+
+Definition recolor_edge
+  {G : sgraph} {ColorType : finType}
+  (c : edge_coloring G ColorType)
+  (e0 : {set G})
+  (c0 : ColorType)
+  : edge_coloring G ColorType :=
+  fun e => if e == e0 then c0 else c e.
+
+Lemma recolor_eq
+  {G : sgraph} {ColorType : finType}
+  (c : edge_coloring G ColorType) e0 c0 :
+  (recolor_edge c e0 c0) e0 = c0.
+Proof. by rewrite /recolor_edge eqxx. Qed.
+
+Lemma recolor_neq
+  {G : sgraph} {ColorType : finType}
+  (c : edge_coloring G ColorType) e0 e1 c0 :
+  e1 != e0 ->
+  (recolor_edge c e0 c0) e1 = c e1.
+Proof. by rewrite /recolor_edge => /negPf ->. Qed.
+
+Definition swap_edge
+  {G : sgraph} {ColorType : finType}
+  (c : edge_coloring G ColorType)
+  (e0 e1 : {set G})
+  : edge_coloring G ColorType :=
+  fun e => 
+    if e == e0 then c e1
+    else if e == e1 then c e0
+    else c e. 
+
+Lemma swap_im
+  {G : sgraph} {ColorType : finType}
+  (c : edge_coloring G ColorType)
+  (e0 e1 : {set G}) :
+  e0 \in E(G) ->
+  e1 \in E(G) ->
+  c[E(G)] = (swap_edge c e0 e1)[E(G)].
+Proof.
+  move=> He0 He1; apply/setP => col.
+  apply/imsetP/imsetP; move=> [e2 He2 ->];
+  exists (if e2 == e0 then e1 else if e2 == e1 then e0 else e2) => //;
+  rewrite /swap_edge;
+  case: ifP => [/eqP He | Hne] //.
+  admit.
+  (* case: ifP => H.
+  - exists e1=> //.
+   [/eqP -> | Hne0].
+Qed. *)
+
+  (* apply/imsetP/imsetP; move=> [e He ->]; 
+  exists e => //.
+  rewrite /swap_edge; case: ifP. *)
+Admitted.
+
+Fixpoint rotate_seq
+  {G : sgraph} {ColorType : finType}
+  (c : edge_coloring G ColorType)
+  (v : G)
+  (f : seq G)
+  (prev : G)
+  : edge_coloring G ColorType :=
+  match f with
+  | [::] => c
+  | w :: ws =>
+    rotate_seq
+        (swap_edge c [set v; prev] [set v; w])
+        v ws w
+  end.
+
+Lemma rotate_seq_im
+  {G : sgraph} {ColorType : finType}
+  (c : edge_coloring G ColorType)
+  (v prev : G) (f : seq G) :
+  c @: E{v} =
+  rotate_seq c v f prev @: E{v}.
+Proof.
+  elim: f c prev => [|w ws IH] c prev /=; first by reflexivity.
+Admitted.
+  (* rewrite -(swap_im c [set v; prev] [set v; w]).
+  exact: IH.
+Qed. *)
+
+Section Rotation. 
+Variables (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c).
+
+Definition len : nat := size (val f) + 1.
+
+Definition fan_nodes := locked (wk :: val f).
+
+Definition rot : edge_coloring G ColorType := 
+  let rev_fan := rev fan_nodes in
+  rotate_seq c v rev_fan (head wk rev_fan).
+
+Lemma rot_im :
+  c @: E{v} = rot @: E{v}.
+Proof.
+  rewrite /rot.
+  exact: rotate_seq_im.
+Qed.
+
+(* decide if want single element or set equality *)
+Lemma rot_abs_edge (c0 : ColorType) :
+  c0 \in absent_set v c ->
+  c0 \in absent_set v rot.
+Proof.
+  rewrite/absent_set.
+Admitted.
+
+Lemma rot_single : 
+  len == 1 -> 
+  forall e, c e == rot e.
+Proof.
+Admitted.
+
+Lemma rot_card :
+  #|c @: E(G)| == #|rot @: E(G)|.
+Proof. 
+Admitted.
+
+(* Needs to be fixed in latex, require premise c is proper *)
+Lemma rot_proper : 
+  is_proper_edge_coloring c ->
+  is_proper_edge_coloring rot.
+Proof. 
+Admitted.
+
+End Rotation.
+
+
+ 
