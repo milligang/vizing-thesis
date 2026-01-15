@@ -10,127 +10,160 @@ Set Implicit Arguments.
 Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
+Section EdgeColoring.
+  (* ---- Edge Coloring Functional Definition ---- *)
+  Variables (G : sgraph) (ColorType : finType).
 
-(* ---- Edge Coloring Functional Definition ---- *)
-(* An edge coloring function assigns edges in E(G) to colors *)
-Definition edge_coloring (G : sgraph) (ColorType : finType) : Type := {set G} -> ColorType.
+  (* An edge coloring function assigns edges in E(G) to colors *)
+  Definition edge_coloring : Type := {set G} -> ColorType.
+  Implicit Type (c : edge_coloring).
 
-(* A proper edge coloring is an edge coloring 
-  where no two adjacent edges have the same color *)
-(* Could do x in e1 instead *)
-Definition is_proper_edge_coloring {G : sgraph}
-                                   {ColorType : finType} 
-                                   (c : edge_coloring G ColorType) : Prop := 
-  forall (e1 e2 : {set G}), 
-  e1 \in E(G) -> e2 \in E(G) -> e1 != e2 -> 
-  (exists x, x \in e1 /\ x \in e2) -> c e1 != c e2.
+  (* A proper edge coloring is an edge coloring 
+    where no two adjacent edges have the same color *)
+  (* Could do x in e1 instead *)
+  Definition is_proper_edge_coloring c : Prop := 
+    forall (e1 e2 : {set G}), 
+    e1 \in E(G) -> e2 \in E(G) -> e1 != e2 -> 
+    (exists x, x \in e1 /\ x \in e2) -> c e1 != c e2.
 
-Definition proper_edge_coloring (G : sgraph) (ColorType : finType) : Type :=
-  { c : edge_coloring G ColorType | is_proper_edge_coloring c }.
+  Definition proper_edge_coloring : Type := { c | is_proper_edge_coloring c }.
 
-Coercion proper_to_edge_coloring {G : sgraph} {ColorType : finType} 
-  (pc : proper_edge_coloring G ColorType) : edge_coloring G ColorType :=
-  proj1_sig pc.
+  Coercion proper_to_edge_coloring
+    (pc : proper_edge_coloring) : edge_coloring :=
+    proj1_sig pc.
 
-(* the image under a coloring c of the set of edges E *)
-Definition coloring_image {G : sgraph}
-                          {ColorType : finType}
-                          (E : {set {set G}})
-                          (c : edge_coloring G ColorType) : {set ColorType} := 
-  c @: E.
-Notation "c [ E ]" := (coloring_image E c) (at level 50).
+  (* the image under a coloring c of the set of edges E *)
+  Definition coloring_image c (E : {set {set G}}) : {set ColorType} := c @: E.
+  Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
-Lemma max_colors_at_vertex {G : sgraph} 
-                     {ColorType : finType} 
-                     (v : G)
-                     (c : edge_coloring G ColorType) :
-  #|c[E{v}]| <= max_degree G.
-Proof.
-  apply: (leq_trans (leq_imset_card _ _)).
-  rewrite card_edge_neigh.
-  rewrite /max_degree.
-  exact: leq_bigmax_cond.
-Qed.
+  Lemma max_colors_at_vertex c (v : G) : #|c[E{v}]| <= max_degree G.
+  Proof.
+    apply: (leq_trans (leq_imset_card _ _)).
+    rewrite card_edge_neigh.
+    rewrite /max_degree.
+    exact: leq_bigmax_cond.
+  Qed.
 
-(* ---- Chromatic Index ---- *)
-(* A k-edge-coloring is a proper coloring which uses exactly k colors *)
-Definition k_edge_coloring (G : sgraph) (k : nat) : Type := 
-  { ColorType : finType &
-    { c : proper_edge_coloring G ColorType | #|c[E(G)]| == k } }.
+End EdgeColoring.
+Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
-Coercion k_to_proper_coloring {G : sgraph} {k : nat} 
-  (kc : k_edge_coloring G k) : 
-  proper_edge_coloring G (projT1 kc) :=
-  proj1_sig (projT2 kc).
+Section Recolor.
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
+  Implicit Types (e f : {set G}) (col : ColorType).
 
-Definition k_edge_card {G : sgraph} {k : nat } (c : k_edge_coloring G k) :
-  #|c[E(G)]| == k :=
-  proj2_sig (projT2 c).
+  Definition recolor_edge e col : edge_coloring G ColorType :=
+    fun edge => if edge == e then col else c edge.
 
-(* G is k-colorable if a k-edge-coloring exists. *)
-Definition k_edge_colorable (G : sgraph) (k : nat) : Prop := 
-  inhabited (k_edge_coloring G k).
+  Lemma recolor_eq e col : (recolor_edge e col) e = col.
+  Proof. by rewrite /recolor_edge eqxx. Qed.
 
-(* The chromatic index chi is the smallest k such that G is k-colorable *)
-Definition is_chromatic_index (G : sgraph) (chi : nat) : Prop :=
-  k_edge_colorable G chi /\ forall k, k < chi -> ~ k_edge_colorable G k.
+  Lemma recolor_neq e f col : f != e -> (recolor_edge e col) f = c f.
+  Proof. by rewrite /recolor_edge => /negPf ->. Qed.
 
-(*  Any valid k-edge-colorable upper bounds chi *)
-Lemma chromatic_index_upper_bound (G : sgraph) (chi k : nat) :
-  is_chromatic_index G chi ->
-  k_edge_colorable G k ->
-  chi <= k.
-Proof.
-  move=> [Hchi_color Hchi_min] Hk.
-  rewrite leqNgt.
-  apply/negP => Hlt.
-  have Hneg : ~ k_edge_colorable G k := Hchi_min _ Hlt.
-  exact: Hneg Hk.
-Qed.
+  Definition swap_edge e f : edge_coloring G ColorType :=
+    fun edge => 
+      if edge == e then c f
+      else if edge == f then c e
+      else c edge. 
 
-(* ----  One-to-one Coloring ---- *)
-(* injective coloring: each edge is a color *)
-Definition inj_edge_coloring {G : sgraph} : edge_coloring G {set G} :=
-  fun e => e.
+  Lemma swap_im e f : 
+    e \in E(G) -> 
+    f \in E(G) ->
+    c[E(G)] = (swap_edge e f)[E(G)].
+  Proof.
+    move=> He0 He1; apply/setP => col.
+    apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
+    exists (if e2 == e then f else if e2 == f then e else e2) => //;
+    repeat case: ifP => //; repeat move=> /eqP -> //; try rewrite eq_refl //.
+    - do 2 move=> _ -> //.
+    - move=> _ /eqP -> //.
+  Qed.
 
-(* injective coloring is a proper coloring *)
-Definition proper_inj_coloring {G : sgraph} : proper_edge_coloring G {set G}.
-Proof.
-  exists inj_edge_coloring.
-  move=> e1 e2 _ _ ne _.
-  exact ne.
-Defined.
+End Recolor.
 
-Lemma inj_im {G : sgraph} : proper_inj_coloring[E(G)] = E(G). 
-Proof.
-  apply/setP => e.
-  apply/imsetP/idP.
-  - move=> [e' He' ->].
-    by rewrite /proper_inj_coloring /inj_edge_coloring /=.
-  - move=> He.
-    exists e => //.
-Qed.
+Section ChromIdx.
+  (* ---- Chromatic Index ---- *)
+  Variables (G : sgraph).
+  Implicit Types (k chi : nat).
+  
+  (* A k-edge-coloring is a proper coloring which uses exactly k colors *)
+  Definition k_edge_coloring k : Type := 
+    { ColorType : finType &
+      { c : proper_edge_coloring G ColorType | #|c[E(G)]| == k } }.
 
-(* injective coloring is a k-edge-coloring with k = #|E(G)| *)
-Definition inj_k_coloring {G : sgraph} : k_edge_coloring G #|E(G)|.
-Proof.
-  exists {set G}, proper_inj_coloring. by rewrite inj_im.
-Defined.
+  Coercion k_to_proper_coloring {k} (kc : k_edge_coloring k) : 
+    proper_edge_coloring G (projT1 kc) :=
+    proj1_sig (projT2 kc).
 
-(* Thus, all graphs have a k-edge-coloring with k = #|E(G)|*)
-Lemma inj_chrom (G : sgraph) :
-  k_edge_colorable G #|E(G)|.
-Proof.
-  constructor. exact inj_k_coloring.
-Qed.
+  Definition k_edge_card {k} (kc : k_edge_coloring k) :
+    #|kc[E(G)]| == k :=
+    proj2_sig (projT2 kc).
 
-(* If chi is a chromatic index of G, then chi <= |E(G)| *)
-Corollary chromatic_index_le_edges (G : sgraph) (chi : nat) :
-  is_chromatic_index G chi -> chi <= #|E(G)|.
-Proof.
-  move=> Hchi. 
-  apply (chromatic_index_upper_bound Hchi (inj_chrom G)).
-Qed.
+  (* G is k-colorable if a k-edge-coloring exists. *)
+  Definition k_edge_colorable k : Prop := inhabited (k_edge_coloring k).
+
+  (* The chromatic index chi is the smallest k such that G is k-colorable *)
+  Definition is_chromatic_index chi : Prop :=
+    k_edge_colorable chi /\ forall k, k < chi -> ~ k_edge_colorable k.
+
+  (*  Any valid k-edge-colorable upper bounds chi *)
+  Lemma chromatic_index_upper_bound k chi :
+    is_chromatic_index chi ->
+    k_edge_colorable k ->
+    chi <= k.
+  Proof.
+    move=> [Hchi_color Hchi_min] Hk.
+    rewrite leqNgt.
+    apply/negP => Hlt.
+    have Hneg : ~ k_edge_colorable k := Hchi_min _ Hlt.
+    exact: Hneg Hk.
+  Qed.
+
+  (* ----  One-to-one Coloring ---- *)
+
+  (* injective coloring: each edge is a color *)
+  Definition inj_edge_coloring : edge_coloring G {set G} :=
+    fun e => e.
+
+  (* injective coloring is a proper coloring *)
+  Definition proper_inj_coloring : proper_edge_coloring G {set G}.
+  Proof.
+    exists inj_edge_coloring.
+    move=> e1 e2 _ _ ne _.
+    exact ne.
+  Defined.
+
+  Lemma inj_im : proper_inj_coloring[E(G)] = E(G). 
+  Proof.
+    apply/setP => e.
+    apply/imsetP/idP.
+    - move=> [e' He' ->].
+      by rewrite /proper_inj_coloring /inj_edge_coloring /=.
+    - move=> He.
+      exists e => //.
+  Qed.
+
+  (* injective coloring is a k-edge-coloring with k = #|E(G)| *)
+  Definition inj_k_coloring : k_edge_coloring #|E(G)|.
+  Proof.
+    exists {set G}, proper_inj_coloring. by rewrite inj_im.
+  Defined.
+
+  (* Thus, all graphs have a k-edge-coloring with k = #|E(G)|*)
+  Lemma inj_chrom : k_edge_colorable #|E(G)|.
+  Proof.
+    constructor. exact inj_k_coloring.
+  Qed.
+
+  (* If chi is a chromatic index of G, then chi <= |E(G)| *)
+  Corollary chromatic_index_le_edges (chi : nat) :
+    is_chromatic_index chi -> chi <= #|E(G)|.
+  Proof.
+    move=> Hchi. 
+    apply (chromatic_index_upper_bound Hchi inj_chrom).
+  Qed.
+
+End ChromIdx.
 
 (* ----  Absent Set ---- *)
 Definition absent_set {G : sgraph} {ColorType: finType} 
@@ -146,182 +179,151 @@ Proof.
   rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
   by rewrite subn_gt0 
             (eqP (k_edge_card c)) 
-            (leq_ltn_trans (max_colors_at_vertex v c)) 
+            (leq_ltn_trans (max_colors_at_vertex c v)) 
             // addn1 ltnSn.
 Qed.
 
-(* ---- Fans ---- *)
 Section Fan.
-Variable (G : sgraph) (ColorType : finType).
-Implicit Types (v w : G) (e : {set G}) (f : seq G) (c : edge_coloring G ColorType).
+  (* ---- Fans ---- *)
+  Variable (G : sgraph) (ColorType : finType).
+  Implicit Types (v w : G) (e : {set G}) (f : seq G) (c : edge_coloring G ColorType).
 
-(* 1. For all w in the fan centered at v, w is in the neighborhood of v *)
-Definition fan_prop_neigh v f := all (fun w => w \in N(v)) f.
+  (* 1. For all w in the fan centered at v, w is in the neighborhood of v *)
+  Definition neigh_prop v f := all (fun w => w \in N(v)) f.
 
-(* 2. if w0 is the first item in fan f centered at v under coloring c,
-  (v, w0) is a distinct color from the rest of the edges in the graph *)
-Definition fan_prop_w0 e c := 
-  [forall (h : {set G} | (h \in E(G)) && (e != h)), c e != c h].
+  (* 2. if w0 is the first item in fan f centered at v under coloring c,
+    (v, w0) is a distinct color from the rest of the edges in the graph *)
+  Definition w0_prop e c := 
+    [forall (h : {set G} | (h \in E(G)) && (e != h)), c e != c h].
 
-(* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
-  the color of (v, w_{i+1} is absent at w_i) *)
-Definition fan_prop_absent e w c := 
-  (c e) \in (absent_set w c).
+  (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
+    the color of (v, w_{i+1} is absent at w_i) *)
+  Definition absent_prop e w c := 
+    (c e) \in (absent_set w c).
 
-Definition fan v wk c f := 
-  uniq (wk::f) && 
-  fan_prop_neigh v (wk::f) &&
-  fan_prop_w0 [set v; (last wk f)] c &&
-  path (
-    fun x2 x1 => fan_prop_absent [set v; x2] x1 c
-  ) wk f.
+  Definition fanp v wk c f := 
+    uniq (wk::f) && 
+    neigh_prop v (wk::f) &&
+    w0_prop [set v; (last wk f)] c &&
+    path (
+      fun x2 x1 => absent_prop [set v; x2] x1 c
+    ) wk f.
 
-(* Definition maximal_fan v c := *)
+  Lemma fanp_neigh v wk c f : fanp v wk c f -> neigh_prop v (wk::f).
+  Proof. by case/andP => /andP [/andP [_ ->] _] _. Qed.
 
+  (* Definition maximal_fan v c := *)
 
 End Fan.
 
 Section Pack.
-Variables (G : sgraph) (ColorType : finType).
-Implicit Types (v w : G) (c : edge_coloring G ColorType).
+  Variables (G : sgraph) (ColorType : finType).
+  Implicit Types (v w : G) (c : edge_coloring G ColorType).
 
-Section FanDef.
-  Variables (v w : G) (c : edge_coloring G ColorType).
+  Section FanDef.
+    Variables (v w : G) (c : edge_coloring G ColorType).
 
-  Record Fan : predArgType := { fval : seq G; _ : fan v w c fval }.
+    Record Fan : predArgType := { fval : seq G; _ : fanp v w c fval }.
 
-  HB.instance Definition _ := [isSub for fval].
-  HB.instance Definition _ := [Countable of Fan by <:].
+    HB.instance Definition _ := [isSub for fval].
+    HB.instance Definition _ := [Countable of Fan by <:].
 
-End FanDef.
+  End FanDef.
 End Pack.
 
-Definition recolor_edge
-  {G : sgraph} {ColorType : finType}
-  (c : edge_coloring G ColorType)
-  (e0 : {set G})
-  (c0 : ColorType)
-  : edge_coloring G ColorType :=
-  fun e => if e == e0 then c0 else c e.
-
-Lemma recolor_eq
-  {G : sgraph} {ColorType : finType}
-  (c : edge_coloring G ColorType) e0 c0 :
-  (recolor_edge c e0 c0) e0 = c0.
-Proof. by rewrite /recolor_edge eqxx. Qed.
-
-Lemma recolor_neq
-  {G : sgraph} {ColorType : finType}
-  (c : edge_coloring G ColorType) e0 e1 c0 :
-  e1 != e0 ->
-  (recolor_edge c e0 c0) e1 = c e1.
-Proof. by rewrite /recolor_edge => /negPf ->. Qed.
-
-Definition swap_edge
-  {G : sgraph} {ColorType : finType}
-  (c : edge_coloring G ColorType)
-  (e0 e1 : {set G})
-  : edge_coloring G ColorType :=
-  fun e => 
-    if e == e0 then c e1
-    else if e == e1 then c e0
-    else c e. 
-
-Lemma swap_im
-  {G : sgraph} {ColorType : finType}
-  (c : edge_coloring G ColorType)
-  (e0 e1 : {set G}) :
-  e0 \in E(G) ->
-  e1 \in E(G) ->
-  c[E(G)] = (swap_edge c e0 e1)[E(G)].
-Proof.
-  move=> He0 He1; apply/setP => col.
-  apply/imsetP/imsetP; move=> [e2 He2 ->];
-  exists (if e2 == e0 then e1 else if e2 == e1 then e0 else e2) => //;
-  rewrite /swap_edge;
-  case: ifP => [/eqP He | Hne] //.
-  admit.
-  (* case: ifP => H.
-  - exists e1=> //.
-   [/eqP -> | Hne0].
-Qed. *)
-
-  (* apply/imsetP/imsetP; move=> [e He ->]; 
-  exists e => //.
-  rewrite /swap_edge; case: ifP. *)
-Admitted.
-
-Fixpoint rotate_seq
+(* Could update this to take in an actual fan, then don't need first match
+  case because fans always have at least one element, but would need to prove this.
+  this allows us to be more general at least. *)
+Fixpoint rotate
   {G : sgraph} {ColorType : finType}
   (c : edge_coloring G ColorType)
   (v : G)
-  (f : seq G)
-  (prev : G)
+  (fs : seq G)
   : edge_coloring G ColorType :=
-  match f with
+  match fs with
+  | w0 :: ws =>
+    match ws with
+    | w1::wss =>
+      rotate
+          (swap_edge c [set v; w0] [set v; w1])
+          v ws
+    | [::] => c
+    end
   | [::] => c
-  | w :: ws =>
-    rotate_seq
-        (swap_edge c [set v; prev] [set v; w])
-        v ws w
   end.
 
-Lemma rotate_seq_im
+Lemma rotate_im
   {G : sgraph} {ColorType : finType}
   (c : edge_coloring G ColorType)
-  (v prev : G) (f : seq G) :
-  c @: E{v} =
-  rotate_seq c v f prev @: E{v}.
+  (v : G) (fs : seq G) :
+  neigh_prop v fs ->
+  c @: E(G) =
+  rotate c v fs @: E(G).
 Proof.
-  elim: f c prev => [|w ws IH] c prev /=; first by reflexivity.
-Admitted.
-  (* rewrite -(swap_im c [set v; prev] [set v; w]).
-  exact: IH.
-Qed. *)
-
-Section Rotation. 
-Variables (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c).
-
-Definition len : nat := size (val f) + 1.
-
-Definition fan_nodes := locked (wk :: val f).
-
-Definition rot : edge_coloring G ColorType := 
-  let rev_fan := rev fan_nodes in
-  rotate_seq c v rev_fan (head wk rev_fan).
-
-Lemma rot_im :
-  c @: E{v} = rot @: E{v}.
-Proof.
-  rewrite /rot.
-  exact: rotate_seq_im.
+  elim: fs c => [|w0 ws IH] c //= /andP [Hw0 Hws].
+  case: ws IH Hws=> [| w1 wss IH] Hws //.
+  rewrite -(IH (swap_edge c [set v; w0] [set v; w1])) //.
+  move/andP: Hws => [Hw1 _].
+  have He0 : [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
+  have He1 : [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
+  exact: swap_im He0 He1.
 Qed.
 
-(* decide if want single element or set equality *)
-Lemma rot_abs_edge (c0 : ColorType) :
-  c0 \in absent_set v c ->
-  c0 \in absent_set v rot.
-Proof.
-  rewrite/absent_set.
-Admitted.
+Section Rotation. 
+  Variables (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c).
 
-Lemma rot_single : 
-  len == 1 -> 
-  forall e, c e == rot e.
-Proof.
-Admitted.
+  Lemma fan_neigh: neigh_prop v (wk::val f).
+  Proof. move: (valP f). exact: fanp_neigh. Qed.
 
-Lemma rot_card :
-  #|c @: E(G)| == #|rot @: E(G)|.
-Proof. 
-Admitted.
+  Lemma in_neigh (w : G) : w \in wk::val f -> w \in N(v).
+  Proof. 
+    move: fan_neigh; rewrite/neigh_prop=> /all_filterP <-.
+    by rewrite mem_filter => /andP [-> _].
+  Qed.
 
-(* Needs to be fixed in latex, require premise c is proper *)
-Lemma rot_proper : 
-  is_proper_edge_coloring c ->
-  is_proper_edge_coloring rot.
-Proof. 
-Admitted.
+  Definition rotateF : edge_coloring G ColorType :=
+    rotate c v (rev (wk::val f)).
+
+  Lemma rotate_imF : c @: E(G) = rotateF @: E(G).
+  Proof.
+    rewrite/rotateF; set fs := (rev (wk::val f)).
+    elim: fs c=> [|w0 ws IH] d //=.
+    case: ws IH=> [|w1 wss IH] //.
+    rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //.
+    have Hw0 : w0 \in N(v) by rewrite in_neigh; admit.
+    have Hw1 : w1 \in N(v) by rewrite in_neigh; admit.
+    have He0 : [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
+    have He1 : [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
+    exact: swap_im He0 He1.
+  Admitted.
+
+  (* decide if want single element or set equality *)
+  Lemma rot_abs_edge (c0 : ColorType) :
+    c0 \in absent_set v c ->
+    c0 \in absent_set v rotateF.
+  Proof.
+    rewrite/absent_set.
+  Admitted.
+
+  Definition len : nat := size (val f) + 1.
+
+  Lemma rot_single : 
+    len == 1 -> 
+    forall e, c e == rotateF e.
+  Proof.
+  Admitted.
+
+  Lemma rot_card :
+    #|c @: E(G)| == #|rotateF @: E(G)|.
+  Proof. 
+  Admitted.
+
+  (* Needs to be fixed in latex, require premise c is proper *)
+  Lemma rot_proper : 
+    is_proper_edge_coloring c ->
+    is_proper_edge_coloring rotateF.
+  Proof. 
+  Admitted.
 
 End Rotation.
 
