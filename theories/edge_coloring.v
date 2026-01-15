@@ -79,6 +79,11 @@ Section Recolor.
     - move=> _ /eqP -> //.
   Qed.
 
+  Lemma swap_im_vertex e f (v : G) :
+    v \in e -> v \in f -> c[E{v}] = (swap_edge e f)[E{v}].
+  Proof.
+  Admitted.
+
 End Recolor.
 
 Section ChromIdx.
@@ -198,7 +203,7 @@ Section Fan.
 
   (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
     the color of (v, w_{i+1} is absent at w_i) *)
-  Definition absent_prop e w c := 
+  Definition absent_prop c e w := 
     (c e) \in (absent_set w c).
 
   Definition fanp v wk c f := 
@@ -206,7 +211,7 @@ Section Fan.
     neigh_prop v (wk::f) &&
     w0_prop [set v; (last wk f)] c &&
     path (
-      fun x2 x1 => absent_prop [set v; x2] x1 c
+      fun x2 x1 => absent_prop c [set v; x2] x1
     ) wk f.
 
   Lemma fanp_neigh v wk c f : fanp v wk c f -> neigh_prop v (wk::f).
@@ -230,6 +235,20 @@ Section Pack.
 
   End FanDef.
 End Pack.
+
+Definition fan_nodes 
+  (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c) 
+  := wk :: val f.
+
+(* Definition in_fan_nodes 
+  (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c) 
+  : collective_pred G := 
+  [pred u | u \in fan_nodes f].
+Canonical Fan_predType 
+  (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c)  
+  := Eval hnf in @PredType G 
+      (Fan v wk c) (@in_fan_nodes G ColorType v wk c).
+Coercion in_fan_nodes : Fan >-> collective_pred. *)
 
 (* Could update this to take in an actual fan, then don't need first match
   case because fans always have at least one element, but would need to prove this.
@@ -257,8 +276,7 @@ Lemma rotate_im
   (c : edge_coloring G ColorType)
   (v : G) (fs : seq G) :
   neigh_prop v fs ->
-  c @: E(G) =
-  rotate c v fs @: E(G).
+  c[E(G)] = rotate c v fs [E(G)].
 Proof.
   elim: fs c => [|w0 ws IH] c //= /andP [Hw0 Hws].
   case: ws IH Hws=> [| w1 wss IH] Hws //.
@@ -272,57 +290,50 @@ Qed.
 Section Rotation. 
   Variables (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c).
 
-  Lemma fan_neigh: neigh_prop v (wk::val f).
-  Proof. move: (valP f). exact: fanp_neigh. Qed.
+  Lemma fan_neigh : neigh_prop v (fan_nodes f).
+  Proof. move: (valP f). rewrite/fan_nodes. exact: fanp_neigh. Qed.
 
-  Lemma in_neigh (w : G) : w \in wk::val f -> w \in N(v).
+  Lemma in_neigh (w : G) : w \in (wk::val f) -> w \in N(v).
   Proof. 
-    move: fan_neigh; rewrite/neigh_prop=> /all_filterP <-.
-    by rewrite mem_filter => /andP [-> _].
+    move: fan_neigh; rewrite/neigh_prop=> /allP H. exact: H.
   Qed.
 
   Definition rotateF : edge_coloring G ColorType :=
     rotate c v (rev (wk::val f)).
 
-  Lemma rotate_imF : c @: E(G) = rotateF @: E(G).
+  Lemma rorate_imF_vertex : c[E{v}] = rotateF[E{v}].
   Proof.
     rewrite/rotateF; set fs := (rev (wk::val f)).
     elim: fs c=> [|w0 ws IH] d //=.
     case: ws IH=> [|w1 wss IH] //.
     rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //.
-    have Hw0 : w0 \in N(v) by rewrite in_neigh; admit.
-    have Hw1 : w1 \in N(v) by rewrite in_neigh; admit.
-    have He0 : [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
-    have He1 : [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
-    exact: swap_im He0 He1.
-  Admitted.
+    have Hv0 : v \in [set v; w0] by rewrite in_set2 eq_refl.
+    have Hv1 : v \in [set v; w1] by rewrite in_set2 eq_refl.
+    exact: swap_im_vertex Hv0 Hv1.
+  Qed.
 
-  (* decide if want single element or set equality *)
-  Lemma rot_abs_edge (c0 : ColorType) :
-    c0 \in absent_set v c ->
-    c0 \in absent_set v rotateF.
+  Lemma rotate_imF : c[E(G)] = rotateF[E(G)].
   Proof.
-    rewrite/absent_set.
-  Admitted.
-
-  Definition len : nat := size (val f) + 1.
-
-  Lemma rot_single : 
-    len == 1 -> 
-    forall e, c e == rotateF e.
-  Proof.
-  Admitted.
+     (* could use rotate_im, but would be nice to remove that
+     lemma entirely and just have this one  *)
+  Admitted. 
 
   Lemma rot_card :
-    #|c @: E(G)| == #|rotateF @: E(G)|.
-  Proof. 
-  Admitted.
+    #|c[E(G)]| == #|rotateF[E(G)]|.
+  Proof. by rewrite rotate_imF. Qed.
+
+  Lemma rot_abs_edge : absent_set v c = absent_set v rotateF.
+  Proof.
+    by rewrite/absent_set rotate_imF rorate_imF_vertex.
+  Qed.
 
   (* Needs to be fixed in latex, require premise c is proper *)
+  (* Thought: use other rotate definition for this, then prove equivalence of the two *)
   Lemma rot_proper : 
     is_proper_edge_coloring c ->
     is_proper_edge_coloring rotateF.
-  Proof. 
+  Proof.
+    rewrite/is_proper_edge_coloring=> Hprop e1 e2 He1 He2 Hneq Hx.
   Admitted.
 
 End Rotation.
