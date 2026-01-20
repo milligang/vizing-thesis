@@ -1,6 +1,6 @@
 # About
 
-To date, we have found no public proof of Vizing's Theorem in Rocq or Lean. 
+To date, we have found no public proof of Vizing's Theorem in Rocq. 
 This is a key theorem for edge colorings in graphs; hence, the purpose of this repository is to provide a proof for Vizing's Theorem in Rocq, as an extension of the graph-theory Rocq library.
 
 ## Files and folders 
@@ -18,4 +18,5 @@ In our case, we use Rocq version 9.0.1 compiled with OCaml 4.14.2.
 ## Authors and contact information
 
 - Milligan Grinstead ([**@milligang**](https://github.com/milligang))
+
 
