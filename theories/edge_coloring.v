@@ -207,7 +207,7 @@ Section Fan.
     (c e) \in (absent_set w c).
 
   Definition fanp v wk c f := 
-    uniq (wk::f) && 
+    uniq (wk::f) &&
     neigh_prop v (wk::f) &&
     w0_prop [set v; (last wk f)] c &&
     path (
@@ -216,8 +216,6 @@ Section Fan.
 
   Lemma fanp_neigh v wk c f : fanp v wk c f -> neigh_prop v (wk::f).
   Proof. by case/andP => /andP [/andP [_ ->] _] _. Qed.
-
-  (* Definition maximal_fan v c := *)
 
 End Fan.
 
@@ -288,15 +286,25 @@ Proof.
 Qed.
 
 Section Rotation. 
-  Variables (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c).
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v wk : G) (f : Fan v wk c).
+  Implicit Type (w : G).
 
   Lemma fan_neigh : neigh_prop v (fan_nodes f).
   Proof. move: (valP f). rewrite/fan_nodes. exact: fanp_neigh. Qed.
 
-  Lemma in_neigh (w : G) : w \in (wk::val f) -> w \in N(v).
+  Lemma in_neigh w : w \in (wk::val f) -> w \in N(v).
   Proof. 
     move: fan_neigh; rewrite/neigh_prop=> /allP H. exact: H.
   Qed.
+
+  Definition valid_fan_vertex w :=
+    (w \in N(v)) && absent_prop c [set v; w] v && (w \notin wk::val f).
+
+  Definition extendFan : seq G := 
+    match [pick w in N(v) | valid_fan_vertex w] with
+    | Some w => w::wk::val f
+    | None => wk::val f
+    end.
 
   Definition rotateF : edge_coloring G ColorType :=
     rotate c v (rev (wk::val f)).
@@ -318,6 +326,38 @@ Section Rotation.
      lemma entirely and just have this one  *)
   Admitted. 
 
+  Definition rotHelper 
+    (u : G) 
+    (col_wOpt : (option G * edge_coloring G ColorType)) :=
+    (Some u, 
+      let (wOpt, d) := col_wOpt in 
+      match wOpt with
+      | None => d
+      | Some w => (swap_edge d [set v; u] [set v; w])
+      end).
+
+  Definition rotate2 : edge_coloring G ColorType :=
+    snd (foldr rotHelper (None, c) (wk::val f)).
+  
+  Lemma rotate2_im : c[E(G)] = rotate2[E(G)].
+  Proof.
+    rewrite /rotate2. move: (wk::val f) => fs.
+    elim: fs c => [|w0 ws IH] d //=.
+    rewrite IH; set rot := (foldr rotHelper (None, d) ws).
+    case: rot => [[w1| ] d0] //=.
+  Admitted.
+
+  Lemma rotate2_im_vert : c[E{v}] = rotate2[E{v}].
+  Proof. 
+    rewrite/rotate2; move: (wk::val f) => fs.
+    elim: fs c => [|w0 ws IH] d //=.
+    rewrite IH; set rot := (foldr rotHelper (None, d) ws).
+    case: rot => [[w1| ] d0] //=.
+    have Hv0 : v \in [set v; w0] by rewrite in_set2 eq_refl.
+    have Hv1 : v \in [set v; w1] by rewrite in_set2 eq_refl.
+    exact: swap_im_vertex Hv0 Hv1.
+  Qed.
+
   Lemma rot_card :
     #|c[E(G)]| == #|rotateF[E(G)]|.
   Proof. by rewrite rotate_imF. Qed.
@@ -338,5 +378,62 @@ Section Rotation.
 
 End Rotation.
 
+Section AltPath.
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
+  Implicit Types (x y : G) (p : seq G) (ca cb : ColorType).
 
+  Fixpoint alternates p ca cb : bool := 
+    match p with 
+    | x::p' =>
+      match p' with 
+      | y::p'' => (c [set x; y] == ca) && alternates p' cb ca
+      | _ => true
+      end
+    | _ => true
+    end.
+  
+    Definition alt_path x y p ca cb := 
+    alternates (x::p) ca cb && pathp x y p.
+
+  Lemma alt_pathW x y p ca cb : alt_path x y p ca cb -> pathp x y p.
+  Proof. by case/andP. Qed.
+  
+  Lemma alt_pathWW x y p ca cb : alt_path x y p ca cb -> path (--) x p.
+  Proof. by move/alt_pathW/pathpW. Qed.
+
+End AltPath.  
+
+Section Pack.
+  Variables (G : sgraph) (ColorType : finType).
+  Implicit Types x y : G.
+  
+  Section AltPathDef.
+    Variables (x y : G) (ca cb : ColorType) (c : edge_coloring G ColorType).
+  
+    Record AltPath : predArgType := { aval : seq G; _ : alt_path c x y aval ca cb }.
+  
+    HB.instance Definition _ := [isSub for aval].
+    HB.instance Definition _ := [Countable of AltPath by <:].
+  
+  End AltPathDef.
+End Pack.
+
+Section Kempe.
+  Variables (G : sgraph) (x y : G) (ColorType : finType) (ca cb : ColorType) (c : edge_coloring G ColorType) (p : AltPath x y ca cb c).
+
+  Definition next_col : ColorType :=
+    let fix next ca' cb' pth := 
+      match pth with 
+        | [::] => cb'
+        | hd::tl => next cb' ca' tl
+      end in 
+    next ca cb (x::val p).
+
+  Definition next_alt_vertex v :=
+    (v \in N(y)) && (next_col == c [set v; y]).
+
+  Definition extendPath := 
+    [pick v in N(y) | next_alt_vertex v].
+
+End Kempe.
  
