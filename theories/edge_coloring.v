@@ -179,35 +179,29 @@ Section ChromIdx.
   (*Definition tmp : nat.
     destruct chromatic_index_exists as [n foo].
     Check chromatic_index_exists.
-*)
-
+  *)
 End ChromIdx.
 
-(* Definition foo : sgraph -> nat.
- intros.
- specialize (chromatic_index_exists X) as H.
- destruct H. *)
+Section AbsentSet.
+  Definition absent_set {G : sgraph} {ColorType: finType} 
+    (v : G) (c : edge_coloring G ColorType) :=
+    setD (c[E(G)]) (c[E{v}]).
 
-(* ----  Absent Set ---- *)
-Definition absent_set {G : sgraph} {ColorType: finType} 
-  (v : G) (c : edge_coloring G ColorType) :=
-  setD (c[E(G)]) (c[E{v}]).
-
-Proposition exists_absent_color (G : sgraph) :
-  k_edge_colorable G (max_degree G + 1) ->
-  exists c : k_edge_coloring G (max_degree G + 1),
-  forall v : G, absent_set v c != set0.
-Proof.
-  move=> [c]; exists c => v.
-  rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
-  by rewrite subn_gt0 
-            (eqP (k_edge_card c)) 
-            (leq_ltn_trans (max_colors_at_vertex c v)) 
-            // addn1 ltnSn.
-Qed.
+  Proposition exists_absent_color (G : sgraph) :
+    k_edge_colorable G (max_degree G + 1) ->
+    exists c : k_edge_coloring G (max_degree G + 1),
+    forall v : G, absent_set v c != set0.
+  Proof.
+    move=> [c]; exists c => v.
+    rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
+    by rewrite subn_gt0 
+              (eqP (k_edge_card c)) 
+              (leq_ltn_trans (max_colors_at_vertex c v)) 
+              // addn1 ltnSn.
+  Qed.
+End AbsentSet.
 
 Section Fan.
-  (* ---- Fans ---- *)
   Variable (G : sgraph) (ColorType : finType).
   Implicit Types (v w : G) (e : {set G}) (f : seq G) (c : edge_coloring G ColorType).
 
@@ -438,9 +432,18 @@ Section AltPath.
   Proof. 
   Admitted.
 
-  Lemma altpath_cons ca cb x y z p : 
+  (* Lemma altpath_cons ca cb x y z p : 
     altpath ca cb x y (z :: p) =
     [&& x -- z, c [set x; z] == ca & altpath cb ca z y p].
+  Proof. 
+    by rewrite /altpath alternate_cons pathp_cons andbCA -andbA.
+  Qed. *)
+
+  Lemma altpath_cons ca cb x y z p : 
+    x -- z ->
+    c [set x; z] == ca ->
+    altpath cb ca z y p ->
+    altpath ca cb x y (z :: p).
   Proof. 
     by rewrite /altpath alternate_cons pathp_cons andbCA -andbA.
   Qed.
@@ -462,43 +465,48 @@ Section Pack.
   End AltPathDef.
 End Pack.
 
+(* singleton path *)
+Definition idap {G : sgraph} (ColorType : finType) (c : edge_coloring G ColorType) (ca cb : ColorType) (x : G) : AltPath c ca cb x x := Build_AltPath (altpathxx c ca cb x).
+
 Section Kempe.
-  Variables (G : sgraph) (x y : G) (ColorType : finType) (ca cb : ColorType) (c : edge_coloring G ColorType).
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (ca cb : ColorType) (x y : G).
   Implicit Type (v : G) (ap : AltPath c ca cb x y) (p : Path x y).
 
-  Definition next_col ap : ColorType :=
+  (* Definition next_col ap : ColorType :=
     let fix next ca' cb' pth := 
       match pth with 
         | [::] => cb'
         | _::tl => next cb' ca' tl
       end in 
-    next ca cb (x::val ap).
-
-  (* singleton path *)
-  Definition idap ca cb x : AltPath c ca cb x x := Build_AltPath (altpathxx c ca cb x).
+    next ca cb (x::val ap). *)
 
   (* Convert path to altpath if path alternates ca cb *)
   Definition altpath_of p (AH : alternates c ca cb (x :: val p)) : AltPath c ca cb x y := 
     Sub (val p) (path_altpath AH).
-  
-  (* Definition apcons_proof := altpath_cons (valP p) (valP q). *)
-  (* Definition apcons : AltPath c ca cb x y := Sub (val p ++ val q) pcat_proof. *)
 
-  Definition next_alt_vertex v ap :=
-    (v \in N(y)) && (c [set v; y] == next_col ap).
+  Definition acons {v} (vx : v -- x) Hc ap := Build_AltPath (altpath_cons vx Hc (valP ap)).
+
+  (* Given an alternating ca cb xy-path, the next vertex after x must be color cb
+    to have an alternating cb ca path *)
 
   (* Todo: concat path for Some v; recursively call extend_path *)
   (* Careful of cycles, either require that ca is in the absent
   set of the first vertex in p or update valid_alt for uniqueness*)
-  Definition extend_path ap := 
-    match [pick v in N(y) | next_alt_vertex v ap] with 
-    | None => ap
-    | Some v => ap (* add v to the AltPath *)
+
+  Definition extend_path ap : option {w : G & AltPath c cb ca w y} := 
+    match pickP (fun v => (v \in N(x)) && (c [set v; x] == cb)) with
+    | Pick v Pv =>
+        let Hv := prev_edge_proof (eq_rect (v \in N(x)) is_true (andP Pv).1 (x -- v) (in_opn v x)) in
+        let Hc := (andP Pv).2 in
+        Some (existT _ v (acons Hv Hc ap))
+    | Nopick _ => None
     end.
 
   Definition kempe_chain v := extend_path (idp v).
 
 End Kempe.
+
+(* Lemma tmp : |c[E(G)]| == max_degree G + 2 -> *)
 
 Theorem Vizings (G : sgraph) : 
   is_chromatic_index chi -> 
