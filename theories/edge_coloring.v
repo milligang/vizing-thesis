@@ -279,7 +279,7 @@ Fixpoint rotate
     | [::] => c
     end
   | [::] => c
-  end.
+  end. 
 
 Lemma rotate_im
   {G : sgraph} {ColorType : finType}
@@ -288,8 +288,8 @@ Lemma rotate_im
   neigh_prop v fs ->
   c[E(G)] = rotate c v fs [E(G)].
 Proof.
-  elim: fs c => [|w0 ws IH] c //= /andP [Hw0 Hws].
-  case: ws IH Hws=> [| w1 wss IH] Hws //.
+  elim: fs c=> [|w0 ws IH] c //= /andP [Hw0 Hws].
+  case: ws IH Hws=> [|w1 wss IH] Hws //.
   rewrite -(IH (swap_edge c [set v; w0] [set v; w1])) //.
   move/andP: Hws => [Hw1 _].
   have He0 : [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
@@ -390,7 +390,7 @@ Section Rotation.
 
 End Rotation.
 
-Fixpoint alternates 
+Fixpoint alternates
   {G : sgraph} {ColorType : finType} 
   (c : edge_coloring G ColorType) (ca cb : ColorType) (p : seq G) : bool := 
     match p with 
@@ -407,7 +407,7 @@ Section AltPath.
   Implicit Types (x y : G) (p : seq G) (ca cb : ColorType).
   
   Definition altpath ca cb x y p := 
-    alternates c ca cb (x::p) && pathp x y p.
+    (alternates c ca cb (x::p) || alternates c cb ca (x::p))  && pathp x y p.
 
   Lemma altpathW ca cb x y p : altpath ca cb x y p -> pathp x y p.
   Proof. by case/andP. Qed.
@@ -415,16 +415,20 @@ Section AltPath.
   Lemma altpathWW ca cb x y p : altpath ca cb x y p -> path (--) x p.
   Proof. by move/altpathW/pathpW. Qed.
 
-  Lemma altpathxx ca cb x : altpath ca cb x x [::].
+  Lemma altpathxx ca cb x : altpath ca cb x x [ ::].
   Proof.
     apply/andP; split => //.
   Qed.
 
   Lemma path_altpath {x y} ca cb (pth : Path x y) : 
-    alternates c ca cb (x :: val pth) -> altpath ca cb x y (val pth).
+    alternates c ca cb (x :: val pth) || alternates c cb ca (x :: val pth) 
+    -> altpath ca cb x y (val pth).
   Proof. 
     move => Ap. apply/andP; split=> //. exact: valP pth.
   Qed.
+
+  Definition next_col {ca cb x y p} (ap : altpath ca cb x y p) :=
+    if alternates c ca cb (x :: p) then cb else ca.
 
   Lemma alternate_cons ca cb x y p :
    alternates c ca cb (x::y::p) = 
@@ -439,16 +443,17 @@ Section AltPath.
     by rewrite /altpath alternate_cons pathp_cons andbCA -andbA.
   Qed. *)
 
-  Lemma altpath_cons ca cb x y z p : 
-    x -- z ->
-    c [set x; z] == ca ->
-    altpath cb ca z y p ->
-    altpath ca cb x y (z :: p).
+  Lemma altpath_cons {ca cb y z p} x (ap : altpath ca cb y z p) : 
+    x -- y ->
+    c [set x; y] == next_col ap ->
+    altpath ca cb x z (y :: p).
   Proof. 
-    by rewrite /altpath alternate_cons pathp_cons andbCA -andbA.
+    move: ap;
+    by rewrite /altpath pathp_cons 2!alternate_cons /next_col=> /andP[/orP[->|->] ->] -> Hc;
+    first rewrite Hc; last case: ifP Hc=> _ ->.
   Qed.
 
-End AltPath.  
+End AltPath. 
 
 Section Pack.
   Variables (G : sgraph) (ColorType : finType).
@@ -465,44 +470,36 @@ Section Pack.
   End AltPathDef.
 End Pack.
 
-(* singleton path *)
-Definition idap {G : sgraph} (ColorType : finType) (c : edge_coloring G ColorType) (ca cb : ColorType) (x : G) : AltPath c ca cb x x := Build_AltPath (altpathxx c ca cb x).
-
 Section Kempe.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (ca cb : ColorType) (x y : G).
-  Implicit Type (v : G) (ap : AltPath c ca cb x y) (p : Path x y).
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (ca cb : ColorType).
+  Implicit Types (x y z : G).
+  
+  (* singleton path *)
+  Definition idap x : AltPath c ca cb x x := Build_AltPath (altpathxx c ca cb x).
 
-  (* Definition next_col ap : ColorType :=
-    let fix next ca' cb' pth := 
-      match pth with 
-        | [::] => cb'
-        | _::tl => next cb' ca' tl
-      end in 
-    next ca cb (x::val ap). *)
+  (* Convert from path to altpath *)
+  (* Definition apath_of {x y} (p : Path x y) (AH : alternates c ca cb (x :: val p)) : AltPath c ca cb x y := 
+    Sub (val p) (path_altpath AH). *)
 
-  (* Convert path to altpath if path alternates ca cb *)
-  Definition altpath_of p (AH : alternates c ca cb (x :: val p)) : AltPath c ca cb x y := 
-    Sub (val p) (path_altpath AH).
+  Definition apcons {x y z} (ap : AltPath c ca cb y z) (xy : x -- y) (Hc : c [set x; y] == next_col (valP ap)) := Build_AltPath (altpath_cons xy Hc).
 
-  Definition acons {v} (vx : v -- x) Hc ap := Build_AltPath (altpath_cons vx Hc (valP ap)).
-
-  (* Given an alternating ca cb xy-path, the next vertex after x must be color cb
-    to have an alternating cb ca path *)
-
-  (* Todo: concat path for Some v; recursively call extend_path *)
-  (* Careful of cycles, either require that ca is in the absent
-  set of the first vertex in p or update valid_alt for uniqueness*)
-
-  Definition extend_path ap : option {w : G & AltPath c cb ca w y} := 
-    match pickP (fun v => (v \in N(x)) && (c [set v; x] == cb)) with
+  Definition apextend {x y} (ap : AltPath c ca cb x y) : option {w & AltPath c ca cb w y} := 
+    match pickP (fun v => (v \in N(x)) && (c [set v; x] == next_col (valP ap))) with
     | Pick v Pv =>
         let Hv := prev_edge_proof (eq_rect (v \in N(x)) is_true (andP Pv).1 (x -- v) (in_opn v x)) in
         let Hc := (andP Pv).2 in
-        Some (existT _ v (acons Hv Hc ap))
+        Some (existT _ v (apcons Hv Hc))
     | Nopick _ => None
     end.
+  
+  (* Careful of cycles, either require that ca is in the absent
+  set of the first vertex in p or update valid_alt for uniqueness*)
+  Fixpoint apmax {x y} (ap : AltPath c ca cb x y) : {v : G & AltPath c ca cb v y} :=
+    if apextend ap is Some (existT v ap') 
+    then apmax ap'
+    else existT _ x ap.
 
-  Definition kempe_chain v := extend_path (idp v).
+  Definition kempe x := apmax (idap x).
 
 End Kempe.
 
