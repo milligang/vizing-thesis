@@ -28,6 +28,8 @@ Section EdgeColoring.
 
   Definition proper_edge_coloring : Type := { c | is_proper_edge_coloring c }.
 
+  Definition prop (pc : proper_edge_coloring) := proj2_sig pc.
+
   Coercion proper_to_edge_coloring
     (pc : proper_edge_coloring) : edge_coloring :=
     proj1_sig pc.
@@ -51,14 +53,43 @@ Section Recolor.
   Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
   Implicit Types (e f : {set G}) (col : ColorType).
 
-  Definition recolor_edge e col : edge_coloring G ColorType :=
-    fun edge => if edge == e then col else c edge.
+  Definition recolor_edge e c0 : edge_coloring G ColorType :=
+    fun edge => if edge == e then c0 else c edge.
 
-  Lemma recolor_eq e col : (recolor_edge e col) e = col.
+  Lemma recolor_eq e c0 : (recolor_edge e c0) e = c0.
   Proof. by rewrite /recolor_edge eqxx. Qed.
 
-  Lemma recolor_neq e f col : f != e -> (recolor_edge e col) f = c f.
+  Lemma recolor_neq e f c0 : f != e -> (recolor_edge e c0) f = c f.
   Proof. by rewrite /recolor_edge => /negPf ->. Qed.
+
+  Lemma recolor_im e c0 : 
+    c[E(del_edges e)] = recolor_edge e c0 [E(del_edges e)].
+  Proof.
+    apply/setP => c1.
+    by apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /recolor_edge;
+    exists e2 => //; case: ifP => /eqP Heq //;
+    rewrite Heq in He2; move: (del_edgesN e); rewrite -in_setC => /setCP.
+  Qed.
+
+  Lemma del_edges_col c0 e : 
+    (c0 \in c[E(G)]) ->
+    (c0 != c e) ->
+    (c0 \in c[E(del_edges e)]).
+  Proof.
+  Admitted.
+
+  Lemma replace_col c0 e : 
+    e \in E(G) ->  
+    c0 \in c[E(del_edges e)] ->
+    c e \notin c[E(del_edges e)] -> 
+    #|recolor_edge e c0 [E(G)]| = #|c[E(G)]| - 1.
+  Proof.
+    move=> He.
+    rewrite (del_edges1 He).
+    move: (recolor_im e c0).
+    rewrite /coloring_image 2!imsetU1 2!cardsU1 recolor_eq => -> -> -> /=.
+    by rewrite add0n add1n subn1.
+  Qed.
 
   Definition swap_edge e f : edge_coloring G ColorType :=
     fun edge => 
@@ -71,7 +102,7 @@ Section Recolor.
     f \in E(G) ->
     c[E(G)] = (swap_edge e f)[E(G)].
   Proof.
-    move=> He0 He1; apply/setP => col.
+    move=> He0 He1; apply/setP => c0.
     apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
     exists (if e2 == e then f else if e2 == f then e else e2) => //;
     repeat case: ifP => //; repeat move=> /eqP -> //; try rewrite eq_refl //.
@@ -183,20 +214,31 @@ Section ChromIdx.
 End ChromIdx.
 
 Section AbsentSet.
-  Definition absent_set {G : sgraph} {ColorType: finType} 
-    (v : G) (c : edge_coloring G ColorType) :=
-    setD (c[E(G)]) (c[E{v}]).
+  Variables (G : sgraph).
+  Implicit Types (x y : G).
 
-  Proposition exists_absent_color (G : sgraph) :
+  Definition absent_set {ColorType: finType} 
+    (c : edge_coloring G ColorType) x :=
+    setD (c[E(G)]) (c[E{x}]).
+
+  Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
+    c0 \in absent_set c x <-> [pick e in E{x} | c e == c0] == None.
+  Proof. split=> H. Admitted.
+
+  Lemma absent_edge_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
+    c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
+  Proof. Admitted.
+
+  Proposition exists_absent_color :
     k_edge_colorable G (max_degree G + 1) ->
     exists c : k_edge_coloring G (max_degree G + 1),
-    forall v : G, absent_set v c != set0.
+    forall x : G, absent_set c x != set0.
   Proof.
-    move=> [c]; exists c => v.
+    move=> [c]; exists c => x.
     rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
     by rewrite subn_gt0 
               (eqP (k_edge_card c)) 
-              (leq_ltn_trans (max_colors_at_vertex c v)) 
+              (leq_ltn_trans (max_colors_at_vertex c x)) 
               // addn1 ltnSn.
   Qed.
 End AbsentSet.
@@ -210,18 +252,25 @@ Section Fan.
 
   (* 2. if w0 is the first item in fan f centered at v under coloring c,
     (v, w0) is a distinct color from the rest of the edges in the graph *)
-  Definition w0_prop e c := 
+  (* Todo: two equivalent definitions, choose one *)
+  Definition w0_prop1 c e := c e \notin c[E(del_edges e)].
+    
+  Definition w0_prop2 c e := 
     [forall (h : {set G} | (h \in E(G)) && (e != h)), c e != c h].
 
-  (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
+  Lemma w0_props c e : reflect (w0_prop1 c e) (w0_prop2 c e).
+  Proof. 
+  Admitted.
+
+    (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
     the color of (v, w_{i+1} is absent at w_i) *)
   Definition absent_prop c e w := 
-    (c e) \in (absent_set w c).
+    (c e) \in (absent_set c w).
 
   Definition fanp v wk c f := 
     uniq (wk::f) &&
     neigh_prop v (wk::f) &&
-    w0_prop [set v; (last wk f)] c &&
+    w0_prop2 c [set v; (last wk f)] &&
     path (
       fun x2 x1 => absent_prop c [set v; x2] x1
     ) wk f.
@@ -374,7 +423,7 @@ Section Rotation.
     #|c[E(G)]| == #|rotateF[E(G)]|.
   Proof. by rewrite rotate_imF. Qed.
 
-  Lemma rot_abs_edge : absent_set v c = absent_set v rotateF.
+  Lemma rot_abs_edge : absent_set c v = absent_set rotateF v.
   Proof.
     by rewrite/absent_set rotate_imF rorate_imF_vertex.
   Qed.
@@ -471,19 +520,19 @@ Section Pack.
 End Pack.
 
 Section Kempe.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (ca cb : ColorType).
-  Implicit Types (x y z : G).
+  Variables (G : sgraph) (ColorType : finType) (ca cb : ColorType).
+  Implicit Types (x y z : G) (c : edge_coloring G ColorType) (pc : proper_edge_coloring G ColorType).
   
   (* singleton path *)
-  Definition idap x : AltPath c ca cb x x := Build_AltPath (altpathxx c ca cb x).
+  Definition idap c x : AltPath c ca cb x x := Build_AltPath (altpathxx c ca cb x).
 
   (* Convert from path to altpath *)
   (* Definition apath_of {x y} (p : Path x y) (AH : alternates c ca cb (x :: val p)) : AltPath c ca cb x y := 
     Sub (val p) (path_altpath AH). *)
 
-  Definition apcons {x y z} (ap : AltPath c ca cb y z) (xy : x -- y) (Hc : c [set x; y] == next_col (valP ap)) := Build_AltPath (altpath_cons xy Hc).
+  Definition apcons {c x y z} (ap : AltPath c ca cb y z) (xy : x -- y) (Hc : c [set x; y] == next_col (valP ap)) := Build_AltPath (altpath_cons xy Hc).
 
-  Definition apextend {x y} (ap : AltPath c ca cb x y) : option {w & AltPath c ca cb w y} := 
+  Definition apextend {c x y} (ap : AltPath c ca cb x y) : option {w & AltPath c ca cb w y} := 
     match pickP (fun v => (v \in N(x)) && (c [set v; x] == next_col (valP ap))) with
     | Pick v Pv =>
         let Hv := prev_edge_proof (eq_rect (v \in N(x)) is_true (andP Pv).1 (x -- v) (in_opn v x)) in
@@ -492,18 +541,57 @@ Section Kempe.
     | Nopick _ => None
     end.
   
+  Lemma apextend_none {c x y} (ap : AltPath c ca cb x y) : 
+    apextend ap == None -> next_col (valP ap) \in absent_set c x.
+  Proof. 
+    rewrite /apextend; case pickP=> H _ //. 
+    apply Nopick in H.
+  Admitted.
+
   (* Careful of cycles, either require that ca is in the absent
   set of the first vertex in p or update valid_alt for uniqueness*)
-  Fixpoint apmax {x y} (ap : AltPath c ca cb x y) : {v : G & AltPath c ca cb v y} :=
+  (* must be proper so we don't have cycles later either *)
+  (* Fixpoint apmax {pc x y} (ap : AltPath pc ca cb x y) : {v : G & AltPath pc ca cb v y} :=
     if apextend ap is Some (existT v ap') 
     then apmax ap'
     else existT _ x ap.
 
-  Definition kempe x := apmax (idap x).
+  Definition kempe pc x := apmax (idap pc x).
+
+  Definition apswap (ap : AltPath c ca cb y z) :=  *)
 
 End Kempe.
 
-(* Lemma tmp : |c[E(G)]| == max_degree G + 2 -> *)
+Proposition smaller_coloring 
+  {G : sgraph} {ColorType : finType} {v wj : G}
+  (c : proper_edge_coloring G ColorType) 
+  (f : Fan v wj c) :
+  #|c[E(G)]| == max_degree G + 2 ->
+  (exists cj, (cj \in c[E(G)]) && (cj \in (absent_set c v :&: absent_set c wj))) ->
+  k_edge_colorable G (max_degree G + 1).
+Proof.
+  move=> Hcard [cj] /andP[Hin].
+  rewrite in_setI=> /andP[Hcv Hcw].
+  pose c' := rotateF f.
+  have Hprop : is_proper_edge_coloring c' := rot_proper f (prop c).
+  have Hcvw' : cj \in (absent_set c' v :&: absent_set c' wj).
+  { rewrite in_setI -(rot_abs_edge f) Hcv; admit. }
+  pose c'' := recolor_edge c' [set v; wj] cj.
+  have Hneigh : wj \in N(v) := in_neigh (mem_head wj (val f)).
+  have Hvw : [set v; wj] \in E(G).
+  { by move: Hneigh; rewrite in_opn in_edges. }
+  have Hindel'' : cj \in c'' [E(del_edges [set v; wj])].
+  { 
+    have Hindel : cj \in c [E(del_edges [set v; wj])].
+    { exact: del_edges_col Hin (absent_edge_col Hcv Hneigh). }
+    have Hindel' : cj \in c' [E(del_edges [set v; wj])] by admit.
+    by rewrite -(recolor_im c' ([set v; wj]) cj). 
+  }
+
+
+  have Hcard'' := replace_col Hvw cj. 
+
+Admitted.
 
 Theorem Vizings (G : sgraph) : 
   is_chromatic_index chi -> 
