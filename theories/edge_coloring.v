@@ -16,7 +16,7 @@ Section EdgeColoring.
 
   (* An edge coloring function assigns edges in E(G) to colors *)
   Definition edge_coloring : Type := {set G} -> ColorType.
-  Implicit Type (c : edge_coloring).
+  Implicit Type (c : edge_coloring) (x : G).
 
   (* A proper edge coloring is an edge coloring 
     where no two adjacent edges have the same color *)
@@ -27,24 +27,37 @@ Section EdgeColoring.
     (exists x, x \in e1 /\ x \in e2) -> c e1 != c e2.
 
   Definition proper_edge_coloring : Type := { c | is_proper_edge_coloring c }.
-
-  Definition prop (pc : proper_edge_coloring) := proj2_sig pc.
+  Implicit Type (pc : proper_edge_coloring).
 
   Coercion proper_to_edge_coloring
-    (pc : proper_edge_coloring) : edge_coloring :=
-    proj1_sig pc.
+    pc : edge_coloring := proj1_sig pc.
+
+  Definition prop pc := proj2_sig pc.
 
   (* the image under a coloring c of the set of edges E *)
   Definition coloring_image c (E : {set {set G}}) : {set ColorType} := c @: E.
   Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
-  Lemma max_colors_at_vertex c (v : G) : #|c[E{v}]| <= max_degree G.
+  Lemma leq_col_deg c x : #|c[E{x}]| <= max_degree G.
   Proof.
     apply: (leq_trans (leq_imset_card _ _)).
     rewrite card_edge_neigh.
     rewrite /max_degree.
     exact: leq_bigmax_cond.
   Qed.
+
+  Lemma eq_pcol_deg pc x : #|pc[E{x}]| <= #|E{x}|.
+  Proof.
+  Admitted.
+
+  Lemma leq_vertex_graph c x : #|c[E{x}]| <= #|c[E(G)]|.
+  Proof.
+    apply: subset_leq_card (imsetS c (sub_all_edges x)).
+  Qed.
+
+  Lemma leq_deg_pcol pc x : max_degree G <= #|pc[E(G)]|.
+  Proof.
+  Admitted.
 
 End EdgeColoring.
 Notation "c [ E ]" := (coloring_image c E) (at level 50).
@@ -157,6 +170,13 @@ Section ChromIdx.
 
   (* ----  One-to-one Coloring ---- *)
 
+  (* Todo: can we use Program Definition, is this better? Should we do this elsewhere too? *)
+  Program Definition in_edge_coloring2 : proper_edge_coloring G {set G} := 
+    fun e => e.
+  Next Obligation. 
+    by move=> e1 e2 _ _ ne _.
+  Qed.
+
   (* injective coloring: each edge is a color *)
   Definition inj_edge_coloring : edge_coloring G {set G} :=
     fun e => e.
@@ -227,6 +247,10 @@ Section AbsentSet.
 
   Lemma absent_edge_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
     c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
+  Proof. Admitted.
+
+  Lemma absent_present {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
+    c0 \in c[E(G)] -> c0 \in absent_set c x -> y \in N(x) -> c0 \in c[E(del_edges [set x; y])].
   Proof. Admitted.
 
   Proposition exists_absent_color :
@@ -370,7 +394,7 @@ Section Rotation.
   Definition rotateF : edge_coloring G ColorType :=
     rotate c v (rev (wk::val f)).
 
-  Lemma rorate_imF_vertex : c[E{v}] = rotateF[E{v}].
+  Lemma rotate_imF_vertex : c[E{v}] = rotateF[E{v}].
   Proof.
     rewrite/rotateF; set fs := (rev (wk::val f)).
     elim: fs c=> [|w0 ws IH] d //=.
@@ -420,12 +444,12 @@ Section Rotation.
   Qed.
 
   Lemma rot_card :
-    #|c[E(G)]| == #|rotateF[E(G)]|.
+    #|c[E(G)]| = #|rotateF[E(G)]|.
   Proof. by rewrite rotate_imF. Qed.
 
   Lemma rot_abs_edge : absent_set c v = absent_set rotateF v.
   Proof.
-    by rewrite/absent_set rotate_imF rorate_imF_vertex.
+    by rewrite/absent_set rotate_imF rotate_imF_vertex.
   Qed.
 
   (* Needs to be fixed in latex, require premise c is proper *)
@@ -456,7 +480,7 @@ Section AltPath.
   Implicit Types (x y : G) (p : seq G) (ca cb : ColorType).
   
   Definition altpath ca cb x y p := 
-    (alternates c ca cb (x::p) || alternates c cb ca (x::p))  && pathp x y p.
+    (alternates c ca cb (x::p) || alternates c cb ca (x::p)) && pathp x y p.
 
   Lemma altpathW ca cb x y p : altpath ca cb x y p -> pathp x y p.
   Proof. by case/andP. Qed.
@@ -548,14 +572,20 @@ Section Kempe.
     apply Nopick in H.
   Admitted.
 
-  (* Careful of cycles, either require that ca is in the absent
-  set of the first vertex in p or update valid_alt for uniqueness*)
-  (* must be proper so we don't have cycles later either *)
-  (* Fixpoint apmax {pc x y} (ap : AltPath pc ca cb x y) : {v : G & AltPath pc ca cb v y} :=
+  (* must be proper coloring and absent at start so no cycles when extended *)
+  Definition apstart pc x y :=     
+    { ap : AltPath pc ca cb x y | cb \in absent_set pc y}.
+
+  Coercion apstart_to_altpath {pc x y} (aps : apstart pc x y) : 
+    AltPath pc ca cb x y := projT1 aps.
+
+  (* Fixpoint apmax {pc x y} (ap : apbase pc x y) 
+  : {v : G & apbase pc v y} :=
     if apextend ap is Some (existT v ap') 
     then apmax ap'
-    else existT _ x ap.
+    else existT _ x ap. *)
 
+  (*
   Definition kempe pc x := apmax (idap pc x).
 
   Definition apswap (ap : AltPath c ca cb y z) :=  *)
@@ -566,31 +596,29 @@ Proposition smaller_coloring
   {G : sgraph} {ColorType : finType} {v wj : G}
   (c : proper_edge_coloring G ColorType) 
   (f : Fan v wj c) :
-  #|c[E(G)]| == max_degree G + 2 ->
+  #|c[E(G)]| = max_degree G + 2 ->
   (exists cj, (cj \in c[E(G)]) && (cj \in (absent_set c v :&: absent_set c wj))) ->
   k_edge_colorable G (max_degree G + 1).
 Proof.
   move=> Hcard [cj] /andP[Hin].
   rewrite in_setI=> /andP[Hcv Hcw].
-  pose c' := rotateF f.
-  have Hprop : is_proper_edge_coloring c' := rot_proper f (prop c).
-  have Hcvw' : cj \in (absent_set c' v :&: absent_set c' wj).
-  { rewrite in_setI -(rot_abs_edge f) Hcv; admit. }
-  pose c'' := recolor_edge c' [set v; wj] cj.
-  have Hneigh : wj \in N(v) := in_neigh (mem_head wj (val f)).
+  have Hneigh : wj \in N(v) := (in_neigh (mem_head wj (val f))).
   have Hvw : [set v; wj] \in E(G).
   { by move: Hneigh; rewrite in_opn in_edges. }
-  have Hindel'' : cj \in c'' [E(del_edges [set v; wj])].
+  pose c' := rotateF f.
+  have Hprop' : is_proper_edge_coloring c' := rot_proper f (prop c).
+  have Hin' : cj \in c'[E(del_edges [set v; wj])].
   { 
-    have Hindel : cj \in c [E(del_edges [set v; wj])].
-    { exact: del_edges_col Hin (absent_edge_col Hcv Hneigh). }
-    have Hindel' : cj \in c' [E(del_edges [set v; wj])] by admit.
-    by rewrite -(recolor_im c' ([set v; wj]) cj). 
+    move: (Hin) (Hcv); 
+    rewrite /absent_set (rotate_imF f) (rotate_imF_vertex f) => Hin' Hab.
+    exact: absent_present Hin' Hab Hneigh. 
   }
-
-
-  have Hcard'' := replace_col Hvw cj. 
-
+  have Hnotin' : c' [set v; wj] \notin c'[E(del_edges [set v; wj])] by admit.
+  pose c'' := recolor_edge c' [set v; wj] cj.
+  have Hprop'' : is_proper_edge_coloring c'' by admit.
+  constructor.
+  move: (replace_col Hvw Hin' Hnotin'); 
+  rewrite -rot_card Hcard addn2 subn1 /= -addn1=> Hcard''.
 Admitted.
 
 Theorem Vizings (G : sgraph) : 
