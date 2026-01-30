@@ -1,6 +1,13 @@
 From mathcomp Require Import all_ssreflect.
 From GraphTheory Require Import preliminaries sgraph digraph.
 
+Lemma bigmax_eq_pointwise (I :finType) (P : pred I) (F G: I -> nat) :
+    {in P, forall x, F x = G x} -> \max_(i | P i) F i = \max_(i | P i) G i.
+Proof.
+  move => ?. elim/big_ind2 : _ => // y1 y2 x1 x2 A B.
+  by rewrite A B.
+Qed.
+
 Definition edge_neigh {G : sgraph} (u : G) := [set [set u; v] | v in N(u)].
 Notation "E{ x }" := (edge_neigh x) (at level 0, format "E{ x }").
 
@@ -23,3 +30,8 @@ Proof.
 Qed.
 
 Definition max_degree (G : sgraph) : nat := \max_(x in G) #|N(x)|.
+
+Lemma max_degree_edge (G : sgraph) (x : G) :
+  \max_(x in G) #|N(x)| = \max_(x in G) #|E{x}|.
+Proof. 
+Admitted.

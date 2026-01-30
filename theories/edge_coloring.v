@@ -26,6 +26,16 @@ Section EdgeColoring.
     e1 \in E(G) -> e2 \in E(G) -> e1 != e2 -> 
     (exists x, x \in e1 /\ x \in e2) -> c e1 != c e2.
 
+  Definition is_proper_edge_coloring_inj c : Prop := 
+    forall (e1 e2 : {set G}), 
+    (exists x, e1 \in E{x} /\ e2 \in E{x}) -> 
+    c e1 = c e2 -> e1 = e2.
+
+  (* Definition tmp c : Prop := 
+    forall (x : G), 
+    (forall e1 \in E{x} /\ e2 \in E{x}) -> 
+    c e1 = c e2 -> e1 = e2. *)
+
   Definition proper_edge_coloring : Type := { c | is_proper_edge_coloring c }.
   Implicit Type (pc : proper_edge_coloring).
 
@@ -46,8 +56,9 @@ Section EdgeColoring.
     exact: leq_bigmax_cond.
   Qed.
 
-  Lemma eq_pcol_deg pc x : #|pc[E{x}]| <= #|E{x}|.
+  Lemma eq_deg_pcol pc x : #|E{x}| = #|pc[E{x}]|.
   Proof.
+    (* injective, at a vertex *)
   Admitted.
 
   Lemma leq_vertex_graph c x : #|c[E{x}]| <= #|c[E(G)]|.
@@ -55,8 +66,11 @@ Section EdgeColoring.
     apply: subset_leq_card (imsetS c (sub_all_edges x)).
   Qed.
 
-  Lemma leq_deg_pcol pc x : max_degree G <= #|pc[E(G)]|.
+  Lemma leq_maxdeg_pcol pc x : max_degree G <= #|pc[E(G)]|.
   Proof.
+    (* rewrite /max_degree_edge. *)
+    (* rewrite -card_edge_neigh. *)
+    (* rewrite (bigmax_eq_pointwise (eq_leq card_edge_neigh)). *)
   Admitted.
 
 End EdgeColoring.
@@ -262,9 +276,10 @@ Section AbsentSet.
     rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
     by rewrite subn_gt0 
               (eqP (k_edge_card c)) 
-              (leq_ltn_trans (max_colors_at_vertex c x)) 
+              (leq_ltn_trans (leq_col_deg c x)) 
               // addn1 ltnSn.
   Qed.
+  
 End AbsentSet.
 
 Section Fan.
@@ -345,13 +360,27 @@ Fixpoint rotate
   match fs with
   | w0 :: ws =>
     match ws with
-    | w1::wss =>
+    | w1 :: wss =>
       rotate
           (swap_edge c [set v; w0] [set v; w1])
           v ws
     | [::] => c
     end
   | [::] => c
+  end. 
+
+Fixpoint rotateBetter
+  {G : sgraph} {ColorType : finType}
+  (c : edge_coloring G ColorType)
+  (v : G)
+  (fs : seq G)
+  : edge_coloring G ColorType :=
+  match fs with
+  | w0 :: (w1::tl as ws) =>
+      rotateBetter
+          (swap_edge c [set v; w0] [set v; w1])
+          v ws
+  | _ => c
   end. 
 
 Lemma rotate_im
@@ -411,38 +440,6 @@ Section Rotation.
      lemma entirely and just have this one  *)
   Admitted. 
 
-  Definition rotHelper 
-    (u : G) 
-    (col_wOpt : (option G * edge_coloring G ColorType)) :=
-    (Some u, 
-      let (wOpt, d) := col_wOpt in 
-      match wOpt with
-      | None => d
-      | Some w => (swap_edge d [set v; u] [set v; w])
-      end).
-
-  Definition rotate2 : edge_coloring G ColorType :=
-    snd (foldr rotHelper (None, c) (wk::val f)).
-  
-  Lemma rotate2_im : c[E(G)] = rotate2[E(G)].
-  Proof.
-    rewrite /rotate2. move: (wk::val f) => fs.
-    elim: fs c => [|w0 ws IH] d //=.
-    rewrite IH; set rot := (foldr rotHelper (None, d) ws).
-    case: rot => [[w1| ] d0] //=.
-  Admitted.
-
-  Lemma rotate2_im_vert : c[E{v}] = rotate2[E{v}].
-  Proof. 
-    rewrite/rotate2; move: (wk::val f) => fs.
-    elim: fs c => [|w0 ws IH] d //=.
-    rewrite IH; set rot := (foldr rotHelper (None, d) ws).
-    case: rot => [[w1| ] d0] //=.
-    have Hv0 : v \in [set v; w0] by rewrite in_set2 eq_refl.
-    have Hv1 : v \in [set v; w1] by rewrite in_set2 eq_refl.
-    exact: swap_im_vertex Hv0 Hv1.
-  Qed.
-
   Lemma rot_card :
     #|c[E(G)]| = #|rotateF[E(G)]|.
   Proof. by rewrite rotate_imF. Qed.
@@ -474,6 +471,15 @@ Fixpoint alternates
       end
     | _ => true
     end.
+
+Fixpoint alternatesBetter
+  {G : sgraph} {ColorType : finType} 
+  (c : edge_coloring G ColorType) (ca cb : ColorType) (p : seq G) : bool := 
+  match p with 
+  | x :: (y :: tl as p') =>
+    (c [set x; y] == ca) && alternatesBetter c cb ca p'
+  | _ => true
+  end.
 
 Section AltPath.
   Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
@@ -579,11 +585,25 @@ Section Kempe.
   Coercion apstart_to_altpath {pc x y} (aps : apstart pc x y) : 
     AltPath pc ca cb x y := projT1 aps.
 
-  (* Fixpoint apmax {pc x y} (ap : apbase pc x y) 
-  : {v : G & apbase pc v y} :=
-    if apextend ap is Some (existT v ap') 
-    then apmax ap'
-    else existT _ x ap. *)
+  (* relflect= decidable propisition *)
+  (* prove assumptions/invariants at each step *)
+  (* number of edges left in the graph is decreasing *)
+  (* upper bound the number of steps *)
+  (* Get definition and then prove things about it *)
+
+  (* the first parameter `d` is a "fuel" argument, because functions in Coq
+   must be guaranteed to terminate. *)
+  Program Fixpoint apmax {pc x y} (d : nat) (ap : apstart pc x y) 
+  : {v : G & apstart pc v y} :=
+    match d with 
+    | 0 => existT _ x ap
+    | S d' => 
+      match apextend ap with
+      | Some (existT v ap') => apmax d' ap'
+      | None => existT _ x ap
+      end
+    end.
+  Next Obligation. exact: (projT2 ap). Defined.
 
   (*
   Definition kempe pc x := apmax (idap pc x).
@@ -621,7 +641,9 @@ Proof.
   rewrite -rot_card Hcard addn2 subn1 /= -addn1=> Hcard''.
 Admitted.
 
-Theorem Vizings (G : sgraph) : 
-  is_chromatic_index chi -> 
-  max_degree G <= chi && chi <= max_degree G + 1.
+Theorem Vizings (G : sgraph) (chi : nat): 
+  is_chromatic_index G chi -> 
+  (max_degree G <= chi) && (chi <= max_degree G + 1).
+Proof.
+Admitted.
  

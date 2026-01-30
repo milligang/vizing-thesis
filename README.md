@@ -3,6 +3,9 @@
 To date, we have found no public proof of Vizing's Theorem in Rocq. 
 This is a key theorem for edge colorings in graphs; hence, the purpose of this repository is to provide a proof for Vizing's Theorem in Rocq, as an extension of the graph-theory Rocq library.
 
+## To Run
+Clone the repository. In your terminal, run 'make -f CoqMakefile' to build.
+
 ## Files and folders 
 - basics.v: Lemmas and theorems proven over the course of the project, especially when we were familiazing ourselves with the library, which are not directly related to the proof of Vizing's Theorem
 - aux.v: Structures helpful for the proof of Vizing's Theorem but not directly involved and have independent applications, such as a set of edges adjacent to a vertex.
