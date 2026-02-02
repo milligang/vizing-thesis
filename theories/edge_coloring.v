@@ -56,6 +56,7 @@ Section EdgeColoring.
     exact: leq_bigmax_cond.
   Qed.
 
+  (* Working on proving lower bound, should be quick *)
   Lemma eq_deg_pcol pc x : #|E{x}| = #|pc[E{x}]|.
   Proof.
     (* injective, at a vertex *)
@@ -98,6 +99,7 @@ Section Recolor.
     rewrite Heq in He2; move: (del_edgesN e); rewrite -in_setC => /setCP.
   Qed.
 
+  (* not needed right now *)
   Lemma del_edges_col c0 e : 
     (c0 \in c[E(G)]) ->
     (c0 != c e) ->
@@ -137,6 +139,7 @@ Section Recolor.
     - move=> _ /eqP -> //.
   Qed.
 
+  (* TODO: finish this proof, presumably not too difficult *)
   Lemma swap_im_vertex e f (v : G) :
     v \in e -> v \in f -> c[E{v}] = (swap_edge e f)[E{v}].
   Proof.
@@ -255,7 +258,8 @@ Section AbsentSet.
     (c : edge_coloring G ColorType) x :=
     setD (c[E(G)]) (c[E{x}]).
 
-  Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
+  (* still deciding on definitions further down, tbd which of these three will be needed *)
+    Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
     c0 \in absent_set c x <-> [pick e in E{x} | c e == c0] == None.
   Proof. split=> H. Admitted.
 
@@ -297,7 +301,8 @@ Section Fan.
   Definition w0_prop2 c e := 
     [forall (h : {set G} | (h \in E(G)) && (e != h)), c e != c h].
 
-  Lemma w0_props c e : reflect (w0_prop1 c e) (w0_prop2 c e).
+  (* Todo: decide which w0_prop to use, they are equivalent *)
+    Lemma w0_props c e : reflect (w0_prop1 c e) (w0_prop2 c e).
   Proof. 
   Admitted.
 
@@ -316,6 +321,9 @@ Section Fan.
 
   Lemma fanp_neigh v wk c f : fanp v wk c f -> neigh_prop v (wk::f).
   Proof. by case/andP => /andP [/andP [_ ->] _] _. Qed.
+
+  Lemma rev_neigh v wk f : neigh_prop v (wk::f) -> neigh_prop v (rev (wk::f)).
+  Proof. by rewrite /neigh_prop all_rev. Qed.
 
 End Fan.
 
@@ -358,46 +366,12 @@ Fixpoint rotate
   (fs : seq G)
   : edge_coloring G ColorType :=
   match fs with
-  | w0 :: ws =>
-    match ws with
-    | w1 :: wss =>
+  | w0 :: ((w1::tl) as ws) =>
       rotate
-          (swap_edge c [set v; w0] [set v; w1])
-          v ws
-    | [::] => c
-    end
-  | [::] => c
-  end. 
-
-Fixpoint rotateBetter
-  {G : sgraph} {ColorType : finType}
-  (c : edge_coloring G ColorType)
-  (v : G)
-  (fs : seq G)
-  : edge_coloring G ColorType :=
-  match fs with
-  | w0 :: (w1::tl as ws) =>
-      rotateBetter
           (swap_edge c [set v; w0] [set v; w1])
           v ws
   | _ => c
   end. 
-
-Lemma rotate_im
-  {G : sgraph} {ColorType : finType}
-  (c : edge_coloring G ColorType)
-  (v : G) (fs : seq G) :
-  neigh_prop v fs ->
-  c[E(G)] = rotate c v fs [E(G)].
-Proof.
-  elim: fs c=> [|w0 ws IH] c //= /andP [Hw0 Hws].
-  case: ws IH Hws=> [|w1 wss IH] Hws //.
-  rewrite -(IH (swap_edge c [set v; w0] [set v; w1])) //.
-  move/andP: Hws => [Hw1 _].
-  have He0 : [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
-  have He1 : [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
-  exact: swap_im He0 He1.
-Qed.
 
 Section Rotation. 
   Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v wk : G) (f : Fan v wk c).
@@ -436,9 +410,16 @@ Section Rotation.
 
   Lemma rotate_imF : c[E(G)] = rotateF[E(G)].
   Proof.
-     (* could use rotate_im, but would be nice to remove that
-     lemma entirely and just have this one  *)
-  Admitted. 
+    rewrite /rotateF; set fs := (rev (wk::val f)).
+    have Hws : neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
+    elim: fs c Hws=> [|w0 ws IH] d //= /andP [Hw0 Hws].
+    case: ws IH Hws=> [|w1 wss IH] Hws //.
+    rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //. 
+    move/andP: Hws => [Hw1 _].
+    have He0 : [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
+    have He1 : [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
+    exact: swap_im He0 He1.
+  Qed.
 
   Lemma rot_card :
     #|c[E(G)]| = #|rotateF[E(G)]|.
@@ -449,6 +430,7 @@ Section Rotation.
     by rewrite/absent_set rotate_imF rotate_imF_vertex.
   Qed.
 
+  (* TODO! *)
   (* Needs to be fixed in latex, require premise c is proper *)
   (* Thought: use other rotate definition for this, then prove equivalence of the two *)
   Lemma rot_proper : 
@@ -463,21 +445,9 @@ End Rotation.
 Fixpoint alternates
   {G : sgraph} {ColorType : finType} 
   (c : edge_coloring G ColorType) (ca cb : ColorType) (p : seq G) : bool := 
-    match p with 
-    | x::p' =>
-      match p' with 
-      | y::p'' => (c [set x; y] == ca) && alternates c cb ca p'
-      | _ => true
-      end
-    | _ => true
-    end.
-
-Fixpoint alternatesBetter
-  {G : sgraph} {ColorType : finType} 
-  (c : edge_coloring G ColorType) (ca cb : ColorType) (p : seq G) : bool := 
   match p with 
-  | x :: (y :: tl as p') =>
-    (c [set x; y] == ca) && alternatesBetter c cb ca p'
+  | x :: ((y :: tl) as p') =>
+    (c [set x; y] == ca) && alternates c cb ca p'
   | _ => true
   end.
 
@@ -509,7 +479,8 @@ Section AltPath.
   Definition next_col {ca cb x y p} (ap : altpath ca cb x y p) :=
     if alternates c ca cb (x :: p) then cb else ca.
 
-  Lemma alternate_cons ca cb x y p :
+  (* Not needed right now *)
+    Lemma alternate_cons ca cb x y p :
    alternates c ca cb (x::y::p) = 
    (c [set x; y] == ca) && alternates c cb ca (y::p).
   Proof. 
@@ -571,6 +542,7 @@ Section Kempe.
     | Nopick _ => None
     end.
   
+  (* Not needed right now *)
   Lemma apextend_none {c x y} (ap : AltPath c ca cb x y) : 
     apextend ap == None -> next_col (valP ap) \in absent_set c x.
   Proof. 
@@ -612,6 +584,7 @@ Section Kempe.
 
 End Kempe.
 
+(* Todo: finish up, nearly there. last little admits Hnotin' and Hprop'' may take a second *)
 Proposition smaller_coloring 
   {G : sgraph} {ColorType : finType} {v wj : G}
   (c : proper_edge_coloring G ColorType) 
@@ -641,6 +614,7 @@ Proof.
   rewrite -rot_card Hcard addn2 subn1 /= -addn1=> Hcard''.
 Admitted.
 
+(* TODO *)
 Theorem Vizings (G : sgraph) (chi : nat): 
   is_chromatic_index G chi -> 
   (max_degree G <= chi) && (chi <= max_degree G + 1).
