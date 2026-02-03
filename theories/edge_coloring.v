@@ -21,28 +21,16 @@ Section EdgeColoring.
   (* A proper edge coloring is an edge coloring 
     where no two adjacent edges have the same color *)
   (* Could do x in e1 instead *)
+  
   Definition is_proper_edge_coloring c : Prop := 
-    forall (e1 e2 : {set G}), 
-    e1 \in E(G) -> e2 \in E(G) -> e1 != e2 -> 
-    (exists x, x \in e1 /\ x \in e2) -> c e1 != c e2.
-
-  Definition is_proper_edge_coloring_inj c : Prop := 
-    forall (e1 e2 : {set G}), 
-    (exists x, e1 \in E{x} /\ e2 \in E{x}) -> 
-    c e1 = c e2 -> e1 = e2.
-
-  (* Definition tmp c : Prop := 
-    forall (x : G), 
-    (forall e1 \in E{x} /\ e2 \in E{x}) -> 
-    c e1 = c e2 -> e1 = e2. *)
+    forall (x : G),
+    {in E{x}&, forall (e1 e2 : {set G}), c e1 = c e2 -> e1 = e2}.
 
   Definition proper_edge_coloring : Type := { c | is_proper_edge_coloring c }.
   Implicit Type (pc : proper_edge_coloring).
 
   Coercion proper_to_edge_coloring
     pc : edge_coloring := proj1_sig pc.
-
-  Definition prop pc := proj2_sig pc.
 
   (* the image under a coloring c of the set of edges E *)
   Definition coloring_image c (E : {set {set G}}) : {set ColorType} := c @: E.
@@ -56,23 +44,28 @@ Section EdgeColoring.
     exact: leq_bigmax_cond.
   Qed.
 
-  (* Working on proving lower bound, should be quick *)
-  Lemma eq_deg_pcol pc x : #|E{x}| = #|pc[E{x}]|.
+  (* injective, at a vertex *)
+  Lemma eq_deg_pcol pc x : #|pc[E{x}]| = #|E{x}|.
   Proof.
-    (* injective, at a vertex *)
-  Admitted.
+    apply: card_in_imset.
+    exact: (proj2_sig pc). 
+  Qed.
 
   Lemma leq_vertex_graph c x : #|c[E{x}]| <= #|c[E(G)]|.
   Proof.
     apply: subset_leq_card (imsetS c (sub_all_edges x)).
   Qed.
 
-  Lemma leq_maxdeg_pcol pc x : max_degree G <= #|pc[E(G)]|.
+  Lemma leq_maxdeg_pcol pc : max_degree G <= #|pc[E(G)]|.
   Proof.
-    (* rewrite /max_degree_edge. *)
-    (* rewrite -card_edge_neigh. *)
-    (* rewrite (bigmax_eq_pointwise (eq_leq card_edge_neigh)). *)
-  Admitted.
+    rewrite /max_degree. 
+    have E: \max_(x in G) #|E{x}| = \max_(x in G) #|N(x)|.
+    { apply: bigmax_eq_pointwise => v _; by rewrite card_edge_neigh. }
+    rewrite -E.
+    apply/bigmax_leqP=> x _. 
+    apply: (leq_trans _ (leq_vertex_graph pc x)).
+    by rewrite (eq_deg_pcol pc x).
+  Qed.
 
 End EdgeColoring.
 Notation "c [ E ]" := (coloring_image c E) (at level 50).
@@ -190,9 +183,7 @@ Section ChromIdx.
   (* Todo: can we use Program Definition, is this better? Should we do this elsewhere too? *)
   Program Definition in_edge_coloring2 : proper_edge_coloring G {set G} := 
     fun e => e.
-  Next Obligation. 
-    by move=> e1 e2 _ _ ne _.
-  Qed.
+  Next Obligation. by move=> _ e1 e2 _ _ eq. Qed. 
 
   (* injective coloring: each edge is a color *)
   Definition inj_edge_coloring : edge_coloring G {set G} :=
@@ -202,8 +193,7 @@ Section ChromIdx.
   Definition proper_inj_coloring : proper_edge_coloring G {set G}.
   Proof.
     exists inj_edge_coloring.
-    move=> e1 e2 _ _ ne _.
-    exact ne.
+    by move=> _ e1 e2 _ _ eq.
   Defined.
 
   Lemma inj_im : proper_inj_coloring[E(G)] = E(G). 
@@ -437,7 +427,7 @@ Section Rotation.
     is_proper_edge_coloring c ->
     is_proper_edge_coloring rotateF.
   Proof.
-    rewrite/is_proper_edge_coloring=> Hprop e1 e2 He1 He2 Hneq Hx.
+    rewrite/is_proper_edge_coloring=> Hprop e1 e2 Hex Heq.
   Admitted.
 
 End Rotation.
@@ -599,7 +589,7 @@ Proof.
   have Hvw : [set v; wj] \in E(G).
   { by move: Hneigh; rewrite in_opn in_edges. }
   pose c' := rotateF f.
-  have Hprop' : is_proper_edge_coloring c' := rot_proper f (prop c).
+  have Hprop' : is_proper_edge_coloring c' := rot_proper (proj2_sig c).
   have Hin' : cj \in c'[E(del_edges [set v; wj])].
   { 
     move: (Hin) (Hcv); 
@@ -617,7 +607,9 @@ Admitted.
 (* TODO *)
 Theorem Vizings (G : sgraph) (chi : nat): 
   is_chromatic_index G chi -> 
-  (max_degree G <= chi) && (chi <= max_degree G + 1).
+  max_degree G <= chi <= max_degree G + 1.
 Proof.
+  move=>[Hchi Hchi_min].
 Admitted.
+
  

@@ -30,8 +30,3 @@ Proof.
 Qed.
 
 Definition max_degree (G : sgraph) : nat := \max_(x in G) #|N(x)|.
-
-Lemma max_degree_edge (G : sgraph) (x : G) :
-  \max_(x in G) #|N(x)| = \max_(x in G) #|E{x}|.
-Proof. 
-Admitted.

@@ -2,5 +2,7 @@
 *.vok
 *.vos
 *.glob
+tmp.v
+.tmp.aux
 COQAUX*
 CoqMakefile
