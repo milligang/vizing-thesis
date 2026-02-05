@@ -16,7 +16,7 @@ Clone the repository. In your terminal, run 'make -f CoqMakefile' to build.
 The code in this repository requires the dependencies of package [_graph-theory 0.8_](https://github.com/coq-community/graph-theory):
 Coq 8.11+, MathComp 1.10+, finmap, hierarchy builder 0.10.
 
-In our case, we use Rocq version 9.0.1 compiled with OCaml 4.14.2. 
+In our case, we use Rocq version 9.1.0 compiled with OCaml 4.14.2. 
 
 ## Authors and contact information
 

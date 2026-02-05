@@ -1,4 +1,4 @@
-From mathcomp Require Import all_ssreflect.
+From mathcomp Require Import all_boot.
 From GraphTheory Require Import preliminaries sgraph digraph.
 
 Lemma bigmax_eq_pointwise (I :finType) (P : pred I) (F G: I -> nat) :

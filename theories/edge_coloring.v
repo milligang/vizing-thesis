@@ -1,5 +1,5 @@
 From HB Require Import structures.
-From mathcomp Require Import all_ssreflect.
+From mathcomp Require Import all_boot.
 From Stdlib Require Import Setoid CMorphisms Relation_Definitions.
 From GraphTheory Require Import edone preliminaries bij digraph sgraph connectivity.
 Require Import aux.
@@ -59,9 +59,8 @@ Section EdgeColoring.
   Lemma leq_maxdeg_pcol pc : max_degree G <= #|pc[E(G)]|.
   Proof.
     rewrite /max_degree. 
-    have E: \max_(x in G) #|E{x}| = \max_(x in G) #|N(x)|.
+    have <- : \max_(x in G) #|E{x}| = \max_(x in G) #|N(x)|.
     { apply: bigmax_eq_pointwise => v _; by rewrite card_edge_neigh. }
-    rewrite -E.
     apply/bigmax_leqP=> x _. 
     apply: (leq_trans _ (leq_vertex_graph pc x)).
     by rewrite (eq_deg_pcol pc x).
@@ -83,7 +82,7 @@ Section Recolor.
   Lemma recolor_neq e f c0 : f != e -> (recolor_edge e c0) f = c f.
   Proof. by rewrite /recolor_edge => /negPf ->. Qed.
 
-  Lemma recolor_im e c0 : 
+  Lemma imset_recolor e c0 : 
     c[E(del_edges e)] = recolor_edge e c0 [E(del_edges e)].
   Proof.
     apply/setP => c1.
@@ -108,7 +107,7 @@ Section Recolor.
   Proof.
     move=> He.
     rewrite (del_edges1 He).
-    move: (recolor_im e c0).
+    move: (imset_recolor e c0).
     rewrite /coloring_image 2!imsetU1 2!cardsU1 recolor_eq => -> -> -> /=.
     by rewrite add0n add1n subn1.
   Qed.
@@ -119,7 +118,7 @@ Section Recolor.
       else if edge == f then c e
       else c edge. 
 
-  Lemma swap_im e f : 
+  Lemma imset_swap e f : 
     e \in E(G) -> 
     f \in E(G) ->
     c[E(G)] = (swap_edge e f)[E(G)].
@@ -133,7 +132,7 @@ Section Recolor.
   Qed.
 
   (* TODO: finish this proof, presumably not too difficult *)
-  Lemma swap_im_vertex e f (v : G) :
+  Lemma imset_swap_vertex e f (v : G) :
     v \in e -> v \in f -> c[E{v}] = (swap_edge e f)[E{v}].
   Proof.
   Admitted.
@@ -154,7 +153,7 @@ Section ChromIdx.
     proper_edge_coloring G (projT1 kc) :=
     proj1_sig (projT2 kc).
 
-  Definition k_edge_card {k} (kc : k_edge_coloring k) :
+  Definition card_k_col {k} (kc : k_edge_coloring k) :
     #|kc[E(G)]| == k :=
     proj2_sig (projT2 kc).
 
@@ -196,7 +195,7 @@ Section ChromIdx.
     by move=> _ e1 e2 _ _ eq.
   Defined.
 
-  Lemma inj_im : proper_inj_coloring[E(G)] = E(G). 
+  Lemma imset_inj : proper_inj_coloring[E(G)] = E(G). 
   Proof.
     apply/setP => e.
     apply/imsetP/idP.
@@ -209,7 +208,7 @@ Section ChromIdx.
   (* injective coloring is a k-edge-coloring with k = #|E(G)| *)
   Definition inj_k_coloring : k_edge_coloring #|E(G)|.
   Proof.
-    exists {set G}, proper_inj_coloring. by rewrite inj_im.
+    exists {set G}, proper_inj_coloring. by rewrite imset_inj.
   Defined.
 
   (* Thus, all graphs have a k-edge-coloring with k = #|E(G)|*)
@@ -269,7 +268,7 @@ Section AbsentSet.
     move=> [c]; exists c => x.
     rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
     by rewrite subn_gt0 
-              (eqP (k_edge_card c)) 
+              (eqP (card_k_col c)) 
               (leq_ltn_trans (leq_col_deg c x)) 
               // addn1 ltnSn.
   Qed.
@@ -306,7 +305,7 @@ Section Fan.
     neigh_prop v (wk::f) &&
     w0_prop2 c [set v; (last wk f)] &&
     path (
-      fun x2 x1 => absent_prop c [set v; x2] x1
+      fun x2 => absent_prop c [set v; x2]
     ) wk f.
 
   Lemma fanp_neigh v wk c f : fanp v wk c f -> neigh_prop v (wk::f).
@@ -314,6 +313,19 @@ Section Fan.
 
   Lemma rev_neigh v wk f : neigh_prop v (wk::f) -> neigh_prop v (rev (wk::f)).
   Proof. by rewrite /neigh_prop all_rev. Qed.
+
+  Lemma fan_cons {v wk c f} w (fan : fanp v wk c f) : 
+    w \in N(v) ->
+    w \notin (wk::f) -> 
+    absent_prop c [set v; w] wk ->
+    fanp v w c (wk::f).
+  Proof. 
+    move: fan.
+    rewrite /fanp last_cons /neigh_prop=> /andP[/andP[/andP[Hu Hn]] -> Hp] Hin Hnin Ha //=.
+    (* rewrite cons_uniq {}Hnin {}Hu.
+    rewrite -cat1s all_cat all_seq1.
+    by rewrite -cat1s cat_path. *)
+  Qed.
 
 End Fan.
 
@@ -375,19 +387,30 @@ Section Rotation.
     move: fan_neigh; rewrite/neigh_prop=> /allP H. exact: H.
   Qed.
 
-  Definition valid_fan_vertex w :=
-    (w \in N(v)) && absent_prop c [set v; w] v && (w \notin wk::val f).
+  Definition fancons {w}
+    (Hin : w \in N(v))
+    (Hnin: w \notin wk::val f)
+    (Hab : absent_prop c [set v; w] wk) 
+  := Build_Fan (fan_cons (valP f) Hin Hnin Hab).
 
-  Definition extendFan : seq G := 
-    match [pick w in N(v) | valid_fan_vertex w] with
-    | Some w => w::wk::val f
-    | None => wk::val f
+  Definition valid_fan_vertex w :=
+    (w \in N(v)) && (w \notin wk::val f) && absent_prop c [set v; w] wk.
+
+  Definition extend_fan : option {w & Fan v w c} := 
+    match pickP (valid_fan_vertex) with
+    | Pick w Pw => 
+      let Hins := (andP Pw).1 in
+        let Hin := (andP Hins).1 in
+        let Hnin := (andP Hins).2 in
+      let Hab := (andP Pw).2 in
+      Some (existT _ w (fancons Hin Hnin Hab)) 
+    | Nopick _ => None
     end.
 
   Definition rotateF : edge_coloring G ColorType :=
     rotate c v (rev (wk::val f)).
 
-  Lemma rotate_imF_vertex : c[E{v}] = rotateF[E{v}].
+  Lemma imset_rot_vertex : c[E{v}] = rotateF[E{v}].
   Proof.
     rewrite/rotateF; set fs := (rev (wk::val f)).
     elim: fs c=> [|w0 ws IH] d //=.
@@ -395,10 +418,10 @@ Section Rotation.
     rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //.
     have Hv0 : v \in [set v; w0] by rewrite in_set2 eq_refl.
     have Hv1 : v \in [set v; w1] by rewrite in_set2 eq_refl.
-    exact: swap_im_vertex Hv0 Hv1.
+    exact: imset_swap_vertex Hv0 Hv1.
   Qed.
 
-  Lemma rotate_imF : c[E(G)] = rotateF[E(G)].
+  Lemma imset_rot : c[E(G)] = rotateF[E(G)].
   Proof.
     rewrite /rotateF; set fs := (rev (wk::val f)).
     have Hws : neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
@@ -408,16 +431,16 @@ Section Rotation.
     move/andP: Hws => [Hw1 _].
     have He0 : [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
     have He1 : [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
-    exact: swap_im He0 He1.
+    exact: imset_swap He0 He1.
   Qed.
 
-  Lemma rot_card :
+  Lemma card_rot :
     #|c[E(G)]| = #|rotateF[E(G)]|.
-  Proof. by rewrite rotate_imF. Qed.
+  Proof. by rewrite imset_rot. Qed.
 
   Lemma rot_abs_edge : absent_set c v = absent_set rotateF v.
   Proof.
-    by rewrite/absent_set rotate_imF rotate_imF_vertex.
+    by rewrite/absent_set imset_rot imset_rot_vertex.
   Qed.
 
   (* TODO! *)
@@ -427,10 +450,27 @@ Section Rotation.
     is_proper_edge_coloring c ->
     is_proper_edge_coloring rotateF.
   Proof.
-    rewrite/is_proper_edge_coloring=> Hprop e1 e2 Hex Heq.
+    rewrite/is_proper_edge_coloring=> Hprop x e1 e2 He1 He2 Heq.
   Admitted.
 
 End Rotation.
+
+Fixpoint fanmax 
+  {G : sgraph} 
+  {ColorType : finType} 
+  {v wk : G} 
+  {c : edge_coloring G ColorType} 
+  (d : nat) 
+  (f : Fan v wk c) 
+: {w & Fan v w c} :=
+    match d with 
+    | 0 => existT _ wk f
+    | S d' => 
+      match extend_fan f with
+      | Some (existT w f') => fanmax d' f'
+      | None => existT _ wk f
+      end
+    end.
 
 Fixpoint alternates
   {G : sgraph} {ColorType : finType} 
@@ -444,7 +484,7 @@ Fixpoint alternates
 Section AltPath.
   Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
   Implicit Types (x y : G) (p : seq G) (ca cb : ColorType).
-  
+
   Definition altpath ca cb x y p := 
     (alternates c ca cb (x::p) || alternates c cb ca (x::p)) && pathp x y p.
 
@@ -470,7 +510,7 @@ Section AltPath.
     if alternates c ca cb (x :: p) then cb else ca.
 
   (* Not needed right now *)
-    Lemma alternate_cons ca cb x y p :
+  Lemma alternate_cons ca cb x y p :
    alternates c ca cb (x::y::p) = 
    (c [set x; y] == ca) && alternates c cb ca (y::p).
   Proof. 
@@ -521,9 +561,13 @@ Section Kempe.
   (* Definition apath_of {x y} (p : Path x y) (AH : alternates c ca cb (x :: val p)) : AltPath c ca cb x y := 
     Sub (val p) (path_altpath AH). *)
 
-  Definition apcons {c x y z} (ap : AltPath c ca cb y z) (xy : x -- y) (Hc : c [set x; y] == next_col (valP ap)) := Build_AltPath (altpath_cons xy Hc).
+  Definition apcons {c x y z} 
+    (ap : AltPath c ca cb y z) 
+    (xy : x -- y) 
+    (Hc : c [set x; y] == next_col (valP ap)) 
+  := Build_AltPath (altpath_cons xy Hc).
 
-  Definition apextend {c x y} (ap : AltPath c ca cb x y) : option {w & AltPath c ca cb w y} := 
+  Definition extend_ap {c x y} (ap : AltPath c ca cb x y) : option {w & AltPath c ca cb w y} := 
     match pickP (fun v => (v \in N(x)) && (c [set v; x] == next_col (valP ap))) with
     | Pick v Pv =>
         let Hv := prev_edge_proof (eq_rect (v \in N(x)) is_true (andP Pv).1 (x -- v) (in_opn v x)) in
@@ -533,10 +577,10 @@ Section Kempe.
     end.
   
   (* Not needed right now *)
-  Lemma apextend_none {c x y} (ap : AltPath c ca cb x y) : 
-    apextend ap == None -> next_col (valP ap) \in absent_set c x.
+  Lemma extend_ap_none {c x y} (ap : AltPath c ca cb x y) : 
+    extend_ap ap == None -> next_col (valP ap) \in absent_set c x.
   Proof. 
-    rewrite /apextend; case pickP=> H _ //. 
+    rewrite /extend_ap; case pickP=> H _ //. 
     apply Nopick in H.
   Admitted.
 
@@ -560,7 +604,7 @@ Section Kempe.
     match d with 
     | 0 => existT _ x ap
     | S d' => 
-      match apextend ap with
+      match extend_ap ap with
       | Some (existT v ap') => apmax d' ap'
       | None => existT _ x ap
       end
@@ -593,7 +637,7 @@ Proof.
   have Hin' : cj \in c'[E(del_edges [set v; wj])].
   { 
     move: (Hin) (Hcv); 
-    rewrite /absent_set (rotate_imF f) (rotate_imF_vertex f) => Hin' Hab.
+    rewrite /absent_set (imset_rot f) (imset_rot_vertex f) => Hin' Hab.
     exact: absent_present Hin' Hab Hneigh. 
   }
   have Hnotin' : c' [set v; wj] \notin c'[E(del_edges [set v; wj])] by admit.
@@ -601,7 +645,7 @@ Proof.
   have Hprop'' : is_proper_edge_coloring c'' by admit.
   constructor.
   move: (replace_col Hvw Hin' Hnotin'); 
-  rewrite -rot_card Hcard addn2 subn1 /= -addn1=> Hcard''.
+  rewrite -card_rot Hcard addn2 subn1 /= -addn1=> Hcard''.
 Admitted.
 
 (* TODO *)

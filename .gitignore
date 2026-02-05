@@ -4,5 +4,6 @@
 *.glob
 tmp.v
 .tmp.aux
+depend-graph*
 COQAUX*
 CoqMakefile

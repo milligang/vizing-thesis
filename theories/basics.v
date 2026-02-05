@@ -1,5 +1,5 @@
 Set Warnings "-notation-overridden, -notation-incompatible-prefix". (* to ignore warnings due to the import of ssreflect *)
-From mathcomp Require Import all_ssreflect.
+From mathcomp Require Import all_boot.
 From Stdlib Require Import RelationClasses.
 From GraphTheory Require Import digraph sgraph dom.
 Require Import Stdlib.Logic.Classical_Prop.
@@ -8,9 +8,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 Lemma bipSubCom (n : nat) : subgraph ('K_n,1) ('K_n.+1).
 Proof. 
-    Check sub_Kn.
     apply: sub_Kn.
-    Check card_sum.
     rewrite card_sum !card_ord. 
     by rewrite addn1.
 Qed.
