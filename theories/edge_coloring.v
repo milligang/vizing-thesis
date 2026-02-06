@@ -37,7 +37,7 @@ Section EdgeColoring.
   Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
   Lemma leq_col_deg c x : #|c[E{x}]| <= max_degree G.
-  Proof.
+  Proof. 
     apply: (leq_trans (leq_imset_card _ _)).
     rewrite card_edge_neigh.
     rewrite /max_degree.
@@ -163,6 +163,16 @@ Section ChromIdx.
   (* The chromatic index chi is the smallest k such that G is k-colorable *)
   Definition is_chromatic_index chi : Prop :=
     k_edge_colorable chi /\ forall k, k < chi -> ~ k_edge_colorable k.
+
+  (* We can already lower bound the chromatic index *)
+  Theorem lower_bound (chi : nat): 
+    is_chromatic_index chi -> 
+    max_degree G <= chi.
+  Proof. 
+    do 3![elim] => ColorType H _. 
+    elim: H=> c /eqP <-.
+    by rewrite leq_maxdeg_pcol.
+  Qed.
 
   (*  Any valid k-edge-colorable upper bounds chi *)
   Lemma chromatic_index_upper_bound k chi :
@@ -321,7 +331,7 @@ Section Fan.
     fanp v w c (wk::f).
   Proof. 
     move: fan.
-    rewrite /fanp last_cons /neigh_prop=> /andP[/andP[/andP[Hu Hn]] -> Hp] Hin Hnin Ha //=.
+    by rewrite /fanp last_cons /neigh_prop => /andP[/andP[/andP[Hu Hn]] -> Hp] Hin Hnin Ha.
     (* rewrite cons_uniq {}Hnin {}Hu.
     rewrite -cat1s all_cat all_seq1.
     by rewrite -cat1s cat_path. *)
@@ -653,7 +663,9 @@ Theorem Vizings (G : sgraph) (chi : nat):
   is_chromatic_index G chi -> 
   max_degree G <= chi <= max_degree G + 1.
 Proof.
-  move=>[Hchi Hchi_min].
+  move=> /lower_bound -> /=.
+
 Admitted.
+
 
  
