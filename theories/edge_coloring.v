@@ -160,12 +160,18 @@ Section ChromIdx.
   (* G is k-colorable if a k-edge-coloring exists. *)
   Definition k_edge_colorable k : Prop := inhabited (k_edge_coloring k).
 
+  Lemma lt_k_edge_col n m :
+    k_edge_colorable n -> n < m -> k_edge_colorable m.
+  Proof.
+  Admitted.
+
+
   (* The chromatic index chi is the smallest k such that G is k-colorable *)
   Definition is_chromatic_index chi : Prop :=
     k_edge_colorable chi /\ forall k, k < chi -> ~ k_edge_colorable k.
 
   (* We can already lower bound the chromatic index *)
-  Theorem lower_bound (chi : nat): 
+  Theorem chi_lower_bound (chi : nat): 
     is_chromatic_index chi -> 
     max_degree G <= chi.
   Proof. 
@@ -175,7 +181,7 @@ Section ChromIdx.
   Qed.
 
   (*  Any valid k-edge-colorable upper bounds chi *)
-  Lemma chromatic_index_upper_bound k chi :
+  Lemma chi_upper_bound k chi :
     is_chromatic_index chi ->
     k_edge_colorable k ->
     chi <= k.
@@ -185,6 +191,16 @@ Section ChromIdx.
     apply/negP => Hlt.
     have Hneg : ~ k_edge_colorable k := Hchi_min _ Hlt.
     exact: Hneg Hk.
+  Qed.
+
+  Lemma chi_upper_bound_trans n chi :   
+    is_chromatic_index chi ->
+    (exists k, k_edge_colorable k /\ k <= n) ->
+    chi <= n.
+  Proof.
+    move=> Hchi [k] [Hk Hltn].
+    have Hltk : chi <= k by exact/chi_upper_bound.
+    exact (leq_trans Hltk Hltn).
   Qed.
 
   (* ----  One-to-one Coloring ---- *)
@@ -232,7 +248,7 @@ Section ChromIdx.
     is_chromatic_index chi -> chi <= #|E(G)|.
   Proof.
     move=> Hchi. 
-    apply (chromatic_index_upper_bound Hchi inj_chrom).
+    apply (chi_upper_bound Hchi inj_chrom).
   Qed.
 
   (* make ab set, not straigth existsnec. sig.  *)
@@ -663,15 +679,18 @@ Theorem Vizings (G : sgraph) (chi : nat):
   is_chromatic_index G chi -> 
   max_degree G <= chi <= max_degree G + 1.
 Proof.
-  move=> Hchi. rewrite lower_bound //=. move: Hchi.
+  move=> Hchi. rewrite chi_lower_bound //=.
+  (* apply: chi_upper_bound_trans. exact Hchi.  *)
+  apply (chi_upper_bound_trans Hchi) => {Hchi}.
   (* see edges_sum_degrees proof *)
-  elim/(size_ind (fun G => #|E(G)|)) : G chi => G IH chi.
+  elim/(size_ind (fun G => #|E(G)|)) : G => G IH.
   case: (set_0Vmem E(G)) => [E0|[e edge_e]].
-  - move/chromatic_index_le_edges => He.
-    by apply/(leq_trans He); rewrite E0 cards0.
+  - exists #|E(G)|. split; first by exact/inj_chrom.
+    by rewrite E0 cards0. 
   - have [x [y] [def_e xy]] := edgesP _ edge_e; set G' := del_edges e.
-    have/IH E' : #|E(G')| < #|E(G)|.
+    have/IH [k' [Hk' Hltk']] : #|E(G')| < #|E(G)|.
     { by apply: proper_card; exact: del_edges_proper edge_e _. }
+    have {}Hltk' : k' <= max_degree G + 1 by admit.
 Admitted.
 
 
