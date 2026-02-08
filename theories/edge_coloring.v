@@ -663,8 +663,15 @@ Theorem Vizings (G : sgraph) (chi : nat):
   is_chromatic_index G chi -> 
   max_degree G <= chi <= max_degree G + 1.
 Proof.
-  move=> /lower_bound -> /=.
-
+  move=> Hchi. rewrite lower_bound //=. move: Hchi.
+  (* see edges_sum_degrees proof *)
+  elim/(size_ind (fun G => #|E(G)|)) : G chi => G IH chi.
+  case: (set_0Vmem E(G)) => [E0|[e edge_e]].
+  - move/chromatic_index_le_edges => He.
+    by apply/(leq_trans He); rewrite E0 cards0.
+  - have [x [y] [def_e xy]] := edgesP _ edge_e; set G' := del_edges e.
+    have/IH E' : #|E(G')| < #|E(G)|.
+    { by apply: proper_card; exact: del_edges_proper edge_e _. }
 Admitted.
 
 
