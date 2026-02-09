@@ -8,17 +8,30 @@ Proof.
   by rewrite A B.
 Qed.
 
-Definition edge_neigh {G : sgraph} (u : G) := [set [set u; v] | v in N(u)].
-Notation "E{ x }" := (edge_neigh x) (at level 0, format "E{ x }").
+Definition edge_neigh (G : sgraph) x := [set [set x; y] | y in N(G;x)].
+
+Notation "E{ x }" := (@edge_neigh _ x) (at level 0, format "E{ x }").
+Notation "E{ G ; x }" := (@edge_neigh G x) (at level 0, format "E{ G ; x }"). 
 
 Lemma sub_all_edges {G : sgraph} (v : G) : E{v} \subset E(G).
 Proof.
     apply/subsetP => e.
-    rewrite /edge_neigh.
+    rewrite/edge_neigh.
     move/imsetP => [w Hw ->].
     apply/edgesP; exists v, w.
     split => //.
     by rewrite in_opn in Hw.
+Qed.
+
+Lemma del_edges_edge_neigh (G : sgraph) (A e : {set G}) (x : G): 
+  e \in E{del_edges A;x} = (e \in E{G;x}) && ~~ (e \subset A).
+Proof.
+  rewrite/edge_neigh.
+  apply/imsetP/andP => [[z + ->] | [/imsetP [z] Hin -> Hns]].
+  - rewrite (del_edges_opn _ x) => /andP[Hin ->].
+    by split; first apply/imsetP; try exists z.
+  - move/andP: (conj Hin Hns). rewrite -del_edges_opn.
+    by exists z.
 Qed.
 
 Lemma card_edge_neigh (G : sgraph) (v : G) :
