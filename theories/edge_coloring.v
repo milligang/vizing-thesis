@@ -259,24 +259,29 @@ Section ChromIdx.
   *)
 End ChromIdx.
 
-Lemma del_edges_coloring (G : sgraph) (k : nat) (e0 : {set G}) :
-  k_edge_colorable (del_edges e0) k -> k_edge_colorable G (k + 1).
+(* arguably, could also work for matchings not just single edge *)
+Lemma del_edges_coloring (G : sgraph) (k : nat) (del_e : {set G}) :
+  del_e \in E(G) -> k_edge_colorable (del_edges del_e) k -> k_edge_colorable G (k + 1).
 Proof. 
-  move=> [[ColorType [[Hc Hp] Hcard]]].
-  pose c' := fun e1 =>
-    if e1 == e0 then None else Some (Hc e1).
+  move=> He [[ColorType [[Hc Hp] Hcard]]].
+  pose c' := fun e =>
+    if e == del_e then None else Some (Hc e).
   have Hp': is_proper_edge_coloring c'.
-    { 
-      move=> x f0 f1 Hin0 Hin1. rewrite /c'.
-      case H00 : (f0 == e0); case H10 : (f1 == e0)=> //.
-      - by move/eqP: H00 => ->; move/eqP: H10 => ->.
-      - move: Hin0 Hin1; rewrite /edge_neigh.
+    {
+      move=> x f0 f1 /(subsetP (sub_all_edges x)) Hf0 /(subsetP (sub_all_edges x)) Hf1.
+      rewrite /c'.
+      case H00: (f0 == del_e); case H10 : (f1 == del_e) => //.
+      - move/eqP: H00 => ->; move/eqP: H10 => -> //.
+      - move/negbT: H00=> H00. move/negbT: H10=> H10.
+      move: (edges_eqn_sub Hf0 He H00)=> Hsub0.
+      move: (edges_eqn_sub Hf1 He H10)=> Hsub1.
+      (* del_edges_edge_neigh. *)
         (* move=> [Heq]; apply: (Hp x). *)
         admit.
     }
-    rewrite /c'.
-  constructor. rewrite/k_edge_coloring.
-  exists (option ColorType).
+    (* rewrite /c'. *)
+  (* constructor. rewrite/k_edge_coloring. *)
+  (* exists (option ColorType). *)
 Admitted.
 
 Section AbsentSet.
@@ -705,7 +710,7 @@ Proof.
     have/IH [k' [Hk' Hltk']] : #|E(G')| < #|E(G)|.
     { by apply: proper_card; exact: del_edges_proper edge_e _. }
     have {}Hltk' : k' <= max_degree G + 1 by admit.
-    (* have k_edge_colorable G (k' + 1)  *)
+    move: (del_edges_coloring edge_e Hk').
 Admitted.
 
 
