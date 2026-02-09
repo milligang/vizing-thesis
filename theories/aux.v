@@ -34,6 +34,15 @@ Proof.
     by exists z.
 Qed.
 
+Lemma del_edges1_neq {G : sgraph} (e del_e : {set G}) :
+  e \in E(del_edges del_e) -> e != del_e.
+Proof.
+  move=> He.
+  apply/eqP => Heq.
+  rewrite Heq in He.
+  by move: (del_edgesN del_e); rewrite He.
+Qed.
+
 Lemma card_edge_neigh (G : sgraph) (v : G) :
   #|E{v}| = #|N(v)|.
 Proof.

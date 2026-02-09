@@ -259,30 +259,55 @@ Section ChromIdx.
   *)
 End ChromIdx.
 
+Section ExtendCol. 
+  Variables
+    (G : sgraph)  
+    (del_e : {set G}) 
+    (He : del_e \in E(G)).
+
+  Definition extended_col 
+    {ColorType : finType}
+    (c : edge_coloring (del_edges del_e) ColorType)
+  : edge_coloring G (option ColorType) :=
+    fun e => if e == del_e then None else Some (c e).
+
+  Lemma proper_extended_col
+    {ColorType : finType}
+    (pc : proper_edge_coloring (del_edges del_e) ColorType)
+  : is_proper_edge_coloring (extended_col pc).
+  Proof.
+    (* exists (extended_col pc). *)
+    move: pc => [c Hp] x f0 f1 /(subsetP (sub_all_edges x)) Hf0 /(subsetP (sub_all_edges x)) Hf1.
+    rewrite /extended_col.
+    case H00: (f0 == del_e); case H10 : (f1 == del_e) => //.
+    - move/eqP: H00 => ->; move/eqP: H10 => -> //.
+    - move/negbT: H00=> H00. move/negbT: H10=> H10.
+    move: (edges_eqn_sub Hf0 He H00)=> Hsub0.
+    move: (edges_eqn_sub Hf1 He H10)=> Hsub1.
+    move=> [Heq]; apply (Hp x).
+  Admitted.
+
+  Lemma card_extended_col 
+    {k : nat} 
+    (kc : k_edge_coloring (del_edges del_e) k) 
+  : #|extended_col kc[E(G)]| = k + 1.
+  Proof. 
+    (* move: kc => [CT [pc Hcard]]. *)
+    (* exists (option CT), (proper_extended_col pc). *)
+  Admitted.
+
 (* arguably, could also work for matchings not just single edge *)
-Lemma del_edges_coloring (G : sgraph) (k : nat) (del_e : {set G}) :
-  del_e \in E(G) -> k_edge_colorable (del_edges del_e) k -> k_edge_colorable G (k + 1).
-Proof. 
-  move=> He [[ColorType [[Hc Hp] Hcard]]].
-  pose c' := fun e =>
-    if e == del_e then None else Some (Hc e).
-  have Hp': is_proper_edge_coloring c'.
-    {
-      move=> x f0 f1 /(subsetP (sub_all_edges x)) Hf0 /(subsetP (sub_all_edges x)) Hf1.
-      rewrite /c'.
-      case H00: (f0 == del_e); case H10 : (f1 == del_e) => //.
-      - move/eqP: H00 => ->; move/eqP: H10 => -> //.
-      - move/negbT: H00=> H00. move/negbT: H10=> H10.
-      move: (edges_eqn_sub Hf0 He H00)=> Hsub0.
-      move: (edges_eqn_sub Hf1 He H10)=> Hsub1.
-      (* del_edges_edge_neigh. *)
-        (* move=> [Heq]; apply: (Hp x). *)
-        admit.
-    }
-    (* rewrite /c'. *)
-  (* constructor. rewrite/k_edge_coloring. *)
-  (* exists (option ColorType). *)
-Admitted.
+  Lemma del_edges_coloring (k : nat) :
+    k_edge_colorable (del_edges del_e) k -> k_edge_colorable G (k + 1).
+  Proof. 
+    (* move=> Hpe [[ColorType [Hpc Hcard]]]. *)
+    (* pose c' := extended_col Hpc. *)
+    (* have Hp': is_proper_edge_coloring c' := proper_extended_col He. *)
+      (* rewrite /c'. *)
+    (* constructor. rewrite/k_edge_coloring. *)
+    (* exists (option ColorType). *)
+  Admitted.
+End ExtendCol.
 
 Section AbsentSet.
   Variables (G : sgraph).
@@ -321,8 +346,8 @@ Section AbsentSet.
 End AbsentSet.
 
 Section Fan.
-  Variable (G : sgraph) (ColorType : finType).
-  Implicit Types (v w : G) (e : {set G}) (f : seq G) (c : edge_coloring G ColorType).
+  Variable (G : sgraph).
+  Implicit Types (v w : G) (e : {set G}) (f : seq G) (ColorType : finType).
 
   (* 1. For all w in the fan centered at v, w is in the neighborhood of v *)
   Definition neigh_prop v f := all (fun w => w \in N(v)) f.
@@ -330,36 +355,45 @@ Section Fan.
   (* 2. if w0 is the first item in fan f centered at v under coloring c,
     (v, w0) is a distinct color from the rest of the edges in the graph *)
   (* Todo: two equivalent definitions, choose one *)
-  Definition w0_prop1 c e := c e \notin c[E(del_edges e)].
+  Definition w0_prop 
+    {ColorType} (c : edge_coloring G ColorType) e 
+  := c e \notin c[E(del_edges e)].
     
-  Definition w0_prop2 c e := 
-    [forall (h : {set G} | (h \in E(G)) && (e != h)), c e != c h].
+  (* Definition w0_prop2 c e := 
+    [forall (h : {set G} | (h \in E(G)) && (e != h)), c e != c h]. *)
 
   (* Todo: decide which w0_prop to use, they are equivalent *)
-    Lemma w0_props c e : reflect (w0_prop1 c e) (w0_prop2 c e).
+    (* Lemma w0_props c e : reflect (w0_prop1 c e) (w0_prop2 c e). *)
+  (* Proof.  *)
+  (* Admitted. *)
+
+  Lemma w0_extended_col {e ColorType} (c_del : edge_coloring (del_edges e) ColorType)
+  : w0_prop (extended_col c_del) e.
   Proof. 
-  Admitted.
+    rewrite /w0_prop /extended_col eq_refl.
+    by apply/negP => /imsetP [e' /del_edges1_neq /negbTE ->].
+  Qed.
 
     (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
     the color of (v, w_{i+1} is absent at w_i) *)
-  Definition absent_prop c e w := 
+  Definition absent_prop {ColorType} (c : edge_coloring G ColorType) e w := 
     (c e) \in (absent_set c w).
 
-  Definition fanp v wk c f := 
+  Definition fanp {ColorType} v wk (c : edge_coloring G ColorType) f := 
     uniq (wk::f) &&
     neigh_prop v (wk::f) &&
-    w0_prop2 c [set v; (last wk f)] &&
+    w0_prop c [set v; (last wk f)] &&
     path (
       fun x2 => absent_prop c [set v; x2]
     ) wk f.
 
-  Lemma fanp_neigh v wk c f : fanp v wk c f -> neigh_prop v (wk::f).
+  Lemma fanp_neigh {ColorType} v wk (c : edge_coloring G ColorType) f : fanp v wk c f -> neigh_prop v (wk::f).
   Proof. by case/andP => /andP [/andP [_ ->] _] _. Qed.
 
   Lemma rev_neigh v wk f : neigh_prop v (wk::f) -> neigh_prop v (rev (wk::f)).
   Proof. by rewrite /neigh_prop all_rev. Qed.
 
-  Lemma fan_cons {v wk c f} w (fan : fanp v wk c f) : 
+  Lemma fan_cons {v wk f ColorType} {c : edge_coloring G ColorType} w (fan : fanp v wk c f) : 
     w \in N(v) ->
     w \notin (wk::f) -> 
     absent_prop c [set v; w] wk ->
@@ -431,6 +465,8 @@ Section Rotation.
   Proof. 
     move: fan_neigh; rewrite/neigh_prop=> /allP H. exact: H.
   Qed.
+
+  (* Definition fan0 := BuildFan (fan ) *)
 
   Definition fancons {w}
     (Hin : w \in N(v))
@@ -707,10 +743,13 @@ Proof.
   - exists #|E(G)|. split; first by exact/inj_chrom.
     by rewrite E0 cards0. 
   - have [x [y] [def_e xy]] := edgesP _ edge_e; set G' := del_edges e.
-    have/IH [k' [Hk' Hltk']] : #|E(G')| < #|E(G)|.
+    have/IH [k' [[Hk'] Hltk']] : #|E(G')| < #|E(G)|.
     { by apply: proper_card; exact: del_edges_proper edge_e _. }
     have {}Hltk' : k' <= max_degree G + 1 by admit.
-    move: (del_edges_coloring edge_e Hk').
+    (* move: (extended_col Hk'). => Hk. *)
+    (* pose f0 :=  *)
+    (* pose f = fanmax  *)
+
 Admitted.
 
 
