@@ -8,6 +8,13 @@ Proof.
   by rewrite A B.
 Qed.
 
+Lemma notin_setD {T : finType} (A B : {set T}) (x : T) :
+  x \in A -> x \notin A :\: B -> x \in B.
+Proof.
+  rewrite in_setD => ->.
+  by rewrite andbT negbK.
+Qed.
+
 Definition edge_neigh (G : sgraph) x := [set [set x; y] | y in N(G;x)].
 
 Notation "E{ x }" := (@edge_neigh _ x) (at level 0, format "E{ x }").

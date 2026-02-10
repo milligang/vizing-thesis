@@ -36,6 +36,15 @@ Section EdgeColoring.
   Definition coloring_image c (E : {set {set G}}) : {set ColorType} := c @: E.
   Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
+  Lemma exists_v_of_c c x (c0 : ColorType) : 
+    c0 \in c[E{x}] -> 
+    exists y, ([set x; y] \in E(G)) && (c [set x; y] == c0).
+  Proof.
+    rewrite /edge_neigh /coloring_image => /imsetP[e] /imsetP[y].
+    rewrite in_opn -in_edges => Hin He /eqP Hc; rewrite He eq_sym in Hc.
+    by exists y. 
+  Qed.
+
   Lemma leq_col_deg c x : #|c[E{x}]| <= max_degree G.
   Proof. 
     apply: (leq_trans (leq_imset_card _ _)).
@@ -318,7 +327,7 @@ Section AbsentSet.
     setD (c[E(G)]) (c[E{x}]).
 
   (* still deciding on definitions further down, tbd which of these three will be needed *)
-    Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
+  Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
     c0 \in absent_set c x <-> [pick e in E{x} | c e == c0] == None.
   Proof. split=> H. Admitted.
 
@@ -330,17 +339,13 @@ Section AbsentSet.
     c0 \in c[E(G)] -> c0 \in absent_set c x -> y \in N(x) -> c0 \in c[E(del_edges [set x; y])].
   Proof. Admitted.
 
-  Proposition exists_absent_color :
-    k_edge_colorable G (max_degree G + 1) ->
-    exists c : k_edge_coloring G (max_degree G + 1),
-    forall x : G, absent_set c x != set0.
+  Proposition exists_absent_color {k : nat} (kc : k_edge_coloring G k):
+    max_degree G + 1 <= k ->
+    forall x : G, exists c, c \in (absent_set kc x).
   Proof.
-    move=> [c]; exists c => x.
+    rewrite addn1=> Hk x; apply/set0Pn.
     rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
-    by rewrite subn_gt0 
-              (eqP (card_k_col c)) 
-              (leq_ltn_trans (leq_col_deg c x)) 
-              // addn1 ltnSn.
+    by rewrite subn_gt0 (eqP (card_k_col kc)) (leq_ltn_trans (leq_col_deg kc x)).
   Qed.
   
 End AbsentSet.
@@ -423,20 +428,6 @@ Section Pack.
   End FanDef.
 End Pack.
 
-Definition fan_nodes 
-  (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c) 
-  := wk :: val f.
-
-(* Definition in_fan_nodes 
-  (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c) 
-  : collective_pred G := 
-  [pred u | u \in fan_nodes f].
-Canonical Fan_predType 
-  (G : sgraph) (ColorType : finType) (v wk : G) (c : edge_coloring G ColorType) (f : Fan v wk c)  
-  := Eval hnf in @PredType G 
-      (Fan v wk c) (@in_fan_nodes G ColorType v wk c).
-Coercion in_fan_nodes : Fan >-> collective_pred. *)
-
 (* Could update this to take in an actual fan, then don't need first match
   case because fans always have at least one element, but would need to prove this.
   this allows us to be more general at least. *)
@@ -454,19 +445,35 @@ Fixpoint rotate
   | _ => c
   end. 
 
+  Lemma Fan_of_proof 
+    {G : sgraph} 
+    {ColorType} 
+    {v w0 : G} 
+    (c_del : edge_coloring (del_edges [set v; w0]) ColorType) 
+  : v -- w0 -> fanp v w0 (extended_col c_del) [::].
+  Proof.
+    by rewrite /fanp (w0_extended_col c_del) -in_opn.
+  Qed.
+
+  Definition Fan_of_del_edges 
+    {G : sgraph} 
+    {ColorType} 
+    {v w0 : G}
+    (He : v -- w0)
+    (c_del : edge_coloring (del_edges [set v; w0]) ColorType)
+  := Build_Fan (Fan_of_proof c_del He).
+
 Section Rotation. 
   Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v wk : G) (f : Fan v wk c).
   Implicit Type (w : G).
 
-  Lemma fan_neigh : neigh_prop v (fan_nodes f).
-  Proof. move: (valP f). rewrite/fan_nodes. exact: fanp_neigh. Qed.
+  Lemma fan_neigh : neigh_prop v ( wk :: val f).
+  Proof. move: (valP f). exact: fanp_neigh. Qed.
 
   Lemma in_neigh w : w \in (wk::val f) -> w \in N(v).
   Proof. 
     move: fan_neigh; rewrite/neigh_prop=> /allP H. exact: H.
   Qed.
-
-  (* Definition fan0 := BuildFan (fan ) *)
 
   Definition fancons {w}
     (Hin : w \in N(v))
@@ -487,6 +494,33 @@ Section Rotation.
       Some (existT _ w (fancons Hin Hnin Hab)) 
     | Nopick _ => None
     end.
+
+  (* For ck in A_c(wk) and c[E{v}], if we can't extend f then an edge on the fan is colored ck *)
+  Lemma extend_none (ck : ColorType) :
+    ck \in c[E(G)] ->  
+    ck \notin absent_set c v ->  
+    ck \in absent_set c wk ->
+    extend_fan = None ->
+    exists w, 
+    [&& [set v; w] \in E(G), c [set v; w] == ck & w \in (wk :: val f)].
+  Proof.
+    rewrite/extend_fan/valid_fan_vertex => Hinc Hnab Hab;
+    case: pickP => [//|Hf _].
+    have Hatv: ck \in c[E{v}] by exact: notin_setD Hinc Hnab.
+    move: (exists_v_of_c Hatv)=> [w] /andP[Hine /eqP Hc].
+    exists w. move: (Hf w).
+    have -> : w \in N(v) by rewrite in_opn -in_edges.
+    by rewrite /absent_prop Hine Hc Hab eq_refl /= andbT=> /negbFE.
+  Qed.
+
+  Lemma extend_absent :
+    extend_fan = None ->   
+    (forall wi, ~~ ((wi \in (wk :: val f)) && (c [set v; wi] == c [set v; wk]))) ->
+    absent_prop c [set v; wk] v.
+  Proof.
+    rewrite/extend_fan.
+    case: pickP=> [//|+ _].
+  Admitted.
 
   Definition rotateF : edge_coloring G ColorType :=
     rotate c v (rev (wk::val f)).
@@ -730,26 +764,46 @@ Proof.
 Admitted.
 
 (* TODO *)
+(* see edges_sum_degrees proof *)
 Theorem Vizings (G : sgraph) (chi : nat): 
   is_chromatic_index G chi -> 
   max_degree G <= chi <= max_degree G + 1.
 Proof.
-  move=> Hchi. rewrite chi_lower_bound //=.
-  (* apply: chi_upper_bound_trans. exact Hchi.  *)
+  move=> Hchi; 
+  rewrite chi_lower_bound //=.
   apply (chi_upper_bound_trans Hchi) => {Hchi}.
-  (* see edges_sum_degrees proof *)
   elim/(size_ind (fun G => #|E(G)|)) : G => G IH.
   case: (set_0Vmem E(G)) => [E0|[e edge_e]].
-  - exists #|E(G)|. split; first by exact/inj_chrom.
-    by rewrite E0 cards0. 
-  - have [x [y] [def_e xy]] := edgesP _ edge_e; set G' := del_edges e.
-    have/IH [k' [[Hk'] Hltk']] : #|E(G')| < #|E(G)|.
+  - (* Base case #|E(G)| = 0 *)
+    exists #|E(G)|.
+    split; first by exact/inj_chrom.
+    by rewrite E0 cards0.
+  - (* Induction *)
+    have [v [w0] [def_e vw0]] := edgesP _ edge_e; set G' := del_edges e.
+    have/IH [k' [[Hkc'] Hleqk']]: #|E(G')| < #|E(G)|.
     { by apply: proper_card; exact: del_edges_proper edge_e _. }
-    have {}Hltk' : k' <= max_degree G + 1 by admit.
-    (* move: (extended_col Hk'). => Hk. *)
-    (* pose f0 :=  *)
-    (* pose f = fanmax  *)
+    have: k' <= max_degree G + 1.
+    { by admit. }
+    have Hkc: k_edge_coloring G (k' + 1). 
+      { 
+        exists (option (projT1 Hkc')), 
+        (exist _ (extended_col Hkc') (@proper_extended_col _ _ edge_e _ Hkc'));
+        by rewrite (card_extended_col edge_e Hkc'). 
+      } 
+    rewrite leq_eqVlt => /orP[/eqP Heqk'| Hltk']; first last.
+    - (*if k' < max_degree G + 1, then we are done *) 
+      exists (k' + 1).
+      by split; [ |rewrite addn1].
+    (* k' = max_degree G + 1, need to rotate out color *)
+    rewrite Heqk' in Hkc.
+    pose f0 := Fan_of_del_edges vw0 Hkc'.
+    case Hfmax: (fanmax #|N(v)| f0) => [w fmax].
+    have tmp: (max_degree G + 1 <= max_degree G + 1 + 1) by rewrite (addn1 (max_degree G + 1)).
+    move: (exists_absent_color Hkc tmp w) => {tmp} [c] Hab.
+    have Hc:= proper_to_edge_coloring (k_to_proper_coloring Hkc).
+    case: (pickP [pred wi | (wi \in (w :: val fmax)) && (Hc [set v; wi] == c)]) => [wi /andP [Hwi Heq] | Hno].
 
+    
 Admitted.
 
 
