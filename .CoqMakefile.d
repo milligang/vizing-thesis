@@ -6,3 +6,5 @@ theories/edge_coloring.vo theories/edge_coloring.glob theories/edge_coloring.v.b
 theories/edge_coloring.vos theories/edge_coloring.vok theories/edge_coloring.required_vos: theories/edge_coloring.v theories/aux.vos /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
 theories/tmp.vo theories/tmp.glob theories/tmp.v.beautified theories/tmp.required_vo: theories/tmp.v theories/aux.vo /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
 theories/tmp.vos theories/tmp.vok theories/tmp.required_vos: theories/tmp.v theories/aux.vos /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
+depend-graph/depend_build.vo depend-graph/depend_build.glob depend-graph/depend_build.v.beautified depend-graph/depend_build.required_vo: depend-graph/depend_build.v theories/edge_coloring.vo /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
+depend-graph/depend_build.vos depend-graph/depend_build.vok depend-graph/depend_build.required_vos: depend-graph/depend_build.v theories/edge_coloring.vos /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker

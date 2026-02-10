@@ -101,12 +101,12 @@ Section Recolor.
   Qed.
 
   (* not needed right now *)
-  Lemma del_edges_col c0 e : 
+  (* Lemma del_edges_col c0 e : 
     (c0 \in c[E(G)]) ->
     (c0 != c e) ->
     (c0 \in c[E(del_edges e)]).
   Proof.
-  Admitted.
+  Admitted. *)
 
   Lemma replace_col c0 e : 
     e \in E(G) ->  
@@ -255,11 +255,11 @@ Section ChromIdx.
   Qed.
 
   (* make ab set, not straigth existsnec. sig.  *)
-  Lemma chromatic_index_exists : exists chi, is_chromatic_index chi.
+  (* Lemma chromatic_index_exists : exists chi, is_chromatic_index chi.
   Proof.
   have Hbase: k_edge_colorable #|E(G)| by exact: inj_chrom.
   (* Use well-ordering to find minimum *)
-  Admitted.
+  Admitted. *)
 
   (* Todo: Lemma chromatic_index_unique *)
   (*Definition tmp : nat.
@@ -306,7 +306,7 @@ Section ExtendCol.
   Admitted.
 
 (* arguably, could also work for matchings not just single edge *)
-  Lemma del_edges_coloring (k : nat) :
+  (* Lemma del_edges_coloring (k : nat) :
     k_edge_colorable (del_edges del_e) k -> k_edge_colorable G (k + 1).
   Proof. 
     (* move=> Hpe [[ColorType [Hpc Hcard]]]. *)
@@ -315,7 +315,7 @@ Section ExtendCol.
       (* rewrite /c'. *)
     (* constructor. rewrite/k_edge_coloring. *)
     (* exists (option ColorType). *)
-  Admitted.
+  Admitted. *)
 End ExtendCol.
 
 Section AbsentSet.
@@ -327,13 +327,13 @@ Section AbsentSet.
     setD (c[E(G)]) (c[E{x}]).
 
   (* still deciding on definitions further down, tbd which of these three will be needed *)
-  Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
+  (* Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
     c0 \in absent_set c x <-> [pick e in E{x} | c e == c0] == None.
   Proof. split=> H. Admitted.
 
   Lemma absent_edge_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
     c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
-  Proof. Admitted.
+  Proof. Admitted. *)
 
   Lemma absent_present {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
     c0 \in c[E(G)] -> c0 \in absent_set c x -> y \in N(x) -> c0 \in c[E(del_edges [set x; y])].
@@ -513,14 +513,14 @@ Section Rotation.
     by rewrite /absent_prop Hine Hc Hab eq_refl /= andbT=> /negbFE.
   Qed.
 
-  Lemma extend_absent :
+  (* Lemma extend_absent :
     extend_fan = None ->   
     (forall wi, ~~ ((wi \in (wk :: val f)) && (c [set v; wi] == c [set v; wk]))) ->
     absent_prop c [set v; wk] v.
   Proof.
     rewrite/extend_fan.
     case: pickP=> [//|+ _].
-  Admitted.
+  Admitted. *)
 
   Definition rotateF : edge_coloring G ColorType :=
     rotate c v (rev (wk::val f)).
@@ -624,7 +624,6 @@ Section AltPath.
   Definition next_col {ca cb x y p} (ap : altpath ca cb x y p) :=
     if alternates c ca cb (x :: p) then cb else ca.
 
-  (* Not needed right now *)
   Lemma alternate_cons ca cb x y p :
    alternates c ca cb (x::y::p) = 
    (c [set x; y] == ca) && alternates c cb ca (y::p).
@@ -692,12 +691,12 @@ Section Kempe.
     end.
   
   (* Not needed right now *)
-  Lemma extend_ap_none {c x y} (ap : AltPath c ca cb x y) : 
+  (* Lemma extend_ap_none {c x y} (ap : AltPath c ca cb x y) : 
     extend_ap ap == None -> next_col (valP ap) \in absent_set c x.
   Proof. 
     rewrite /extend_ap; case pickP=> H _ //. 
     apply Nopick in H.
-  Admitted.
+  Admitted. *)
 
   (* must be proper coloring and absent at start so no cycles when extended *)
   Definition apstart pc x y :=     
@@ -802,8 +801,6 @@ Proof.
     move: (exists_absent_color Hkc tmp w) => {tmp} [c] Hab.
     have Hc:= proper_to_edge_coloring (k_to_proper_coloring Hkc).
     case: (pickP [pred wi | (wi \in (w :: val fmax)) && (Hc [set v; wi] == c)]) => [wi /andP [Hwi Heq] | Hno].
-
-    
 Admitted.
 
 
