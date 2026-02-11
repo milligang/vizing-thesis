@@ -59,3 +59,21 @@ Proof.
 Qed.
 
 Definition max_degree (G : sgraph) : nat := \max_(x in G) #|N(x)|.
+
+(* When we delete edges, it's easier to reason about E{x} *)
+Lemma max_deg_edge (G : sgraph) : \max_(x in G) #|N(x)| = \max_(x in G) #|E{x}|.
+Proof.
+  apply: bigmax_eq_pointwise => v _; by rewrite card_edge_neigh.
+Qed.
+
+Lemma del_edges_max_deg (G : sgraph) (A : {set G} ):
+  max_degree (del_edges A) <= max_degree G.
+Proof.
+  rewrite/max_degree 2!max_deg_edge.
+  apply: bigmax_leq_pointwise => x _.
+  apply: subset_leq_card.
+  apply/subsetP => e.
+  by rewrite (@del_edges_edge_neigh G A e) => /andP[-> _].
+Qed.
+
+  

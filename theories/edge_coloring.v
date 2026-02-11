@@ -67,9 +67,7 @@ Section EdgeColoring.
 
   Lemma leq_maxdeg_pcol pc : max_degree G <= #|pc[E(G)]|.
   Proof.
-    rewrite /max_degree. 
-    have <- : \max_(x in G) #|E{x}| = \max_(x in G) #|N(x)|.
-    { apply: bigmax_eq_pointwise => v _; by rewrite card_edge_neigh. }
+    rewrite /max_degree max_deg_edge.
     apply/bigmax_leqP=> x _. 
     apply: (leq_trans _ (leq_vertex_graph pc x)).
     by rewrite (eq_deg_pcol pc x).
@@ -348,7 +346,8 @@ Section AbsentSet.
 
   Lemma absent_present {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
     c0 \in absent_set c x -> y \in N(x) -> c0 \in c[E(del_edges [set x; y])].
-  Proof. Admitted.
+  Proof. 
+  Admitted.
 
   Proposition exists_absent_color {k : nat} (kc : k_edge_coloring G k):
     max_degree G + 1 <= k ->
@@ -815,7 +814,7 @@ Proof.
     have/IH [k' [[kc'] Hleqk']]: #|E(G')| < #|E(G)|.
     { by apply: proper_card; exact: del_edges_proper Ein _. }
     have: k' <= max_degree G + 1.
-    { by admit. }
+    { by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg. }
     pose kc := k_extended_col Ein kc'.
     rewrite leq_eqVlt => /orP[/eqP Heqk'| Hltk']; first last.
     - (*if k' < max_degree G + 1, then we are done *) 
