@@ -30,7 +30,7 @@ Proof.
     by rewrite in_opn in Hw.
 Qed.
 
-Lemma del_edges_edge_neigh (G : sgraph) (A e : {set G}) (x : G): 
+Lemma del_edges_edge_neigh (G : sgraph) (A e : {set G}) (x : G) : 
   e \in E{del_edges A;x} = (e \in E{G;x}) && ~~ (e \subset A).
 Proof.
   rewrite/edge_neigh.
