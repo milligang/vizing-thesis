@@ -76,76 +76,6 @@ Section EdgeColoring.
 End EdgeColoring.
 Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
-Section Recolor.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
-  Implicit Types (e f : {set G}) (col : ColorType).
-
-  Definition recolor_edge e c0 : edge_coloring G ColorType :=
-    fun edge => if edge == e then c0 else c edge.
-
-  Lemma recolor_eq e c0 : (recolor_edge e c0) e = c0.
-  Proof. by rewrite /recolor_edge eqxx. Qed.
-
-  Lemma recolor_neq e f c0 : f != e -> (recolor_edge e c0) f = c f.
-  Proof. by rewrite /recolor_edge => /negPf ->. Qed.
-
-  Lemma imset_recolor e c0 : 
-    c[E(del_edges e)] = recolor_edge e c0 [E(del_edges e)].
-  Proof.
-    apply/setP => c1.
-    by apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /recolor_edge;
-    exists e2 => //; case: ifP => /eqP Heq //;
-    rewrite Heq in He2; move: (del_edgesN e); rewrite -in_setC => /setCP.
-  Qed.
-
-  (* not needed right now *)
-  (* Lemma del_edges_col c0 e : 
-    (c0 \in c[E(G)]) ->
-    (c0 != c e) ->
-    (c0 \in c[E(del_edges e)]).
-  Proof.
-  Admitted. *)
-
-  Lemma replace_col c0 e : 
-    e \in E(G) ->  
-    c0 \in c[E(del_edges e)] ->
-    c e \notin c[E(del_edges e)] -> 
-    #|recolor_edge e c0 [E(G)]| = #|c[E(G)]| - 1.
-  Proof.
-    move=> He.
-    rewrite (del_edges1 He).
-    move: (imset_recolor e c0).
-    rewrite /coloring_image 2!imsetU1 2!cardsU1 recolor_eq => -> -> -> /=.
-    by rewrite add0n add1n subn1.
-  Qed.
-
-  Definition swap_edge e f : edge_coloring G ColorType :=
-    fun edge => 
-      if edge == e then c f
-      else if edge == f then c e
-      else c edge. 
-
-  Lemma imset_swap e f : 
-    e \in E(G) -> 
-    f \in E(G) ->
-    c[E(G)] = (swap_edge e f)[E(G)].
-  Proof.
-    move=> He0 He1; apply/setP => c0.
-    apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
-    exists (if e2 == e then f else if e2 == f then e else e2) => //;
-    repeat case: ifP => //; repeat move=> /eqP -> //; try rewrite eq_refl //.
-    - do 2 move=> _ -> //.
-    - move=> _ /eqP -> //.
-  Qed.
-
-  (* TODO: finish this proof, presumably not too difficult *)
-  Lemma imset_swap_vertex e f (v : G) :
-    v \in e -> v \in f -> c[E{v}] = (swap_edge e f)[E{v}].
-  Proof.
-  Admitted.
-
-End Recolor.
-
 Section ChromIdx.
   (* ---- Chromatic Index ---- *)
   Variables (G : sgraph).
@@ -284,26 +214,35 @@ Section ExtendCol.
     (pc : proper_edge_coloring (del_edges del_e) ColorType)
   : is_proper_edge_coloring (extended_col pc).
   Proof.
-    (* exists (extended_col pc). *)
-    move: pc => [c Hp] x f0 f1 /(subsetP (sub_all_edges x)) Hf0 /(subsetP (sub_all_edges x)) Hf1.
+    move: pc => [c Hp] x f0 f1 Hf0 Hf1.
     rewrite /extended_col.
     case H00: (f0 == del_e); case H10 : (f1 == del_e) => //.
     - move/eqP: H00 => ->; move/eqP: H10 => -> //.
-    - move/negbT: H00=> H00. move/negbT: H10=> H10.
-    move: (edges_eqn_sub Hf0 He H00)=> Hsub0.
-    move: (edges_eqn_sub Hf1 He H10)=> Hsub1.
-    move=> [Heq]; apply (Hp x).
-  Admitted.
+    move=> [Heq]; apply (Hp x); last by [];
+    move/negbT: H00=> H00; move/negbT: H10=> H10;
+    move/(subsetP (sub_all_edges x)): (Hf0)=> Hf0G;
+    move/(subsetP (sub_all_edges x)): (Hf1)=> Hf1G;
+    move: (edges_eqn_sub Hf0G He H00)=> Hsub0;
+    move: (edges_eqn_sub Hf1G He H10)=> Hsub1;
+    by rewrite (@del_edges_edge_neigh G del_e _ _).
+  Qed.
 
+  (* TODO: Should be straightforward, need to figure out which tactic to use8 *)
   Lemma card_extended_col 
     {k : nat} 
     (kc : k_edge_coloring (del_edges del_e) k) 
   : #|extended_col kc[E(G)]| = k + 1.
   Proof. 
+    rewrite/extended_col/coloring_image.
+    rewrite (del_edges1 He).
+    rewrite imsetU1 eq_refl.
+    (* under eq_imset => e. rewrite (del_edges1_neq). *)
+    (* rewrite del_edgesN. *)
     (* move: kc => [CT [pc Hcard]]. *)
     (* exists (option CT), (proper_extended_col pc). *)
   Admitted.
 
+  (* extended_col of a k-edge-coloring produces a (k+1)-edge-coloring *)
   Definition k_extended_col 
     {k : nat}
     (kc : k_edge_coloring (del_edges del_e) k)
@@ -344,11 +283,6 @@ Section AbsentSet.
     c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
   Proof. Admitted. *)
 
-  Lemma absent_present {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
-    c0 \in absent_set c x -> y \in N(x) -> c0 \in c[E(del_edges [set x; y])].
-  Proof. 
-  Admitted.
-
   Proposition exists_absent_color {k : nat} (kc : k_edge_coloring G k):
     max_degree G + 1 <= k ->
     forall x : G, exists c, c \in (absent_set kc x).
@@ -359,6 +293,93 @@ Section AbsentSet.
   Qed.
   
 End AbsentSet.
+
+Section Recolor.
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
+  Implicit Types (e f : {set G}) (col : ColorType).
+
+  Definition recolor_edge e c0 : edge_coloring G ColorType :=
+    fun edge => if edge == e then c0 else c edge.
+
+  Lemma recolor_eq e c0 : (recolor_edge e c0) e = c0.
+  Proof. by rewrite /recolor_edge eqxx. Qed.
+
+  Lemma recolor_neq e f c0 : f != e -> (recolor_edge e c0) f = c f.
+  Proof. by rewrite /recolor_edge => /negPf ->. Qed.
+
+  Lemma imset_recolor e c0 : 
+    c[E(del_edges e)] = recolor_edge e c0 [E(del_edges e)].
+  Proof.
+    apply/setP => c1.
+    by apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /recolor_edge;
+    exists e2 => //; case: ifP => /eqP Heq //;
+    rewrite Heq in He2; move: (del_edgesN e); rewrite -in_setC => /setCP.
+  Qed.
+
+  (* not needed right now *)
+  (* Lemma del_edges_col c0 e : 
+    (c0 \in c[E(G)]) ->
+    (c0 != c e) ->
+    (c0 \in c[E(del_edges e)]).
+  Proof.
+  Admitted. *)
+
+  Lemma replace_col c0 e : 
+    e \in E(G) ->  
+    c0 \in c[E(del_edges e)] ->
+    c e \notin c[E(del_edges e)] -> 
+    #|recolor_edge e c0 [E(G)]| = #|c[E(G)]| - 1.
+  Proof.
+    move=> He.
+    rewrite (del_edges1 He).
+    move: (imset_recolor e c0).
+    rewrite /coloring_image 2!imsetU1 2!cardsU1 recolor_eq => -> -> -> /=.
+    by rewrite add0n add1n subn1.
+  Qed.
+
+  Definition swap_edge e f : edge_coloring G ColorType :=
+    fun edge => 
+      if edge == e then c f
+      else if edge == f then c e
+      else c edge. 
+
+  Lemma imset_swap e f : 
+    e \in E(G) -> 
+    f \in E(G) ->
+    c[E(G)] = (swap_edge e f)[E(G)].
+  Proof.
+    move=> He0 He1; apply/setP=> c0.
+    apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
+    exists (if e2 == e then f else if e2 == f then e else e2) => //;
+    repeat case: ifP => //; repeat move=> /eqP -> //; try rewrite eq_refl //.
+    - do 2 move=> _ -> //.
+    - move=> _ /eqP -> //.
+  Qed.
+
+  (* Same proof as above*)
+  Lemma imset_swap_vertex e f (v : G) :
+    e \in E{v} -> 
+    f \in E{v} -> 
+    c[E{v}] = (swap_edge e f)[E{v}].
+  Proof.
+    move=> He0 He1; apply/setP=> c0.
+    apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
+    exists (if e2 == e then f else if e2 == f then e else e2) => //;
+    repeat case: ifP => //; repeat move=> /eqP -> //; try rewrite eq_refl //.
+    - do 2 move=> _ -> //.
+    - move=> _ /eqP -> //.
+  Qed.
+
+  (* TODO, but want to finish the rot_proper first *)
+  Lemma swap_proper_vertex (x y z : G) :
+    is_proper_edge_coloring c ->
+    (c [set x; y]) \in absent_set c z ->
+    (c [set x; z]) \in absent_set c y ->
+    is_proper_edge_coloring (swap_edge [set x; y] [set x; z]).
+  Proof.
+  Admitted.
+
+End Recolor.
 
 Section Fan.
   Variable (G : sgraph).
@@ -557,28 +578,32 @@ Section Rotation.
 
   Lemma imset_rot_vertex : c[E{v}] = rotateF[E{v}].
   Proof.
-    rewrite/rotateF; set fs := (rev (wk::val f)).
-    elim: fs c=> [|w0 ws IH] d //=.
-    case: ws IH=> [|w1 wss IH] //.
-    rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //.
-    have Hv0 : v \in [set v; w0] by rewrite in_set2 eq_refl.
-    have Hv1 : v \in [set v; w1] by rewrite in_set2 eq_refl.
-    exact: imset_swap_vertex Hv0 Hv1.
-  Qed.
-
-  Lemma imset_rot : c[E(G)] = rotateF[E(G)].
-  Proof.
     rewrite /rotateF; set fs := (rev (wk::val f)).
     have Hws : neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
     elim: fs c Hws=> [|w0 ws IH] d //= /andP [Hw0 Hws].
     case: ws IH Hws=> [|w1 wss IH] Hws //.
     rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //. 
     move/andP: Hws => [Hw1 _].
-    have He0 : [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
-    have He1 : [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
+    have He0 : [set v; w0] \in E{v} by rewrite/edge_neigh; apply/imsetP; exists w0.
+    have He1 : [set v; w1] \in E{v} by rewrite/edge_neigh; apply/imsetP; exists w1.
+    exact: imset_swap_vertex He0 He1.
+  Qed.
+
+  (* Basically the same as above *)
+  Lemma imset_rot : c[E(G)] = rotateF[E(G)].
+  Proof.
+    rewrite/rotateF; set fs := (rev (wk::val f)).
+    have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
+    elim: fs c Hws=> [|w0 ws IH] d //= /andP [Hw0 Hws].
+    case: ws IH Hws=> [|w1 wss IH] Hws //.
+    rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //. 
+    move/andP: Hws => [Hw1 _].
+    have He0: [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
+    have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
     exact: imset_swap He0 He1.
   Qed.
 
+  (* TO THINK: Arguably doesn't need to be it's own lemma *)
   Lemma card_rot :
     #|c[E(G)]| = #|rotateF[E(G)]|.
   Proof. by rewrite imset_rot. Qed.
@@ -588,14 +613,17 @@ Section Rotation.
     by rewrite/absent_set imset_rot imset_rot_vertex.
   Qed.
 
-  (* TODO! *)
-  (* Needs to be fixed in latex, require premise c is proper *)
-  (* Thought: use other rotate definition for this, then prove equivalence of the two *)
+  (* TODO! induction, b/c preserved at every step *)
   Lemma rot_proper : 
     is_proper_edge_coloring c ->
     is_proper_edge_coloring rotateF.
   Proof.
-    rewrite/is_proper_edge_coloring=> Hprop x e1 e2 He1 He2 Heq.
+    rewrite/is_proper_edge_coloring/rotateF; set fs := (rev (wk::val f)).
+    (* have Hab: absent_prop *)
+    elim: fs c=> [//|w0 ws IH] d Hd.
+    case: ws IH=> [|w1 wss IH] //.
+    specialize (IH (swap_edge d [set v; w0] [set v; w1])).
+    (* rewrite -(IH (swap_edge d [set v; w0] [set v; w1])).  *)
   Admitted.
 
 End Rotation.
@@ -781,12 +809,20 @@ Proof.
   have Hin' : cj \in c'[E(del_edges [set v; wj])].
   { 
     move: (Hcv);
-    rewrite /absent_set (imset_rot f) (imset_rot_vertex f) => Hab.
-    exact: absent_present Hab Hneigh. 
+    rewrite /absent_set (imset_rot f) (imset_rot_vertex f)=> /setDP [Hcj _].
+    (* in absent set of v, v wj is a color at v *)
+    (* c' [E(del)] = c [E(G)] - c del *)
+    rewrite /coloring_image/c'.
+    (* rewrite (del_edges1 Hvw) in Hcj. *)
+    admit.
+    (* exact: absent_present Hab Hneigh.  *)
   }
   have Hnotin' : c' [set v; wj] \notin c'[E(del_edges [set v; wj])] by admit.
   pose c'' := recolor_edge c' [set v; wj] cj.
-  have Hprop'' : is_proper_edge_coloring c'' by admit.
+  have Hprop'' : is_proper_edge_coloring c''.
+  { 
+    by admit. 
+  }
   constructor.
   move: (replace_col Hvw Hin' Hnotin').
   rewrite -card_rot (eqP (card_k_col c)).
