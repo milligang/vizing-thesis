@@ -13,14 +13,11 @@ Unset Printing Implicit Defensive.
 Section EdgeColoring.
   (* ---- Edge Coloring Functional Definition ---- *)
   Variables (G : sgraph) (ColorType : finType).
+  Implicit Type (x : G).
 
   (* An edge coloring function assigns edges in E(G) to colors *)
   Definition edge_coloring : Type := {set G} -> ColorType.
-  Implicit Type (c : edge_coloring) (x : G).
-
-  (* A proper edge coloring is an edge coloring 
-    where no two adjacent edges have the same color *)
-  (* Could do x in e1 instead *)
+  Implicit Type (c : edge_coloring).
   
   Definition is_proper_edge_coloring c : Prop := 
     forall (x : G),
@@ -32,7 +29,7 @@ Section EdgeColoring.
   Coercion proper_to_edge_coloring
     pc : edge_coloring := proj1_sig pc.
 
-  (* the image under a coloring c of the set of edges E *)
+  (* TO THINK: Should we remove this notation? It matches the write-up, but may just add confusion for the rocq code *)
   Definition coloring_image c (E : {set {set G}}) : {set ColorType} := c @: E.
   Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
@@ -53,7 +50,6 @@ Section EdgeColoring.
     exact: leq_bigmax_cond.
   Qed.
 
-  (* injective, at a vertex *)
   Lemma eq_deg_pcol pc x : #|pc[E{x}]| = #|E{x}|.
   Proof.
     apply: card_in_imset.
@@ -77,7 +73,6 @@ End EdgeColoring.
 Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
 Section ChromIdx.
-  (* ---- Chromatic Index ---- *)
   Variables (G : sgraph).
   Implicit Types (k chi : nat).
   
@@ -106,7 +101,7 @@ Section ChromIdx.
     k_edge_colorable chi /\ forall k, k < chi -> ~ k_edge_colorable k.
 
   (* We can already lower bound the chromatic index *)
-  Theorem chi_lower_bound (chi : nat): 
+  Theorem chi_lower_bound chi : 
     is_chromatic_index chi -> 
     max_degree G <= chi.
   Proof. 
@@ -115,7 +110,7 @@ Section ChromIdx.
     by rewrite leq_maxdeg_pcol.
   Qed.
 
-  (*  Any valid k-edge-colorable upper bounds chi *)
+  (* Any valid k-edge-coloring upper bounds chi *)
   Lemma chi_upper_bound k chi :
     is_chromatic_index chi ->
     k_edge_colorable k ->
@@ -128,19 +123,19 @@ Section ChromIdx.
     exact: Hneg Hk.
   Qed.
 
-  Lemma chi_upper_bound_trans n chi :   
+  Lemma chi_upper_bound_trans k chi :   
     is_chromatic_index chi ->
-    (exists k, k_edge_colorable k /\ k <= n) ->
-    chi <= n.
+    (exists n, k_edge_colorable n /\ n <= k) ->
+    chi <= k.
   Proof.
-    move=> Hchi [k] [Hk Hltn].
-    have Hltk : chi <= k by exact/chi_upper_bound.
+    move=> Hchi [n] [Hk Hltn].
+    have Hltk : chi <= n by exact/chi_upper_bound.
     exact (leq_trans Hltk Hltn).
   Qed.
 
   (* ----  One-to-one Coloring ---- *)
 
-  (* Todo: can we use Program Definition, is this better? Should we do this elsewhere too? *)
+  (* TO THINK: we could use Program Definition, is this better? Should we do this elsewhere too? *)
   Program Definition in_edge_coloring2 : proper_edge_coloring G {set G} := 
     fun e => e.
   Next Obligation. by move=> _ e1 e2 _ _ eq. Qed. 
@@ -149,7 +144,6 @@ Section ChromIdx.
   Definition inj_edge_coloring : edge_coloring G {set G} :=
     fun e => e.
 
-  (* injective coloring is a proper coloring *)
   Definition proper_inj_coloring : proper_edge_coloring G {set G}.
   Proof.
     exists inj_edge_coloring.
@@ -166,7 +160,6 @@ Section ChromIdx.
       exists e => //.
   Qed.
 
-  (* injective coloring is a k-edge-coloring with k = #|E(G)| *)
   Definition inj_k_coloring : k_edge_coloring #|E(G)|.
   Proof.
     exists {set G}, proper_inj_coloring. by rewrite imset_inj.
@@ -179,25 +172,14 @@ Section ChromIdx.
   Qed.
 
   (* If chi is a chromatic index of G, then chi <= |E(G)| *)
-  Corollary chromatic_index_le_edges (chi : nat) :
+  Corollary chromatic_index_le_edges chi :
     is_chromatic_index chi -> chi <= #|E(G)|.
   Proof.
     move=> Hchi. 
     apply (chi_upper_bound Hchi inj_chrom).
   Qed.
 
-  (* make ab set, not straigth existsnec. sig.  *)
-  (* Lemma chromatic_index_exists : exists chi, is_chromatic_index chi.
-  Proof.
-  have Hbase: k_edge_colorable #|E(G)| by exact: inj_chrom.
-  (* Use well-ordering to find minimum *)
-  Admitted. *)
-
-  (* Todo: Lemma chromatic_index_unique *)
-  (*Definition tmp : nat.
-    destruct chromatic_index_exists as [n foo].
-    Check chromatic_index_exists.
-  *)
+  (* TO THINK: could also prove chromatic index exists and is unique *)
 End ChromIdx.
 
 Section ExtendCol. 
@@ -296,7 +278,7 @@ End AbsentSet.
 
 Section Recolor.
   Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
-  Implicit Types (e f : {set G}) (col : ColorType).
+  Implicit Types (e f : {set G}).
 
   Definition recolor_edge e c0 : edge_coloring G ColorType :=
     fun edge => if edge == e then c0 else c edge.
@@ -324,7 +306,7 @@ Section Recolor.
   Proof.
   Admitted. *)
 
-  Lemma replace_col c0 e : 
+  Lemma replace_col e c0 : 
     e \in E(G) ->  
     c0 \in c[E(del_edges e)] ->
     c e \notin c[E(del_edges e)] -> 
@@ -357,10 +339,10 @@ Section Recolor.
   Qed.
 
   (* Same proof as above*)
-  Lemma imset_swap_vertex e f (v : G) :
-    e \in E{v} -> 
-    f \in E{v} -> 
-    c[E{v}] = (swap_edge e f)[E{v}].
+  Lemma imset_swap_vertex e f (x : G) :
+    e \in E{x} -> 
+    f \in E{x} -> 
+    c[E{x}] = (swap_edge e f)[E{x}].
   Proof.
     move=> He0 He1; apply/setP=> c0.
     apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
@@ -370,7 +352,7 @@ Section Recolor.
     - move=> _ /eqP -> //.
   Qed.
 
-  (* TODO, but want to finish the rot_proper first *)
+  (* TO DO: finish the rot_proper first, then complete this helper *)
   Lemma swap_proper_vertex (x y z : G) :
     is_proper_edge_coloring c ->
     (c [set x; y]) \in absent_set c z ->
@@ -382,8 +364,8 @@ Section Recolor.
 End Recolor.
 
 Section Fan.
-  Variable (G : sgraph).
-  Implicit Types (v w : G) (e : {set G}) (f : seq G) (ColorType : finType).
+  Variable (G : sgraph) (ColorType : finType).
+  Implicit Types (c : edge_coloring G ColorType) (v w : G) (e : {set G}) (f : seq G).
 
   (* 1. For all w in the fan centered at v, w is in the neighborhood of v *)
   Definition neigh_prop v f := all (fun w => w \in N(v)) f.
@@ -403,7 +385,7 @@ Section Fan.
   (* Proof.  *)
   (* Admitted. *)
 
-  Lemma w0_extended_col {e ColorType} (c_del : edge_coloring (del_edges e) ColorType)
+  Lemma w0_extended_col {e} (c_del : edge_coloring (del_edges e) ColorType)
   : w0_prop (extended_col c_del) e.
   Proof. 
     rewrite /w0_prop /extended_col eq_refl.
@@ -412,10 +394,10 @@ Section Fan.
 
     (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
     the color of (v, w_{i+1} is absent at w_i) *)
-  Definition absent_prop {ColorType} (c : edge_coloring G ColorType) e w := 
+  Definition absent_prop c e w := 
     (c e) \in (absent_set c w).
 
-  Definition fanp {ColorType} v wk (c : edge_coloring G ColorType) f := 
+  Definition fanp c f v wk := 
     uniq (wk::f) &&
     neigh_prop v (wk::f) &&
     w0_prop c [set v; (last wk f)] &&
@@ -423,17 +405,17 @@ Section Fan.
       fun x2 => absent_prop c [set v; x2]
     ) wk f.
 
-  Lemma fanp_neigh {ColorType} v wk (c : edge_coloring G ColorType) f : fanp v wk c f -> neigh_prop v (wk::f).
+  Lemma fanp_neigh c f v wk : fanp c f v wk -> neigh_prop v (wk::f).
   Proof. by case/andP => /andP [/andP [_ ->] _] _. Qed.
 
-  Lemma rev_neigh v wk f : neigh_prop v (wk::f) -> neigh_prop v (rev (wk::f)).
+  Lemma rev_neigh f v wk : neigh_prop v (wk::f) -> neigh_prop v (rev (wk::f)).
   Proof. by rewrite /neigh_prop all_rev. Qed.
 
-  Lemma fan_cons {v wk f ColorType} {c : edge_coloring G ColorType} w (fan : fanp v wk c f) : 
+  Lemma fan_cons c {f v wk} w (fan : fanp c f v wk) : 
     w \in N(v) ->
     w \notin (wk::f) -> 
     absent_prop c [set v; w] wk ->
-    fanp v w c (wk::f).
+    fanp c (wk::f) v w.
   Proof. 
     move: fan.
     by rewrite /fanp last_cons /neigh_prop => /andP[/andP[/andP[Hu Hn]] -> Hp] Hin Hnin Ha.
@@ -446,12 +428,12 @@ End Fan.
 
 Section Pack.
   Variables (G : sgraph) (ColorType : finType).
-  Implicit Types (v w : G) (c : edge_coloring G ColorType).
+  Implicit Types (c : edge_coloring G ColorType) (v w : G).
 
   Section FanDef.
-    Variables (v w : G) (c : edge_coloring G ColorType).
+    Variables (c : edge_coloring G ColorType) (v w : G).
 
-    Record Fan : predArgType := { fval : seq G; _ : fanp v w c fval }.
+    Record Fan : predArgType := { fval : seq G; _ : fanp c fval v w }.
 
     HB.instance Definition _ := [isSub for fval].
     HB.instance Definition _ := [Countable of Fan by <:].
@@ -459,66 +441,59 @@ Section Pack.
   End FanDef.
 End Pack.
 
-(* Could update this to take in an actual fan, then don't need first match
-  case because fans always have at least one element, but would need to prove this.
-  this allows us to be more general at least. *)
-Fixpoint rotate
-  {G : sgraph} {ColorType : finType}
-  (c : edge_coloring G ColorType)
-  (v : G)
-  (fs : seq G)
-  : edge_coloring G ColorType :=
-  match fs with
-  | w0 :: ((w1::tl) as ws) =>
-      rotate
-          (swap_edge c [set v; w0] [set v; w1])
-          v ws
-  | _ => c
-  end. 
+Section FanOps.
+  Variables (G : sgraph) (ColorType : finType).
+  Implicit Types (k : nat) (c : edge_coloring G ColorType) (fs : seq G).
 
-Lemma Fan_of_proof 
-  {G : sgraph} 
-  {ColorType} 
-  {v w0 : G} 
-  (c_del : edge_coloring (del_edges [set v; w0]) ColorType) 
-: v -- w0 -> fanp v w0 (extended_col c_del) [::].
-Proof.
-  by rewrite /fanp (w0_extended_col c_del) -in_opn.
-Qed.
+  (* Could update this to take in an actual fan, then don't need first match
+    case because fans always have at least one element, but would need to prove this.
+    this allows us to be more general at least. *)
+  Fixpoint rotate c fs (v : G) : edge_coloring G ColorType :=
+    match fs with
+    | w0 :: ((w1::tl) as ws) =>
+        rotate
+            (swap_edge c [set v; w0] [set v; w1])
+            ws v
+    | _ => c
+    end. 
 
-Definition Fan_of_del_edges 
-  {G : sgraph} 
-  {ColorType} 
-  {v w0 : G}
-  (He : v -- w0)
-  (c_del : edge_coloring (del_edges [set v; w0]) ColorType)
-:= Build_Fan (Fan_of_proof c_del He).
+  Lemma Fan_of_proof 
+    {v w0 : G} 
+    (c_del : edge_coloring (del_edges [set v; w0]) ColorType) 
+  : v -- w0 -> fanp (extended_col c_del) [::] v w0.
+  Proof.
+    by rewrite /fanp (w0_extended_col c_del) -in_opn.
+  Qed.
 
-Lemma k_Fan_of_proof
-  {G : sgraph} 
-  {k : nat} 
-  {v w0 : G} 
-  (He : [set v; w0] \in E(G))
-  (c_del : k_edge_coloring (del_edges [set v; w0]) k) 
-: fanp v w0 (k_extended_col He c_del) [::].
-Proof.
-  rewrite /fanp (w0_extended_col c_del) //=.
-  by have -> : w0 \in N(v) by move: (He); rewrite in_edges in_opn.
-Qed.
+  Definition Fan_of_del_edges 
+    {v w0 : G}
+    (He : v -- w0)
+    (c_del : edge_coloring (del_edges [set v; w0]) ColorType)
+  := Build_Fan (Fan_of_proof c_del He).
 
-Definition k_Fan_of_del_edges 
-  {G : sgraph} 
-  {k : nat} 
-  {v w0 : G}
-  (He : [set v; w0] \in E(G))
-  (c_del : k_edge_coloring (del_edges [set v; w0]) k) 
-:= Build_Fan (k_Fan_of_proof He c_del).
+  Lemma k_Fan_of_proof
+    {k} {v w0 : G} 
+    (He : [set v; w0] \in E(G))
+    (kc_del : k_edge_coloring (del_edges [set v; w0]) k) 
+  : fanp (k_extended_col He kc_del) [::] v w0.
+  Proof.
+    rewrite /fanp (w0_extended_col kc_del) //=.
+    by have -> : w0 \in N(v) by move: (He); rewrite in_edges in_opn.
+  Qed.
+
+  (* TO THINK: Is there a way to avoid this (just use fan_of...) *)
+  Definition k_Fan_of_del_edges 
+    {k} {v w0 : G}
+    (He : [set v; w0] \in E(G))
+    (c_del : k_edge_coloring (del_edges [set v; w0]) k) 
+  := Build_Fan (k_Fan_of_proof He c_del).
+End FanOps.
 
 Section Rotation. 
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v wk : G) (f : Fan v wk c).
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v wk : G) (f : Fan c v wk).
   Implicit Type (w : G).
 
-  Lemma fan_neigh : neigh_prop v ( wk :: val f).
+  Lemma fan_neigh : neigh_prop v (wk::val f).
   Proof. move: (valP f). exact: fanp_neigh. Qed.
 
   Lemma in_neigh w : w \in (wk::val f) -> w \in N(v).
@@ -526,6 +501,7 @@ Section Rotation.
     move: fan_neigh; rewrite/neigh_prop=> /allP H. exact: H.
   Qed.
 
+  (* TO THINK: fancons hypotheses and valid_fan_vertex seem repetitive, would be nice to just have one *)
   Definition fancons {w}
     (Hin : w \in N(v))
     (Hnin: w \notin wk::val f)
@@ -535,7 +511,7 @@ Section Rotation.
   Definition valid_fan_vertex w :=
     (w \in N(v)) && (w \notin wk::val f) && absent_prop c [set v; w] wk.
 
-  Definition extend_fan : option {w & Fan v w c} := 
+  Definition extend_fan : option {w & Fan c v w} := 
     match pickP (valid_fan_vertex) with
     | Pick w Pw => 
       let Hins := (andP Pw).1 in
@@ -574,7 +550,7 @@ Section Rotation.
   Admitted. *)
 
   Definition rotateF : edge_coloring G ColorType :=
-    rotate c v (rev (wk::val f)).
+    rotate c (rev (wk::val f)) v.
 
   Lemma imset_rot_vertex : c[E{v}] = rotateF[E{v}].
   Proof.
@@ -613,13 +589,12 @@ Section Rotation.
     by rewrite/absent_set imset_rot imset_rot_vertex.
   Qed.
 
-  (* TODO! induction, b/c preserved at every step *)
+  (* TO DO: induction, b/c preserved at every step - how to reason ab fan properities after inductive step *)
   Lemma rot_proper : 
     is_proper_edge_coloring c ->
     is_proper_edge_coloring rotateF.
   Proof.
-    rewrite/is_proper_edge_coloring/rotateF; set fs := (rev (wk::val f)).
-    (* have Hab: absent_prop *)
+    rewrite/rotateF; set fs := (rev (wk::val f)).
     elim: fs c=> [//|w0 ws IH] d Hd.
     case: ws IH=> [|w1 wss IH] //.
     specialize (IH (swap_edge d [set v; w0] [set v; w1])).
@@ -628,14 +603,25 @@ Section Rotation.
 
 End Rotation.
 
+(* TO DO: prove termination!! What is best way to do this?
+  Current set-up: fuel = size of neighborhood of v
+  since every w added to f must be in the neighborhood of v
+  and every w added is uniq (both properties of Fans as they are defined)
+  Is there a way to directly tie this in to the definition of the function?
+  How should the lemma be formulated?
+  Should we require d = or >= #|N(v)|
+  Would there be a way to hide 'd' or remove it?
+  If we prove #|N(v)| is the decreasing argument, could we just
+  call (fanmax f)? (no fuel provided, automatically uses the correct amount)
+*)
 Fixpoint fanmax 
   {G : sgraph} 
   {ColorType : finType} 
   {v wk : G} 
   {c : edge_coloring G ColorType} 
   (d : nat) 
-  (f : Fan v wk c) 
-: {w & Fan v w c} :=
+  (f : Fan c v wk) 
+: {w & Fan c v w} :=
     match d with 
     | 0 => existT _ wk f
     | S d' => 
@@ -682,9 +668,10 @@ Section AltPath.
   Definition next_col {ca cb x y p} (ap : altpath ca cb x y p) :=
     if alternates c ca cb (x :: p) then cb else ca.
 
+  (* TO DO: shouldn't be too complicated *)
   Lemma alternate_cons ca cb x y p :
-   alternates c ca cb (x::y::p) = 
-   (c [set x; y] == ca) && alternates c cb ca (y::p).
+    alternates c ca cb (x::y::p) = 
+    (c [set x; y] == ca) && alternates c cb ca (y::p).
   Proof. 
   Admitted.
 
@@ -763,14 +750,14 @@ Section Kempe.
   Coercion apstart_to_altpath {pc x y} (aps : apstart pc x y) : 
     AltPath pc ca cb x y := projT1 aps.
 
-  (* relflect= decidable propisition *)
-  (* prove assumptions/invariants at each step *)
-  (* number of edges left in the graph is decreasing *)
-  (* upper bound the number of steps *)
-  (* Get definition and then prove things about it *)
-
-  (* the first parameter `d` is a "fuel" argument, because functions in Coq
-   must be guaranteed to terminate. *)
+  (* TO DO: Prove termination!! 
+    what is the best way to do this? 
+    current set-up would be fuel = total vertices of graph
+    this is trickier than the fanmax case
+    we need to prove there are no cycles to show we don't reuse vertices
+    note this is only because we have a proper coloring
+    so there is only one ca and one cb edge per vertex (one in, one out) at most
+  *)
   Program Fixpoint apmax {pc x y} (d : nat) (ap : apstart pc x y) 
   : {v : G & apstart pc v y} :=
     match d with 
@@ -786,16 +773,17 @@ Section Kempe.
   (*
   Definition kempe pc x := apmax (idap pc x).
 
+  TO DO: define swap operation. Shouldn't be to complicated - use swap_edge and iterate through path
   Definition apswap (ap : AltPath c ca cb y z) :=  *)
 
 End Kempe.
 
-(* Todo: finish up, nearly there. last little admits Hnotin' and Hprop'' may take a second *)
+(* TO DO: finish up, nearly there. last little admits Hnotin' and Hprop'' may take a second *)
 (* don't need cj \in c[E(G)] if we already know its in the absent set *)
 Lemma smaller_coloring
   {G : sgraph} {v wj : G} {k}
   {c : k_edge_coloring G (k + 1)} 
-  (f : Fan v wj c) (cj : projT1 c) :
+  (f : Fan c v wj) (cj : projT1 c) :
   k = max_degree G + 1 ->
   cj \in (absent_set c v :&: absent_set c wj) ->
   k_edge_colorable G (max_degree G + 1).
@@ -814,10 +802,11 @@ Proof.
     (* c' [E(del)] = c [E(G)] - c del *)
     rewrite /coloring_image/c'.
     (* rewrite (del_edges1 Hvw) in Hcj. *)
+    (* TO DO: finish, changed an earlier lemma, just need to update this - but basically done here *)
     admit.
     (* exact: absent_present Hab Hneigh.  *)
   }
-  have Hnotin' : c' [set v; wj] \notin c'[E(del_edges [set v; wj])] by admit.
+  have Hnotin' : c'[set v; wj] \notin c'[E(del_edges [set v; wj])] by admit.
   pose c'' := recolor_edge c' [set v; wj] cj.
   have Hprop'' : is_proper_edge_coloring c''.
   { 
@@ -830,8 +819,8 @@ Proof.
   move=> Hcard''.
 Admitted.
 
-(* TODO *)
-(* see edges_sum_degrees proof *)
+(* TO DO *)
+(* see edges_sum_degrees proof for example of induction on edges *)
 Theorem Vizings (G : sgraph) (chi : nat): 
   is_chromatic_index G chi -> 
   max_degree G <= chi <= max_degree G + 1.
@@ -853,7 +842,7 @@ Proof.
     { by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg. }
     pose kc := k_extended_col Ein kc'.
     rewrite leq_eqVlt => /orP[/eqP Heqk'| Hltk']; first last.
-    - (*if k' < max_degree G + 1, then we are done *) 
+    - (* if k' < max_degree G + 1, then we are done *) 
       exists (k' + 1).
       by split; [ |rewrite addn1].
     - pose f0 := k_Fan_of_del_edges Ein kc'.
