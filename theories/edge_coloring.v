@@ -259,11 +259,16 @@ Section AbsentSet.
   (* still deciding on definitions further down, tbd which of these three will be needed *)
   (* Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
     c0 \in absent_set c x <-> [pick e in E{x} | c e == c0] == None.
-  Proof. split=> H. Admitted.
+  Proof. split=> H. Admitted. *)
 
-  Lemma absent_edge_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
+  Lemma absent_edge {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
     c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
-  Proof. Admitted. *)
+  Proof.
+    move=> /setDP[_ /memPnC Hnin] Hn.
+    have Hin : c [set x; y] \in c[E{x}].
+    { by apply/imsetP; exists [set x; y]; first by apply/imsetP; exists y. }
+    by apply Hnin.
+  Qed.
 
   Proposition exists_absent_color {k : nat} (kc : k_edge_coloring G k):
     max_degree G + 1 <= k ->
@@ -287,7 +292,7 @@ Section Recolor.
   Proof. by rewrite /recolor_edge eqxx. Qed.
 
   Lemma recolor_neq e f c0 : f != e -> (recolor_edge e c0) f = c f.
-  Proof. by rewrite /recolor_edge => /negPf ->. Qed.
+  Proof. by rewrite /recolor_edge=> /negPf ->. Qed.
 
   Lemma imset_recolor e c0 : 
     c[E(del_edges e)] = recolor_edge e c0 [E(del_edges e)].
@@ -405,6 +410,9 @@ Section Fan.
       fun x2 => absent_prop c [set v; x2]
     ) wk f.
 
+  Lemma fanp_w0_prop c f v wk : fanp c f v wk -> w0_prop c [set v; (last wk f)].
+  Proof. by case/andP => /andP [_ ->] _. Qed.
+
   Lemma fanp_neigh c f v wk : fanp c f v wk -> neigh_prop v (wk::f).
   Proof. by case/andP => /andP [/andP [_ ->] _] _. Qed.
 
@@ -494,7 +502,10 @@ Section Rotation.
   Implicit Type (w : G).
 
   Lemma fan_neigh : neigh_prop v (wk::val f).
-  Proof. move: (valP f). exact: fanp_neigh. Qed.
+  Proof. move: (valP f); exact: fanp_neigh. Qed.
+
+  Lemma fan_w0_prop : w0_prop c [set v; (last wk (val f))].
+  Proof. move: (valP f); exact: fanp_w0_prop. Qed.
 
   Lemma in_neigh w : w \in (wk::val f) -> w \in N(v).
   Proof. 
@@ -570,14 +581,31 @@ Section Rotation.
   Proof.
     rewrite/rotateF; set fs := (rev (wk::val f)).
     have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
-    elim: fs c Hws=> [|w0 ws IH] d //= /andP [Hw0 Hws].
-    case: ws IH Hws=> [|w1 wss IH] Hws //.
+    elim: fs c Hws=> [|w0 [|w1 wss] IH] d //= /andP [Hw0 Hws].
     rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //. 
     move/andP: Hws => [Hw1 _].
     have He0: [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
     have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
     exact: imset_swap He0 He1.
   Qed.
+  
+  (* TO DO: Helper for next lemma, finish inductive step *)
+  Lemma rot_first_last : c[set v; last wk (\val f)] = rotateF [set v; wk].
+  Proof.
+    rewrite /rotateF.
+    set fs := \val f.
+    elim: fs c=> [|w0 [|w1 wss] IH] d //=.
+    - rewrite/swap_edge. case: ifP=> [/eqP -> //| H].
+      by rewrite eq_refl.
+    - admit.
+  Admitted.
+
+  Lemma rot_w0_prop : w0_prop rotateF [set v; wk].
+  Proof.
+    have +: w0_prop c [set v; (last wk (val f))] by exact: fan_w0_prop.
+    rewrite/w0_prop.
+    have H: c[set v; last wk (\val f)] = rotateF [set v; wk].
+
 
   (* TO THINK: Arguably doesn't need to be it's own lemma *)
   Lemma card_rot :
@@ -589,7 +617,8 @@ Section Rotation.
     by rewrite/absent_set imset_rot imset_rot_vertex.
   Qed.
 
-  (* TO DO: induction, b/c preserved at every step - how to reason ab fan properities after inductive step *)
+  (* TO DO: induction, b/c preserved at every step - how to reason ab fan properities after inductive step? set fseq := val f.
+    move: f=> [fval Hfan]? *)
   Lemma rot_proper : 
     is_proper_edge_coloring c ->
     is_proper_edge_coloring rotateF.
@@ -796,17 +825,17 @@ Proof.
   have Hprop' : is_proper_edge_coloring c' := rot_proper (@is_proper_k_edge_coloring _ _ c).
   have Hin' : cj \in c'[E(del_edges [set v; wj])].
   { 
-    move: (Hcv);
-    rewrite /absent_set (imset_rot f) (imset_rot_vertex f)=> /setDP [Hcj _].
-    (* in absent set of v, v wj is a color at v *)
-    (* c' [E(del)] = c [E(G)] - c del *)
-    rewrite /coloring_image/c'.
-    (* rewrite (del_edges1 Hvw) in Hcj. *)
-    (* TO DO: finish, changed an earlier lemma, just need to update this - but basically done here *)
-    admit.
-    (* exact: absent_present Hab Hneigh.  *)
+    move: (Hcv).
+    rewrite /absent_set (imset_rot f) (imset_rot_vertex f) /coloring_image/c'=> /setDP[/imsetP [ej Hej] Hcj _].
+    rewrite (del_edges1 Hvw) in_setU1 in Hej; rewrite (rot_abs_edge f) in Hcv.
+    have Hneq: ej != [set v; wj] by move: (absent_edge Hcv Hneigh); rewrite Hcj; apply contra_neq=> ->.
+    rewrite (negbTE Hneq) orFb in Hej.
+    by apply/imsetP; exists ej.
   }
-  have Hnotin' : c'[set v; wj] \notin c'[E(del_edges [set v; wj])] by admit.
+  have Hnotin': c'[set v; wj] \notin c'[E(del_edges [set v; wj])].
+  { 
+    admit.
+  }
   pose c'' := recolor_edge c' [set v; wj] cj.
   have Hprop'' : is_proper_edge_coloring c''.
   { 
