@@ -329,19 +329,51 @@ Section Recolor.
       if edge == e then c f
       else if edge == f then c e
       else c edge. 
+  
+  Lemma swap_edge_eq {e f} : e == f -> swap_edge e f =1 c.
+  Proof.
+    move=> /eqP -> e'.
+    rewrite/swap_edge.
+    case Heq: (e' == f)=> //.
+    by move/eqP: Heq ->.
+  Qed.
 
   Lemma imset_swap e f : 
     e \in E(G) -> 
     f \in E(G) ->
     c[E(G)] = (swap_edge e f)[E(G)].
   Proof.
-    move=> He0 He1; apply/setP=> c0.
+    move=> He Hf; apply/setP=> c0.
     apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
     exists (if e2 == e then f else if e2 == f then e else e2) => //;
     repeat case: ifP => //; repeat move=> /eqP -> //; try rewrite eq_refl //.
     - do 2 move=> _ -> //.
     - move=> _ /eqP -> //.
   Qed.
+
+  (* TO DO: would be nice bc more info than previous, but longer and not sure how to finish *)
+  Lemma perm_swap e f : 
+    e \in E(G) -> 
+    f \in E(G) ->
+    perm_eq [seq c e' | e' <- enum E(G)] 
+            [seq (swap_edge e f) e' | e' <- enum E(G)].
+  Proof.
+    move=> He Hf.
+    apply/permP=> x.
+    rewrite !count_map.
+    have Hcount : forall P e' s, e' \in s -> count P s = count P (rem e' s) + (e'  \in s) && P e'.
+    { 
+      move=> P e' s He'; rewrite count_rem subnK //.
+      case pe': (P e')=> //=.
+      rewrite He' -has_count.
+      by apply/hasP; exists e'; try rewrite mem_enum. 
+    }
+    rewrite -mem_enum in He.
+    rewrite !(Hcount _ _ _ He) /=.
+    case Hef: (e == f).
+    - by rewrite (swap_edge_eq Hef) (eq_count (fun e' => congr1 x (swap_edge_eq Hef e'))).
+    - admit.
+  Admitted.
 
   (* Same proof as above*)
   Lemma imset_swap_vertex e f (x : G) :
@@ -588,7 +620,36 @@ Section Rotation.
     have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
     exact: imset_swap He0 He1.
   Qed.
+
+  Lemma perm_rot : 
+    perm_eq [seq c e | e <- enum E(G)] [seq rotateF e | e <- enum E(G)].
+  Proof.
+    rewrite /rotateF; set fs := (rev (wk::val f)).
+    have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
+    elim: fs c Hws => [|w0 [|w1 wss] IH] d //= /andP [Hw0 Hws].
+    apply: (perm_trans _ (IH (swap_edge d [set v; w0] [set v; w1]) _)) => //.
+    move/andP: Hws => [Hw1 _].
+    have He0: [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
+    have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
+    exact: perm_swap He0 He1.
+  Qed.
   
+  
+  (* To DO: could be more general too, bc will need to prove base case anyways *)
+  Lemma imset_rot_del_edge (e0 e1 : {set G}) : 
+    c e0 = rotateF e1 ->
+    c[E(del_edges e0)] = rotateF[E(del_edges e1)].
+  Proof.
+    rewrite/rotateF; set fs := (rev (wk::val f)).
+    have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
+    elim: fs c Hws=> [/=|w0 [|w1 wss] IH] d Hws.
+    (* rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //.  *)
+    (* move/andP: Hws => [Hw1 _].
+    have He0: [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
+    have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
+    exact: imset_swap He0 He1. *)
+  Admitted.
+
   (* TO DO: Helper for next lemma, finish inductive step *)
   Lemma rot_first_last : c[set v; last wk (\val f)] = rotateF [set v; wk].
   Proof.
@@ -604,7 +665,10 @@ Section Rotation.
   Proof.
     have +: w0_prop c [set v; (last wk (val f))] by exact: fan_w0_prop.
     rewrite/w0_prop.
-    have H: c[set v; last wk (\val f)] = rotateF [set v; wk].
+    have Heq: c [E(del_edges [set v; last wk (\val f)])] = rotateF [E(del_edges [set v; wk])] 
+      := imset_rot_del_edge rot_first_last. 
+    by rewrite rot_first_last Heq.
+  Qed.
 
 
   (* TO THINK: Arguably doesn't need to be it's own lemma *)
