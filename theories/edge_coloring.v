@@ -196,8 +196,8 @@ Section ExtendCol.
     (pc : proper_edge_coloring (del_edges del_e) ColorType)
   : is_proper_edge_coloring (extended_col pc).
   Proof.
-    move: pc => [c Hp] x f0 f1 Hf0 Hf1.
-    rewrite /extended_col.
+    move:pc => [c Hp] x f0 f1 Hf0 Hf1.
+    rewrite/extended_col.
     case H00: (f0 == del_e); case H10 : (f1 == del_e) => //.
     - move/eqP: H00 => ->; move/eqP: H10 => -> //.
     move=> [Heq]; apply (Hp x); last by [];
@@ -302,6 +302,23 @@ Section Recolor.
     exists e2 => //; case: ifP => /eqP Heq //;
     rewrite Heq in He2; move: (del_edgesN e); rewrite -in_setC => /setCP.
   Qed.
+
+  Lemma recolor_proper (x y : G) c0 :
+    is_proper_edge_coloring c ->
+    c0 \in absent_set c x ->
+    c0 \in absent_set c y ->
+    is_proper_edge_coloring (recolor_edge [set x; y] c0).
+  Proof.
+    rewrite/recolor_edge=> Hp Hax Hay.
+    move: Hp=> Hp z e1 e2 He1 He2.
+    case Hx1: (e1 \in E{x}); case Hy1: (e1 \in E{y});
+    case Hx2: (e2 \in E{x}); case Hy2: (e2 \in E{y});
+    case Hxy: (x == y).
+(*     
+    case Heq2: (e2 == [set x; y]).
+    - move/eqP: Heq1 => ->; move/eqP: Heq2 => -> //.
+    move: (Hp _ _ _ He1 He2). *)
+  Admitted.
 
   (* not needed right now *)
   (* Lemma del_edges_col c0 e : 
@@ -635,7 +652,7 @@ Section Rotation.
   Qed.
   
   
-  (* To DO: could be more general too, bc will need to prove base case anyways *)
+  (* TO DO: could be more general too, bc will need to prove base case anyways *)
   Lemma imset_rot_del_edge (e0 e1 : {set G}) : 
     c e0 = rotateF e1 ->
     c[E(del_edges e0)] = rotateF[E(del_edges e1)].
@@ -670,16 +687,24 @@ Section Rotation.
     by rewrite rot_first_last Heq.
   Qed.
 
-
   (* TO THINK: Arguably doesn't need to be it's own lemma *)
   Lemma card_rot :
     #|c[E(G)]| = #|rotateF[E(G)]|.
   Proof. by rewrite imset_rot. Qed.
 
-  Lemma rot_abs_edge : absent_set c v = absent_set rotateF v.
+  Lemma rot_absent_center : absent_set c v = absent_set rotateF v.
   Proof.
     by rewrite/absent_set imset_rot imset_rot_vertex.
   Qed.
+
+  (* Lemma rot_absent_fan w : 
+    w \in (wk::val f) -> 
+    c0 \in absent_set c w ->
+    c0 != rotateF [set v; w] ->
+    c0 \in absent_set rotateF w.
+  Proof. 
+  Admitted. *)
+    
 
   (* TO DO: induction, b/c preserved at every step - how to reason ab fan properities after inductive step? set fseq := val f.
     move: f=> [fval Hfan]? *)
@@ -891,15 +916,12 @@ Proof.
   { 
     move: (Hcv).
     rewrite /absent_set (imset_rot f) (imset_rot_vertex f) /coloring_image/c'=> /setDP[/imsetP [ej Hej] Hcj _].
-    rewrite (del_edges1 Hvw) in_setU1 in Hej; rewrite (rot_abs_edge f) in Hcv.
+    rewrite (del_edges1 Hvw) in_setU1 in Hej; rewrite (rot_absent_center f) in Hcv.
     have Hneq: ej != [set v; wj] by move: (absent_edge Hcv Hneigh); rewrite Hcj; apply contra_neq=> ->.
     rewrite (negbTE Hneq) orFb in Hej.
     by apply/imsetP; exists ej.
   }
-  have Hnotin': c'[set v; wj] \notin c'[E(del_edges [set v; wj])].
-  { 
-    admit.
-  }
+  have Hnotin': c'[set v; wj] \notin c'[E(del_edges [set v; wj])] by exact: rot_w0_prop.
   pose c'' := recolor_edge c' [set v; wj] cj.
   have Hprop'' : is_proper_edge_coloring c''.
   { 

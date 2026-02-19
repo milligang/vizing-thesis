@@ -30,6 +30,17 @@ Proof.
     by rewrite in_opn in Hw.
 Qed.
 
+Lemma edge_neigh_edge {G : sgraph} (x y : G) (e : {set G}) : 
+  e \in E{x} -> e \in E{y} -> x != y -> (e = [set x; y]) /\ x -- y.
+Proof.
+  move/imsetP=> [z1] Hn1 He1.
+  move/imsetP=> [z2] Hn2 He2.
+  rewrite He2 in He1.
+  case: (iffLR (doubleton_eq_iff y z2 x z1) He1);
+  move=> [Hxy Hz]; first by rewrite Hxy eqxx.
+  by rewrite in_opn -Hxy in Hn1; rewrite Hz setUC in He2.
+Qed.
+
 Lemma del_edges_edge_neigh (G : sgraph) (A e : {set G}) (x : G) : 
   e \in E{del_edges A;x} = (e \in E{G;x}) && ~~ (e \subset A).
 Proof.
