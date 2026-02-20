@@ -303,6 +303,11 @@ Section Recolor.
     rewrite Heq in He2; move: (del_edgesN e); rewrite -in_setC => /setCP.
   Qed.
 
+  (* TO DO: will likely make a lemma related to absent set, since we will use similar logic for swap_proper_vertex
+    but this specifically is needed for the smaller lemma at the end, 
+    mostly just LOTS of case work now though reasonably straightforward
+    some of the cases are relatively similar
+  *)
   Lemma recolor_proper (x y : G) c0 :
     is_proper_edge_coloring c ->
     c0 \in absent_set c x ->
@@ -310,10 +315,17 @@ Section Recolor.
     is_proper_edge_coloring (recolor_edge [set x; y] c0).
   Proof.
     rewrite/recolor_edge=> Hp Hax Hay.
-    move: Hp=> Hp z e1 e2 He1 He2.
+    move: Hp=> Hp z e1 e2.
+    case: (x =P y)=> [-> |/eqP Hxy].
+    - case: ifP=> [/eqP -> |_ He1]; 
+      case: ifP=> [/eqP ->|_];
+      try (by move: He1; exact: (Hp z));
+      by move=> H; have := subsetP (sub_all_edges z) _ H;
+      rewrite in_edges sg_irrefl.
     case Hx1: (e1 \in E{x}); case Hy1: (e1 \in E{y});
-    case Hx2: (e2 \in E{x}); case Hy2: (e2 \in E{y});
-    case Hxy: (x == y).
+    case Hx2: (e2 \in E{x}); case Hy2: (e2 \in E{y}).
+    have [-> A2]:= edge_neigh_edge _ _ _ Hx1 Hy1 Hxy.
+    rewrite eq_refl.
 (*     
     case Heq2: (e2 == [set x; y]).
     - move/eqP: Heq1 => ->; move/eqP: Heq2 => -> //.
@@ -668,7 +680,7 @@ Section Rotation.
   Admitted.
 
   (* TO DO: Helper for next lemma, finish inductive step *)
-  Lemma rot_first_last : c[set v; last wk (\val f)] = rotateF [set v; wk].
+  Lemma rot_first_last : c [set v; last wk (\val f)] = rotateF [set v; wk].
   Proof.
     rewrite /rotateF.
     set fs := \val f.
@@ -697,14 +709,14 @@ Section Rotation.
     by rewrite/absent_set imset_rot imset_rot_vertex.
   Qed.
 
-  (* Lemma rot_absent_fan w : 
+  (* TO DO: may rephrase, can make it more/less general *)
+  Lemma rot_absent_fan w c0 : 
     w \in (wk::val f) -> 
+    c0 \in absent_set c v ->
     c0 \in absent_set c w ->
-    c0 != rotateF [set v; w] ->
     c0 \in absent_set rotateF w.
   Proof. 
-  Admitted. *)
-    
+  Admitted.
 
   (* TO DO: induction, b/c preserved at every step - how to reason ab fan properities after inductive step? set fseq := val f.
     move: f=> [fval Hfan]? *)
@@ -924,15 +936,17 @@ Proof.
   have Hnotin': c'[set v; wj] \notin c'[E(del_edges [set v; wj])] by exact: rot_w0_prop.
   pose c'' := recolor_edge c' [set v; wj] cj.
   have Hprop'' : is_proper_edge_coloring c''.
-  { 
-    by admit. 
+  {   
+    have Hcw':= rot_absent_fan (mem_head wj (val f)) Hcv Hcw.
+    rewrite (rot_absent_center f) in Hcv.
+    exact: recolor_proper Hprop' Hcv Hcw'.
   }
-  constructor.
   move: (replace_col Hvw Hin' Hnotin').
   rewrite -card_rot (eqP (card_k_col c)).
   have ->: k + 1 - 1 = max_degree G + 1 by rewrite Hk addn1 subn1.
   move=> Hcard''.
-Admitted.
+  by constructor; exists (projT1 c), (exist _ c'' Hprop''); rewrite Hcard''.
+Qed.
 
 (* TO DO *)
 (* see edges_sum_degrees proof for example of induction on edges *)
