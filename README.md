@@ -18,6 +18,7 @@ The code in this repository requires the dependencies of package [_graph-theory 
 Coq 8.11+, MathComp 1.10+, finmap, hierarchy builder 0.10.
 
 In our case, we use Rocq version 9.1.0 compiled with OCaml 4.14.2. 
+We also use the Equations pluggin for recursive functinos. If you're using opam, this can be installed by running 'opam install rocq-equations'.
 
 ## Authors and contact information
 

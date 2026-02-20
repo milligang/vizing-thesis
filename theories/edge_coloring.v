@@ -3,6 +3,7 @@ From mathcomp Require Import all_boot.
 From Stdlib Require Import Setoid CMorphisms Relation_Definitions.
 From GraphTheory Require Import edone preliminaries bij digraph sgraph connectivity.
 Require Import aux.
+From Equations Require Import Equations.
 
 Set Warnings "-notation-overridden, -notation-incompatible-prefix".
 
@@ -136,9 +137,8 @@ Section ChromIdx.
   (* ----  One-to-one Coloring ---- *)
 
   (* TO THINK: we could use Program Definition, is this better? Should we do this elsewhere too? *)
-  Program Definition in_edge_coloring2 : proper_edge_coloring G {set G} := 
-    fun e => e.
-  Next Obligation. by move=> _ e1 e2 _ _ eq. Qed. 
+  (* Program Definition in_edge_coloring2 : proper_edge_coloring G {set G} := 
+    fun e => e. *)
 
   (* injective coloring: each edge is a color *)
   Definition inj_edge_coloring : edge_coloring G {set G} :=
@@ -310,11 +310,10 @@ Section Recolor.
   *)
   Lemma recolor_proper (x y : G) c0 :
     is_proper_edge_coloring c ->
-    c0 \in absent_set c x ->
-    c0 \in absent_set c y ->
+    c0 \in (absent_set c x :&: absent_set c y) ->
     is_proper_edge_coloring (recolor_edge [set x; y] c0).
   Proof.
-    rewrite/recolor_edge=> Hp Hax Hay.
+    rewrite/recolor_edge in_setI=> Hp /andP[Hax Hay].
     move: Hp=> Hp z e1 e2.
     case: (x =P y)=> [-> |/eqP Hxy].
     - case: ifP=> [/eqP -> |_ He1]; 
@@ -480,17 +479,16 @@ Section Fan.
   Lemma rev_neigh f v wk : neigh_prop v (wk::f) -> neigh_prop v (rev (wk::f)).
   Proof. by rewrite /neigh_prop all_rev. Qed.
 
-  Lemma fan_cons c {f v wk} w (fan : fanp c f v wk) : 
-    w \in N(v) ->
-    w \notin (wk::f) -> 
-    absent_prop c [set v; w] wk ->
+  Definition valid_fan_vertex {c f v wk} (fan : fanp c f v wk) (w : G) :=
+    (w \in N(v)) && (w \notin wk::f) && absent_prop c [set v; w] wk.
+  
+  Lemma fan_cons {c f v wk} (fan : fanp c f v wk) (w : G) : 
+    valid_fan_vertex fan w ->
     fanp c (wk::f) v w.
   Proof. 
     move: fan.
-    by rewrite /fanp last_cons /neigh_prop => /andP[/andP[/andP[Hu Hn]] -> Hp] Hin Hnin Ha.
-    (* rewrite cons_uniq {}Hnin {}Hu.
-    rewrite -cat1s all_cat all_seq1.
-    by rewrite -cat1s cat_path. *)
+    by rewrite /fanp last_cons /neigh_prop /valid_fan_vertex
+      => /andP[/andP[/andP[Hu Hn]] -> Hp] /andP[/andP[Hin Hnin] Ha].
   Qed.
 
 End Fan.
@@ -573,24 +571,11 @@ Section Rotation.
     move: fan_neigh; rewrite/neigh_prop=> /allP H. exact: H.
   Qed.
 
-  (* TO THINK: fancons hypotheses and valid_fan_vertex seem repetitive, would be nice to just have one *)
-  Definition fancons {w}
-    (Hin : w \in N(v))
-    (Hnin: w \notin wk::val f)
-    (Hab : absent_prop c [set v; w] wk) 
-  := Build_Fan (fan_cons (valP f) Hin Hnin Hab).
-
-  Definition valid_fan_vertex w :=
-    (w \in N(v)) && (w \notin wk::val f) && absent_prop c [set v; w] wk.
+  Definition fancons {w} (H : valid_fan_vertex (valP f) w) := Build_Fan (fan_cons H).
 
   Definition extend_fan : option {w & Fan c v w} := 
-    match pickP (valid_fan_vertex) with
-    | Pick w Pw => 
-      let Hins := (andP Pw).1 in
-        let Hin := (andP Hins).1 in
-        let Hnin := (andP Hins).2 in
-      let Hab := (andP Pw).2 in
-      Some (existT _ w (fancons Hin Hnin Hab)) 
+    match pickP (valid_fan_vertex (valP f)) with
+    | Pick w Pw => Some (existT _ w (fancons Pw)) 
     | Nopick _ => None
     end.
 
@@ -712,9 +697,8 @@ Section Rotation.
   (* TO DO: may rephrase, can make it more/less general *)
   Lemma rot_absent_fan w c0 : 
     w \in (wk::val f) -> 
-    c0 \in absent_set c v ->
-    c0 \in absent_set c w ->
-    c0 \in absent_set rotateF w.
+    c0 \in (absent_set c v :&: absent_set c w) ->
+    c0 \in (absent_set rotateF v :&: absent_set rotateF w).
   Proof. 
   Admitted.
 
@@ -744,22 +728,40 @@ End Rotation.
   If we prove #|N(v)| is the decreasing argument, could we just
   call (fanmax f)? (no fuel provided, automatically uses the correct amount)
 *)
-Fixpoint fanmax 
-  {G : sgraph} 
+
+Equations fanmax 
+  {G : sgraph}
   {ColorType : finType} 
   {v wk : G} 
-  {c : edge_coloring G ColorType} 
-  (d : nat) 
+  {c : edge_coloring G ColorType}
   (f : Fan c v wk) 
-: {w & Fan c v w} :=
-    match d with 
-    | 0 => existT _ wk f
-    | S d' => 
-      match extend_fan f with
-      | Some (existT w f') => fanmax d' f'
-      | None => existT _ wk f
-      end
-    end.
+: {w & Fan c v w} by wf #|N(v) :\: [set x in wk :: val f]| lt :=
+  fanmax f := 
+  match pickP (valid_fan_vertex (valP f)) with
+    | Pick w Pw => fanmax (fancons Pw)
+    | Nopick _ => existT _ wk f
+  end.
+Next Obligation.
+  apply/ltP/proper_card/properP. rewrite (set_cons w _).
+  split.
+  - exact/setDS/subsetU1. 
+  - have /andP[/andP[Hin Hnin] _] := Pw.
+    by exists w; rewrite 2!inE // in_set1 inE eq_refl Hin.
+Qed.
+  
+  (* Lemma extend_fanmax 
+    {G : sgraph} 
+    {ColorType : finType} 
+    {v wk : G} 
+    {c : edge_coloring G ColorType} 
+    (d : nat) 
+    (f : Fan c v wk)
+  : #|N(v)| <= d ->
+    extend_fan (projT2 (fanmax d f)) = None.
+  Proof.
+    rewrite /fanmax.
+    induction (extend_fan f). *)
+ 
 
 Fixpoint alternates
   {G : sgraph} {ColorType : finType} 
@@ -918,7 +920,7 @@ Lemma smaller_coloring
   cj \in (absent_set c v :&: absent_set c wj) ->
   k_edge_colorable G (max_degree G + 1).
 Proof.
-  rewrite in_setI=> Hk /andP[Hcv Hcw].
+  move=> Hk Hcvw.
   have Hneigh : wj \in N(v) := (in_neigh (mem_head wj (val f))).
   have Hvw : [set v; wj] \in E(G).
   { by move: Hneigh; rewrite in_opn in_edges. }
@@ -926,7 +928,7 @@ Proof.
   have Hprop' : is_proper_edge_coloring c' := rot_proper (@is_proper_k_edge_coloring _ _ c).
   have Hin' : cj \in c'[E(del_edges [set v; wj])].
   { 
-    move: (Hcv).
+    rewrite in_setI in Hcvw; move/andP: (Hcvw)=> [Hcv _]; move: (Hcv).
     rewrite /absent_set (imset_rot f) (imset_rot_vertex f) /coloring_image/c'=> /setDP[/imsetP [ej Hej] Hcj _].
     rewrite (del_edges1 Hvw) in_setU1 in Hej; rewrite (rot_absent_center f) in Hcv.
     have Hneq: ej != [set v; wj] by move: (absent_edge Hcv Hneigh); rewrite Hcj; apply contra_neq=> ->.
@@ -935,12 +937,7 @@ Proof.
   }
   have Hnotin': c'[set v; wj] \notin c'[E(del_edges [set v; wj])] by exact: rot_w0_prop.
   pose c'' := recolor_edge c' [set v; wj] cj.
-  have Hprop'' : is_proper_edge_coloring c''.
-  {   
-    have Hcw':= rot_absent_fan (mem_head wj (val f)) Hcv Hcw.
-    rewrite (rot_absent_center f) in Hcv.
-    exact: recolor_proper Hprop' Hcv Hcw'.
-  }
+  have Hprop'' := recolor_proper Hprop' (rot_absent_fan (mem_head wj (val f)) Hcvw).
   move: (replace_col Hvw Hin' Hnotin').
   rewrite -card_rot (eqP (card_k_col c)).
   have ->: k + 1 - 1 = max_degree G + 1 by rewrite Hk addn1 subn1.
@@ -975,7 +972,7 @@ Proof.
       exists (k' + 1).
       by split; [ |rewrite addn1].
     - pose f0 := k_Fan_of_del_edges Ein kc'.
-      case Hfmax: (fanmax #|N(v)| f0) => [w fmax].
+      case Hfmax: (fanmax f0) => [w fmax].
       have tmp: (max_degree G + 1 <= k' + 1) by rewrite Heqk' (addn1 (max_degree G + 1)).
       move: (exists_absent_color kc tmp w) => {tmp} [c] Habw.
       case Habv: (c \in absent_set kc v).
