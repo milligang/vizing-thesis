@@ -573,30 +573,6 @@ Section Rotation.
 
   Definition fancons {w} (H : valid_fan_vertex (valP f) w) := Build_Fan (fan_cons H).
 
-  Definition extend_fan : option {w & Fan c v w} := 
-    match pickP (valid_fan_vertex (valP f)) with
-    | Pick w Pw => Some (existT _ w (fancons Pw)) 
-    | Nopick _ => None
-    end.
-
-  (* For ck in A_c(wk) and c[E{v}], if we can't extend f then an edge on the fan is colored ck *)
-  Lemma extend_none (ck : ColorType) :
-    ck \in c[E(G)] ->  
-    ck \notin absent_set c v ->  
-    ck \in absent_set c wk ->
-    extend_fan = None ->
-    exists w, 
-    [&& [set v; w] \in E(G), c [set v; w] == ck & w \in (wk :: val f)].
-  Proof.
-    rewrite/extend_fan/valid_fan_vertex => Hinc Hnab Hab;
-    case: pickP => [//|Hf _].
-    have Hatv: ck \in c[E{v}] by exact: notin_setD Hinc Hnab.
-    move: (exists_v_of_c Hatv)=> [w] /andP[Hine /eqP Hc].
-    exists w. move: (Hf w).
-    have -> : w \in N(v) by rewrite in_opn -in_edges.
-    by rewrite /absent_prop Hine Hc Hab eq_refl /= andbT=> /negbFE.
-  Qed.
-
   (* Lemma extend_absent :
     extend_fan = None ->   
     (forall wi, ~~ ((wi \in (wk :: val f)) && (c [set v; wi] == c [set v; wk]))) ->
@@ -717,51 +693,58 @@ Section Rotation.
 
 End Rotation.
 
-(* TO DO: prove termination!! What is best way to do this?
-  Current set-up: fuel = size of neighborhood of v
-  since every w added to f must be in the neighborhood of v
-  and every w added is uniq (both properties of Fans as they are defined)
-  Is there a way to directly tie this in to the definition of the function?
-  How should the lemma be formulated?
-  Should we require d = or >= #|N(v)|
-  Would there be a way to hide 'd' or remove it?
-  If we prove #|N(v)| is the decreasing argument, could we just
-  call (fanmax f)? (no fuel provided, automatically uses the correct amount)
-*)
+Section MaximalFan.
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v : G).
+  Implicit Types (wk : G) (ck : ColorType).
 
-Equations fanmax 
-  {G : sgraph}
-  {ColorType : finType} 
-  {v wk : G} 
-  {c : edge_coloring G ColorType}
-  (f : Fan c v wk) 
-: {w & Fan c v w} by wf #|N(v) :\: [set x in wk :: val f]| lt :=
-  fanmax f := 
-  match pickP (valid_fan_vertex (valP f)) with
-    | Pick w Pw => fanmax (fancons Pw)
-    | Nopick _ => existT _ wk f
-  end.
-Next Obligation.
-  apply/ltP/proper_card/properP. rewrite (set_cons w _).
-  split.
-  - exact/setDS/subsetU1. 
-  - have /andP[/andP[Hin Hnin] _] := Pw.
-    by exists w; rewrite 2!inE // in_set1 inE eq_refl Hin.
-Qed.
-  
-  (* Lemma extend_fanmax 
-    {G : sgraph} 
-    {ColorType : finType} 
-    {v wk : G} 
-    {c : edge_coloring G ColorType} 
-    (d : nat) 
-    (f : Fan c v wk)
-  : #|N(v)| <= d ->
-    extend_fan (projT2 (fanmax d f)) = None.
+  Definition is_fanmax {wk} (f : Fan c v wk) : Prop :=
+    forall w, ~~ valid_fan_vertex (valP f) w.
+
+  Equations fanmax {wk} (f : Fan c v wk) 
+  : {w & Fan c v w} by wf #|N(v) :\: [set x in wk :: val f]| lt :=
+    fanmax f := 
+    match pickP (valid_fan_vertex (valP f)) with
+      | Pick w Pw => fanmax (fancons Pw)
+      | Nopick _ => existT _ wk f
+    end.
+  Next Obligation.
+    apply/ltP/proper_card/properP. rewrite (set_cons w _).
+    split.
+    - exact/setDS/subsetU1. 
+    - have /andP[/andP[Hin Hnin] _] := Pw.
+      by exists w; rewrite 2!inE // in_set1 inE eq_refl Hin.
+  Qed.
+
+  Lemma fanmax_is_max {wk} (f : Fan c v wk)
+  : is_fanmax (projT2 (fanmax f)).
   Proof.
-    rewrite /fanmax.
-    induction (extend_fan f). *)
- 
+    rewrite/is_fanmax=> w.
+    funelim (fanmax f).
+    case: pickP=> [wp Pw | Np].
+    - exact (H wp Pw w).
+    - by rewrite (Np w).
+  Qed.
+
+  (* For ck in A_c(wk) and c[E{v}], if we can't extend f then an edge on the fan is colored ck *)
+  Lemma fanmax_present
+    {ck} {wk} (f : Fan c v wk)
+    (Hf : is_fanmax f)
+    (Hinc : ck \in c[E(G)])
+    (Hnab : ck \notin absent_set c v)
+    (Hab : ck \in absent_set c wk)
+  :
+    exists wj, 
+    [&& [set v; wj] \in E(G), c [set v; wj] == ck & wj \in (wk :: val f)].
+  Proof.
+    have Hatv: ck \in c[E{v}] by exact: notin_setD Hinc Hnab.
+    move: (exists_v_of_c Hatv)=> [wj] /andP[Hine /eqP Hc].
+    exists wj; rewrite/is_fanmax in Hf; move: (Hf wj); rewrite/valid_fan_vertex.
+    have -> : wj \in N(v) by rewrite in_opn -in_edges.
+    by rewrite /absent_prop Hine Hc Hab eq_refl /= andbT negbK.
+  Qed.
+
+End MaximalFan.
+
 
 Fixpoint alternates
   {G : sgraph} {ColorType : finType} 
