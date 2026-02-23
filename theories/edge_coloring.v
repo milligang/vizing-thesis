@@ -486,9 +486,9 @@ Section Fan.
     valid_fan_vertex fan w ->
     fanp c (wk::f) v w.
   Proof. 
-    move: fan.
-    by rewrite /fanp last_cons /neigh_prop /valid_fan_vertex
-      => /andP[/andP[/andP[Hu Hn]] -> Hp] /andP[/andP[Hin Hnin] Ha].
+    by move: fan;
+    rewrite /fanp last_cons /neigh_prop /valid_fan_vertex
+    => /andP[/andP[/andP[Hu Hn]] -> Hp] /andP[/andP[Hin Hnin] Ha].
   Qed.
 
 End Fan.
@@ -512,9 +512,6 @@ Section FanOps.
   Variables (G : sgraph) (ColorType : finType).
   Implicit Types (k : nat) (c : edge_coloring G ColorType) (fs : seq G).
 
-  (* Could update this to take in an actual fan, then don't need first match
-    case because fans always have at least one element, but would need to prove this.
-    this allows us to be more general at least. *)
   Fixpoint rotate c fs (v : G) : edge_coloring G ColorType :=
     match fs with
     | w0 :: ((w1::tl) as ws) =>
@@ -729,13 +726,13 @@ Section MaximalFan.
   Lemma fanmax_present
     {ck} {wk} (f : Fan c v wk)
     (Hf : is_fanmax f)
-    (Hinc : ck \in c[E(G)])
     (Hnab : ck \notin absent_set c v)
     (Hab : ck \in absent_set c wk)
   :
     exists wj, 
     [&& [set v; wj] \in E(G), c [set v; wj] == ck & wj \in (wk :: val f)].
   Proof.
+    have Hinc: ck \in c[E(G)] by rewrite/absent_set in_setD in Hab; exact: proj2 (andP Hab).
     have Hatv: ck \in c[E{v}] by exact: notin_setD Hinc Hnab.
     move: (exists_v_of_c Hatv)=> [wj] /andP[Hine /eqP Hc].
     exists wj; rewrite/is_fanmax in Hf; move: (Hf wj); rewrite/valid_fan_vertex.
@@ -757,38 +754,47 @@ Fixpoint alternates
 
 Section AltPath.
   Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
-  Implicit Types (x y : G) (p : seq G) (ca cb : ColorType).
+  Implicit Types (x y z : G) (p : seq G) (ca cb : ColorType).
 
   Definition altpath ca cb x y p := 
-    (alternates c ca cb (x::p) || alternates c cb ca (x::p)) && pathp x y p.
+    (alternates c ca cb (x::p) || alternates c cb ca (x::p)) && upath x y p.
 
   Lemma altpathW ca cb x y p : altpath ca cb x y p -> pathp x y p.
-  Proof. by case/andP. Qed.
+  Proof.
+    case/andP=> ap; apply (@upathW G x y p).
+  Qed.
   
   Lemma altpathWW ca cb x y p : altpath ca cb x y p -> path (--) x p.
   Proof. by move/altpathW/pathpW. Qed.
 
   Lemma altpathxx ca cb x : altpath ca cb x x [ ::].
   Proof.
-    apply/andP; split => //.
+    by apply/andP; split.
   Qed.
 
-  Lemma path_altpath {x y} ca cb (pth : Path x y) : 
-    alternates c ca cb (x :: val pth) || alternates c cb ca (x :: val pth) 
+  (* Lemma path_altpath {x y} ca cb (pth : Path x y) : 
+    alternates c ca cb (x :: val pth) || alternates c cb ca (x :: val pth) && upath x y p
     -> altpath ca cb x y (val pth).
   Proof. 
-    move => Ap. apply/andP; split=> //. exact: valP pth.
-  Qed.
+    by move=> Ap; apply/andP; split=> //; exact: valP pth.
+  Qed. *)
 
   Definition next_col {ca cb x y p} (ap : altpath ca cb x y p) :=
-    if alternates c ca cb (x :: p) then cb else ca.
+    if alternates c ca cb (x::p) then cb else ca.
 
-  (* TO DO: shouldn't be too complicated *)
   Lemma alternate_cons ca cb x y p :
     alternates c ca cb (x::y::p) = 
     (c [set x; y] == ca) && alternates c cb ca (y::p).
-  Proof. 
-  Admitted.
+  Proof. by []. Qed.
+
+  Lemma alternates_ca_cb ca cb x p:
+    ((alternates c ca cb (x::p)) && (alternates c cb ca (x::p))) -> ((ca == cb) || (nilp p)).
+  Proof.
+    move: x; elim p=> [//| y p'] IH. 
+    rewrite -{3}cat1s cat_nilp=> x.
+    rewrite 2!alternate_cons=> /andP[/andP[/eqP Hca Hab] /andP[/eqP Hcb Hac]].
+    by have ->: (ca == cb) by rewrite -Hca Hcb.
+  Qed.
 
   (* Lemma altpath_cons ca cb x y z p : 
     altpath ca cb x y (z :: p) =
@@ -797,15 +803,26 @@ Section AltPath.
     by rewrite /altpath alternate_cons pathp_cons andbCA -andbA.
   Qed. *)
 
-  Lemma altpath_cons {ca cb y z p} x (ap : altpath ca cb y z p) : 
-    x -- y ->
-    c [set x; y] == next_col ap ->
+  Lemma altpath_cons {ca cb y z p} (ap : altpath ca cb z y p) x: 
+    altpath ca cb x y (z::p) = [&& x -- z, c [set x; z] == next_col ap, x \notin (z::p) & altpath ca cb z y p].
+  Proof. 
+    rewrite/altpath upath_cons /next_col 2!alternate_cons. 
+    case: (boolP ((c [set x; z] == cb) && alternates c ca cb (z :: p)));
+    first by move=> /andP[Hcb ->]; rewrite Hcb.
+    case (alternates c ca cb (z :: p)).
+    rewrite andbT.
+  Admitted.
+
+  (* Lemma altpath_cons {ca cb y z p} (ap : altpath ca cb y z p) x : 
+    valid_altpath_vertex ap x -> 
     altpath ca cb x z (y :: p).
   Proof. 
-    move: ap;
-    by rewrite /altpath pathp_cons 2!alternate_cons /next_col=> /andP[/orP[->|->] ->] -> Hc;
-    first rewrite Hc; last case: ifP Hc=> _ ->.
-  Qed.
+    by move: ap;
+    rewrite/altpath pathp_cons 2!alternate_cons/valid_altpath_vertex/next_col;
+    move=> /andP[/orP[->|->] ->] /andP[-> Hc];
+    first rewrite Hc;
+    last case: ifP Hc=> _ ->.
+  Qed. *)
 
 End AltPath. 
 
@@ -835,11 +852,11 @@ Section Kempe.
   (* Definition apath_of {x y} (p : Path x y) (AH : alternates c ca cb (x :: val p)) : AltPath c ca cb x y := 
     Sub (val p) (path_altpath AH). *)
 
-  Definition apcons {c x y z} 
-    (ap : AltPath c ca cb y z) 
-    (xy : x -- y) 
-    (Hc : c [set x; y] == next_col (valP ap)) 
-  := Build_AltPath (altpath_cons xy Hc).
+  Definition apcons 
+    {c x y z} 
+    {ap : AltPath c ca cb y z}
+    (H : valid_altpath_vertex (valP ap) x)
+  := Build_AltPath (altpath_cons H).
 
   Definition extend_ap {c x y} (ap : AltPath c ca cb x y) : option {w & AltPath c ca cb w y} := 
     match pickP (fun v => (v \in N(x)) && (c [set v; x] == next_col (valP ap))) with
@@ -858,12 +875,13 @@ Section Kempe.
     apply Nopick in H.
   Admitted. *)
 
+  (* may use this as definition, or have it as lemma *)
   (* must be proper coloring and absent at start so no cycles when extended *)
-  Definition apstart pc x y :=     
+  (* Definition apstart pc x y :=     
     { ap : AltPath pc ca cb x y | cb \in absent_set pc y}.
 
   Coercion apstart_to_altpath {pc x y} (aps : apstart pc x y) : 
-    AltPath pc ca cb x y := projT1 aps.
+    AltPath pc ca cb x y := projT1 aps. *)
 
   (* TO DO: Prove termination!! 
     what is the best way to do this? 
@@ -873,6 +891,13 @@ Section Kempe.
     note this is only because we have a proper coloring
     so there is only one ca and one cb edge per vertex (one in, one out) at most
   *)
+  Definition is_apmax {c y z} (ap : AltPath c ca cb y z) : Prop :=
+    forall x, ~~ valid_altpath_vertex (valP ap) x.
+
+  (* for proper edge colorings, this is equivalent to the above *)
+  Definition is_apmax_abs {c y z} (ap : AltPath pc ca cb y z) : Prop :=
+    next_col (valP ap) \in absent_set c y.
+
   Program Fixpoint apmax {pc x y} (d : nat) (ap : apstart pc x y) 
   : {v : G & apstart pc v y} :=
     match d with 
@@ -958,11 +983,13 @@ Proof.
       case Hfmax: (fanmax f0) => [w fmax].
       have tmp: (max_degree G + 1 <= k' + 1) by rewrite Heqk' (addn1 (max_degree G + 1)).
       move: (exists_absent_color kc tmp w) => {tmp} [c] Habw.
-      case Habv: (c \in absent_set kc v).
+      case: (boolP (c \in absent_set kc v))=> Habv.
       - (* if c is absent at v, we can replace extra color with c *)
         have Hcap: (c \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv Habw).
         by exists k'; rewrite Heqk'; move: (smaller_coloring fmax Heqk' Hcap).
-      - admit.
+      - have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite Hfmax /=. 
+        have := (fanmax_present HfisMax Habv Habw)=> [[wj] Hwj].
+      admit.
 Admitted.
 
 
