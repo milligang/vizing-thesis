@@ -814,13 +814,8 @@ Section AltPath.
     by rewrite/altpath upath_cons alternate_cons -2!andbA (andbC (upath z y p)) (andbA (x -- z)).
   Qed.
 
-  (* Lemma pathp_rcons x y z p: pathp x y (rcons p z) -> y = z.
-  Proof. case/andP => _ /eqP <-. exact: last_rcons. Qed.
-
-  Lemma rcons_pathp x y p : path (--) x (rcons p y) = pathp x y (rcons p y).
-  Proof. by rewrite /pathp last_rcons eqxx andbT. Qed. *)
-
-  
+  Lemma altpath_rcons ca cb x y z p: altpath ca cb x y (rcons p z) -> y = z.
+  Proof. move/altpathW; exact: pathp_rcons. Qed.  
 
   (* Lemma altpath_cons {ca cb y z p} (ap : altpath ca cb y z p) x : 
     valid_altpath_vertex ap x -> 
@@ -835,20 +830,21 @@ Section AltPath.
 
 End AltPath. 
 
-Section Pack.
-  Variables (G : sgraph) (ColorType : finType).
-  Implicit Types x y : G.
+
+Section AltPathDef.
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (ca cb : ColorType) (x y : G).
+  Record AltPath : predArgType := { aval : IPath x y; avalP : altpath c ca cb x y (nodes aval) }.
+
+  HB.instance Definition _ := [isSub for aval].
+  HB.instance Definition _ := [Countable of AltPath by <:].
+  HB.instance Definition _ := [Finite of AltPath by <:].
+
+  Definition ipath_of_altpath (p : AltPath) := aval p. 
+  Definition in_altpath p x := x \in ipath_of_altpath p.
   
-  Section AltPathDef.
-    Variables (c : edge_coloring G ColorType) (ca cb : ColorType) (x y : G).
-  
-    Record AltPath : predArgType := { aval : seq G; avalP : altpath c ca cb x y aval }.
-  
-    HB.instance Definition _ := [isSub for aval].
-    HB.instance Definition _ := [Countable of AltPath by <:].
-  
-  End AltPathDef.
-End Pack.
+  Canonical AltPath_predType := Eval hnf in @PredType G AltPath in_altpath.
+  Coercion ipath_of_altpath : AltPath >-> IPath.
+End AltPathDef.
 
 Section Kempe.
   Variables (G : sgraph) (ColorType : finType) (ca cb : ColorType).
