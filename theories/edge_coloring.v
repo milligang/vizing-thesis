@@ -756,8 +756,8 @@ Section AltPath.
   Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
   Implicit Types (x y z : G) (p : seq G) (ca cb : ColorType).
 
-  Definition altpath ca cb x y p := 
-    (alternates c ca cb (x::p) || alternates c cb ca (x::p)) && upath x y p.
+  Definition altpath ca cb x y p := alternates c ca cb (x::p) && upath x y p.
+    (* (alternates c ca cb (x::p) || alternates c cb ca (x::p)) && upath x y p. *)
 
   Lemma altpathW ca cb x y p : altpath ca cb x y p -> pathp x y p.
   Proof.
@@ -779,8 +779,13 @@ Section AltPath.
     by move=> Ap; apply/andP; split=> //; exact: valP pth.
   Qed. *)
 
-  Definition next_col {ca cb x y p} (ap : altpath ca cb x y p) :=
-    if alternates c ca cb (x::p) then cb else ca.
+  Fixpoint next_col ca cb p : ColorType := 
+    match p with 
+    | _ :: p' => next_col cb ca p'
+    | _ => cb
+    end.
+  Definition altpath_next_col {ca cb x y p} (ap : altpath ca cb x y p) := next_col ca cb p.
+  (* if alternates c ca cb (x::p) then cb else ca. *)
 
   Lemma alternate_cons ca cb x y p :
     alternates c ca cb (x::y::p) = 
@@ -803,15 +808,19 @@ Section AltPath.
     by rewrite /altpath alternate_cons pathp_cons andbCA -andbA.
   Qed. *)
 
-  Lemma altpath_cons {ca cb y z p} (ap : altpath ca cb z y p) x: 
-    altpath ca cb x y (z::p) = [&& x -- z, c [set x; z] == next_col ap, x \notin (z::p) & altpath ca cb z y p].
-  Proof. 
-    rewrite/altpath upath_cons /next_col 2!alternate_cons. 
-    case: (boolP ((c [set x; z] == cb) && alternates c ca cb (z :: p)));
-    first by move=> /andP[Hcb ->]; rewrite Hcb.
-    case (alternates c ca cb (z :: p)).
-    rewrite andbT.
-  Admitted.
+  Lemma altpath_cons {ca cb y z p} x: 
+    altpath ca cb x y (z::p) = [&& c [set x; z] == ca, altpath cb ca z y p, x -- z & x \notin (z::p)].
+  Proof.
+    by rewrite/altpath upath_cons alternate_cons -2!andbA (andbC (upath z y p)) (andbA (x -- z)).
+  Qed.
+
+  (* Lemma pathp_rcons x y z p: pathp x y (rcons p z) -> y = z.
+  Proof. case/andP => _ /eqP <-. exact: last_rcons. Qed.
+
+  Lemma rcons_pathp x y p : path (--) x (rcons p y) = pathp x y (rcons p y).
+  Proof. by rewrite /pathp last_rcons eqxx andbT. Qed. *)
+
+  
 
   (* Lemma altpath_cons {ca cb y z p} (ap : altpath ca cb y z p) x : 
     valid_altpath_vertex ap x -> 
