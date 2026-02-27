@@ -742,178 +742,98 @@ Section MaximalFan.
 
 End MaximalFan.
 
+Section AltPath.
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (s : seq G) (x y z : G).
+  Implicit Types (ca cb : ColorType) (s : seq G) (p : Path x y) (zx: z -- x) (yz: y -- z).
 
-Fixpoint alternates
-  {G : sgraph} {ColorType : finType} 
-  (c : edge_coloring G ColorType) (ca cb : ColorType) (p : seq G) : bool := 
-  match p with 
-  | x :: ((y :: tl) as p') =>
-    (c [set x; y] == ca) && alternates c cb ca p'
-  | _ => true
+  Fixpoint alternates ca cb s : bool := 
+    match s with 
+    | x :: ((y :: tl) as s') =>
+      (c [set x; y] == ca) && alternates cb ca s'
+    | _ => true
   end.
 
-Section AltPath.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
-  Implicit Types (x y z : G) (p : seq G) (ca cb : ColorType).
-
-  Definition altpath ca cb x y p := alternates c ca cb (x::p) && upath x y p.
-    (* (alternates c ca cb (x::p) || alternates c cb ca (x::p)) && upath x y p. *)
-
-  Lemma altpathW ca cb x y p : altpath ca cb x y p -> pathp x y p.
-  Proof.
-    case/andP=> ap; apply (@upathW G x y p).
-  Qed.
+  Fixpoint next_col ca cb s : ColorType := 
+  match s with 
+  | _ :: s' => next_col cb ca s'
+  | _ => cb
+  end.
   
-  Lemma altpathWW ca cb x y p : altpath ca cb x y p -> path (--) x p.
-  Proof. by move/altpathW/pathpW. Qed.
-
-  Lemma altpathxx ca cb x : altpath ca cb x x [ ::].
+  Lemma alternates_rcons ca cb yz p : 
+    alternates ca cb (nodes (pcat p (edgep yz))) = 
+    alternates ca cb (nodes p) && (c [set y; z] == next_col ca cb (nodes p)).
   Proof.
-    by apply/andP; split.
+  Admitted.
+
+  Lemma alternate_cons ca cb zx p :
+    alternates ca cb (nodes (pcat (edgep zx) p)) = 
+    (c [set z; x] == ca) && alternates cb ca (nodes p).
+  Proof.
+    rewrite nodes_pcat !nodesE.
+    by case: (val p).
   Qed.
 
-  (* Lemma path_altpath {x y} ca cb (pth : Path x y) : 
-    alternates c ca cb (x :: val pth) || alternates c cb ca (x :: val pth) && upath x y p
-    -> altpath ca cb x y (val pth).
-  Proof. 
-    by move=> Ap; apply/andP; split=> //; exact: valP pth.
-  Qed. *)
-
-  Fixpoint next_col ca cb p : ColorType := 
-    match p with 
-    | _ :: p' => next_col cb ca p'
-    | _ => cb
-    end.
-  Definition altpath_next_col {ca cb x y p} (ap : altpath ca cb x y p) := next_col ca cb p.
-  (* if alternates c ca cb (x::p) then cb else ca. *)
-
-  Lemma alternate_cons ca cb x y p :
-    alternates c ca cb (x::y::p) = 
-    (c [set x; y] == ca) && alternates c cb ca (y::p).
-  Proof. by []. Qed.
-
-  Lemma alternates_ca_cb ca cb x p:
-    ((alternates c ca cb (x::p)) && (alternates c cb ca (x::p))) -> ((ca == cb) || (nilp p)).
+  Lemma alternates_ca_cb ca cb p :
+    ((alternates ca cb (nodes p)) && (alternates cb ca (nodes p))) -> ((ca == cb) || (x == y)).
   Proof.
-    move: x; elim p=> [//| y p'] IH. 
+  Admitted.
+    (* move: x; elim p=> [//| y p'] IH. 
     rewrite -{3}cat1s cat_nilp=> x.
     rewrite 2!alternate_cons=> /andP[/andP[/eqP Hca Hab] /andP[/eqP Hcb Hac]].
     by have ->: (ca == cb) by rewrite -Hca Hcb.
-  Qed.
-
-  (* Lemma altpath_cons ca cb x y z p : 
-    altpath ca cb x y (z :: p) =
-    [&& x -- z, c [set x; z] == ca & altpath cb ca z y p].
-  Proof. 
-    by rewrite /altpath alternate_cons pathp_cons andbCA -andbA.
   Qed. *)
 
-  Lemma altpath_cons {ca cb y z p} x: 
-    altpath ca cb x y (z::p) = [&& c [set x; z] == ca, altpath cb ca z y p, x -- z & x \notin (z::p)].
+  Definition altpath ca cb {v w : G} (p0 : Path v w) := alternates ca cb (nodes p0) && (irred p0).
+
+  Lemma altpathE ca cb {v w : G} (p0 : Path v w) : altpath ca cb p0 =  alternates ca cb (nodes p0) && (irred p0).
+  Proof. by []. Qed.
+
+  Definition altpath_next_col {ca cb} {v w : G} {p0 : Path v w} (ap : altpath ca cb p0) :=
+    next_col ca cb (nodes p0).
+
+  Lemma altpath_idp ca cb : altpath ca cb (idp x).
+  Proof. by rewrite altpathE nodesE irred_idp. Qed.
+
+  Lemma altpath_edge ca cb xy : (@altpath ca cb x y (edgep xy)) = (c [set x; y] == ca).
+  Proof. by rewrite altpathE nodesE irred_edge /=. Qed.
+
+  Lemma altpath_edgeL ca cb zx p : 
+    altpath ca cb (pcat (edgep zx) p) = (z \notin p) && (c [set z; x] == ca) && (altpath cb ca p).
   Proof.
-    by rewrite/altpath upath_cons alternate_cons -2!andbA (andbC (upath z y p)) (andbA (x -- z)).
+    case: p=> p pth_p.
+    rewrite !altpathE irred_edgeL mem_path !nodesE /=.
+    by rewrite !andbA (andbAC _ _ (z  \notin x :: p)) (andbC _ (z  \notin x :: p)).
   Qed.
-
-  Lemma altpath_rcons ca cb x y z p: altpath ca cb x y (rcons p z) -> y = z.
-  Proof. move/altpathW; exact: pathp_rcons. Qed.  
-
-  (* Lemma altpath_cons {ca cb y z p} (ap : altpath ca cb y z p) x : 
-    valid_altpath_vertex ap x -> 
-    altpath ca cb x z (y :: p).
-  Proof. 
-    by move: ap;
-    rewrite/altpath pathp_cons 2!alternate_cons/valid_altpath_vertex/next_col;
-    move=> /andP[/orP[->|->] ->] /andP[-> Hc];
-    first rewrite Hc;
-    last case: ifP Hc=> _ ->.
-  Qed. *)
-
-End AltPath. 
-
-
-Section AltPathDef.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (ca cb : ColorType) (x y : G).
-  Record AltPath : predArgType := { aval : IPath x y; avalP : altpath c ca cb x y (nodes aval) }.
-
-  HB.instance Definition _ := [isSub for aval].
-  HB.instance Definition _ := [Countable of AltPath by <:].
-  HB.instance Definition _ := [Finite of AltPath by <:].
-
-  Definition ipath_of_altpath (p : AltPath) := aval p. 
-  Definition in_altpath p x := x \in ipath_of_altpath p.
   
-  Canonical AltPath_predType := Eval hnf in @PredType G AltPath in_altpath.
-  Coercion ipath_of_altpath : AltPath >-> IPath.
-End AltPathDef.
+  Lemma altpath_edgeR ca cb p yz :
+    altpath ca cb (pcat p (edgep yz)) = (z \notin p) && (c [set y; z] == next_col ca cb (nodes p)) && altpath ca cb p.
+  Proof.
+    rewrite !altpathE irred_edgeR alternates_rcons.
+    (* by rewrite !andbA (andbC (alternates ca cb (nodes p)) _). (andbAC _ _ (z  \notin p)).  *)
+  Admitted.
+
+End AltPath.
 
 Section Kempe.
-  Variables (G : sgraph) (ColorType : finType) (ca cb : ColorType).
-  Implicit Types (x y z : G) (c : edge_coloring G ColorType) (pc : proper_edge_coloring G ColorType).
+  Variables (G : sgraph) (ColorType : finType) (pc : proper_edge_coloring G ColorType) (ca cb : ColorType) (x : G). 
+  Implicit Types (y : G).
+  Hypothesis start_abs : cb \in absent_set pc x.
   
-  (* singleton path *)
-  Definition idap c x : AltPath c ca cb x x := Build_AltPath (altpathxx c ca cb x).
+  Definition valid_altpath_vertex {y} {p : Path x y} (ap : altpath pc ca cb p) (z : G) :=
+    (z \in N(y)) && ((proper_to_edge_coloring pc) [set y; z] == altpath_next_col ap).
 
-  (* Convert from path to altpath *)
-  (* Definition apath_of {x y} (p : Path x y) (AH : alternates c ca cb (x :: val p)) : AltPath c ca cb x y := 
-    Sub (val p) (path_altpath AH). *)
+  Definition is_altmax {y} {p : Path x y} (ap : altpath pc ca cb p) : Prop :=
+    altpath_next_col ap \in absent_set pc y.
 
-  Definition apcons 
-    {c x y z} 
-    {ap : AltPath c ca cb y z}
-    (H : valid_altpath_vertex (valP ap) x)
-  := Build_AltPath (altpath_cons H).
-
-  Definition extend_ap {c x y} (ap : AltPath c ca cb x y) : option {w & AltPath c ca cb w y} := 
-    match pickP (fun v => (v \in N(x)) && (c [set v; x] == next_col (valP ap))) with
-    | Pick v Pv =>
-        let Hv := prev_edge_proof (eq_rect (v \in N(x)) is_true (andP Pv).1 (x -- v) (in_opn v x)) in
-        let Hc := (andP Pv).2 in
-        Some (existT _ v (apcons Hv Hc))
-    | Nopick _ => None
+  Equations apmax {y} {p : Path x y} (ap : altpath pc ca cb p) 
+  : {z & {q : Path x z & altpath pc ca cb q}} by wf #|[set: G] :\: [set z in p]| lt :=
+    apmax ap := 
+    match pickP (valid_altpath_vertex ap) with
+      | Pick z Pz => existT _ y (existT _ p ap)
+      (* apmax (altpath ca cb (pcat p (edgep yz))) *)
+      | Nopick _ => existT _ y (existT _ p ap)
     end.
-  
-  (* Not needed right now *)
-  (* Lemma extend_ap_none {c x y} (ap : AltPath c ca cb x y) : 
-    extend_ap ap == None -> next_col (valP ap) \in absent_set c x.
-  Proof. 
-    rewrite /extend_ap; case pickP=> H _ //. 
-    apply Nopick in H.
-  Admitted. *)
-
-  (* may use this as definition, or have it as lemma *)
-  (* must be proper coloring and absent at start so no cycles when extended *)
-  (* Definition apstart pc x y :=     
-    { ap : AltPath pc ca cb x y | cb \in absent_set pc y}.
-
-  Coercion apstart_to_altpath {pc x y} (aps : apstart pc x y) : 
-    AltPath pc ca cb x y := projT1 aps. *)
-
-  (* TO DO: Prove termination!! 
-    what is the best way to do this? 
-    current set-up would be fuel = total vertices of graph
-    this is trickier than the fanmax case
-    we need to prove there are no cycles to show we don't reuse vertices
-    note this is only because we have a proper coloring
-    so there is only one ca and one cb edge per vertex (one in, one out) at most
-  *)
-  Definition is_apmax {c y z} (ap : AltPath c ca cb y z) : Prop :=
-    forall x, ~~ valid_altpath_vertex (valP ap) x.
-
-  (* for proper edge colorings, this is equivalent to the above *)
-  Definition is_apmax_abs {c y z} (ap : AltPath pc ca cb y z) : Prop :=
-    next_col (valP ap) \in absent_set c y.
-
-  Program Fixpoint apmax {pc x y} (d : nat) (ap : apstart pc x y) 
-  : {v : G & apstart pc v y} :=
-    match d with 
-    | 0 => existT _ x ap
-    | S d' => 
-      match extend_ap ap with
-      | Some (existT v ap') => apmax d' ap'
-      | None => existT _ x ap
-      end
-    end.
-  Next Obligation. exact: (projT2 ap). Defined.
+  (* Next Obligation. *)
 
   (*
   Definition kempe pc x := apmax (idap pc x).
