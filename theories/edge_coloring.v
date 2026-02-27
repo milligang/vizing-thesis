@@ -182,6 +182,39 @@ Section ChromIdx.
   (* TO THINK: could also prove chromatic index exists and is unique *)
 End ChromIdx.
 
+Section AbsentSet.
+  Variables (G : sgraph).
+  Implicit Types (x y : G).
+
+  Definition absent_set {ColorType : finType} 
+    (c : edge_coloring G ColorType) x :=
+    setD (c[E(G)]) (c[E{x}]).
+
+  (* still deciding on definitions further down, tbd which of these three will be needed *)
+  (* Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
+    c0 \in absent_set c x <-> [pick e in E{x} | c e == c0] == None.
+  Proof. split=> H. Admitted. *)
+
+  Lemma absent_edge {ColorType : finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
+    c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
+  Proof.
+    move=> /setDP[_ /memPnC Hnin] Hn.
+    have Hin : c [set x; y] \in c[E{x}].
+    { by apply/imsetP; exists [set x; y]; first by apply/imsetP; exists y. }
+    by apply Hnin.
+  Qed.
+
+  Proposition exists_absent_color {k : nat} (kc : k_edge_coloring G k):
+    max_degree G + 1 <= k ->
+    forall x : G, exists c, c \in (absent_set kc x).
+  Proof.
+    rewrite addn1=> Hk x; apply/set0Pn.
+    rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
+    by rewrite subn_gt0 (eqP (card_k_col kc)) (leq_ltn_trans (leq_col_deg kc x)).
+  Qed.
+  
+End AbsentSet.
+
 Section ExtendCol. 
   Variables (G : sgraph) (del_e : {set G}) (He : del_e \in E(G)).
 
@@ -235,6 +268,15 @@ Section ExtendCol.
     by rewrite (card_extended_col kc). 
   Defined.
 
+  Lemma extended_absent 
+    {k : nat}
+    {kc : k_edge_coloring (del_edges del_e) k}
+    {c0 : projT1 kc}
+    {x : G}
+    (H : c0 \in absent_set kc x)
+  : Some c0 \in absent_set (k_extended_col kc) x.
+  Proof.
+  Admitted.
   (* arguably, could also work for matchings not just single edge *)
   (* Lemma del_edges_coloring (k : nat) :
     k_edge_colorable (del_edges del_e) k -> k_edge_colorable G (k + 1).
@@ -247,39 +289,6 @@ Section ExtendCol.
     (* exists (option ColorType). *)
   Admitted. *)
 End ExtendCol.
-
-Section AbsentSet.
-  Variables (G : sgraph).
-  Implicit Types (x y : G).
-
-  Definition absent_set {ColorType: finType} 
-    (c : edge_coloring G ColorType) x :=
-    setD (c[E(G)]) (c[E{x}]).
-
-  (* still deciding on definitions further down, tbd which of these three will be needed *)
-  (* Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
-    c0 \in absent_set c x <-> [pick e in E{x} | c e == c0] == None.
-  Proof. split=> H. Admitted. *)
-
-  Lemma absent_edge {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
-    c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
-  Proof.
-    move=> /setDP[_ /memPnC Hnin] Hn.
-    have Hin : c [set x; y] \in c[E{x}].
-    { by apply/imsetP; exists [set x; y]; first by apply/imsetP; exists y. }
-    by apply Hnin.
-  Qed.
-
-  Proposition exists_absent_color {k : nat} (kc : k_edge_coloring G k):
-    max_degree G + 1 <= k ->
-    forall x : G, exists c, c \in (absent_set kc x).
-  Proof.
-    rewrite addn1=> Hk x; apply/set0Pn.
-    rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
-    by rewrite subn_gt0 (eqP (card_k_col kc)) (leq_ltn_trans (leq_col_deg kc x)).
-  Qed.
-  
-End AbsentSet.
 
 Section Recolor.
   Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
@@ -450,12 +459,16 @@ Section Fan.
   (* Proof.  *)
   (* Admitted. *)
 
-  Lemma w0_extended_col {e} (c_del : edge_coloring (del_edges e) ColorType)
+  Lemma w0_prop_extended {e} (c_del : edge_coloring (del_edges e) ColorType)
   : w0_prop (extended_col c_del) e.
   Proof. 
     rewrite /w0_prop /extended_col eq_refl.
     by apply/negP => /imsetP [e' /del_edges1_neq /negbTE ->].
   Qed.
+
+  Lemma w0_col_extended {e} (c_del : edge_coloring (del_edges e) ColorType)
+  : (extended_col c_del) e = None.
+  Proof. by rewrite /extended_col eq_refl. Qed.
 
     (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
     the color of (v, w_{i+1} is absent at w_i) *)
@@ -526,7 +539,7 @@ Section FanOps.
     (c_del : edge_coloring (del_edges [set v; w0]) ColorType) 
   : v -- w0 -> fanp (extended_col c_del) [::] v w0.
   Proof.
-    by rewrite /fanp (w0_extended_col c_del) -in_opn.
+    by rewrite /fanp (w0_prop_extended c_del) -in_opn.
   Qed.
 
   Definition Fan_of_del_edges 
@@ -541,7 +554,7 @@ Section FanOps.
     (kc_del : k_edge_coloring (del_edges [set v; w0]) k) 
   : fanp (k_extended_col He kc_del) [::] v w0.
   Proof.
-    rewrite /fanp (w0_extended_col kc_del) //=.
+    rewrite /fanp (w0_prop_extended kc_del) //=.
     by have -> : w0 \in N(v) by move: (He); rewrite in_edges in_opn.
   Qed.
 
@@ -562,6 +575,11 @@ Section Rotation.
 
   Lemma fan_w0_prop : w0_prop c [set v; (last wk (val f))].
   Proof. move: (valP f); exact: fanp_w0_prop. Qed.
+
+  (* Lemma none_w0_extended {k : nat} {e} (He : e \in E(G)) (kc_del : k_edge_coloring (del_edges e) k) w
+  : ((k_extended_col He kc_del) [set v; w] = None) = (w = (last wk (val f))).
+  Proof.
+  Admitted. *)
 
   Lemma in_neigh w : w \in (wk::val f) -> w \in N(v).
   Proof. 
@@ -835,11 +853,6 @@ Section Kempe.
   Variables (G : sgraph) (ColorType : finType) (pc : proper_edge_coloring G ColorType) (ca cb : ColorType) (x : G). 
   Implicit Types (y : G).
   Hypothesis start_abs : cb \in absent_set pc x.
-  
-  Lemma altpath_swap_proper {y} {p : Path x y} (ap : altpath pc ca cb p) : 
-    is_proper_edge_coloring (altpath_swap ap).
-  Proof.
-  Admitted.
  
   Definition valid_altpath_vertex {y} {p : Path x y} (ap : altpath pc ca cb p) (z : G) :=
     (z \in N(y)) && ((proper_to_edge_coloring pc) [set y; z] == altpath_next_col ap).
@@ -857,12 +870,11 @@ Section Kempe.
     (ap : altpath pc ca cb p) 
     (z : G) 
     (Pz : valid_altpath_vertex ap z) 
-  :
-    altpath pc ca cb (pcat p (edgep (valid_altpath_edge Pz))).
+  : altpath pc ca cb (pcat p (edgep (valid_altpath_edge Pz))).
   Proof.
   Admitted.
   
-  Definition is_altmax {y} {p : Path x y} (ap : altpath pc ca cb p) : Prop :=
+  Definition is_apmax {y} {p : Path x y} (ap : altpath pc ca cb p) : Prop :=
     altpath_next_col ap \in absent_set pc y.
 
   Equations apmax {y} {p : Path x y} (ap : altpath pc ca cb p) 
@@ -879,9 +891,15 @@ Section Kempe.
     - apply/setDS.  *)
   Admitted.
 
-  (*
-  Definition kempe pc x := apmax (idap pc x). *)
+  Lemma apmax_is_apmax {y} {p : Path x y} (ap : altpath pc ca cb p)
+  : is_apmax (projT2 (projT2 (apmax ap))).
+  Proof.
+  Admitted.
 
+  Lemma altpath_swap_proper {y} {p : Path x y} (ap : altpath pc ca cb p) (Ha : is_apmax ap) :
+    is_proper_edge_coloring (altpath_swap ap).
+  Proof.
+  Admitted.
 End Kempe.
 
 (* TO DO: finish up, nearly there. last little admits Hnotin' and Hprop'' may take a second *)
@@ -929,33 +947,45 @@ Proof.
   rewrite chi_lower_bound //=.
   apply (chi_upper_bound_trans Hchi) => {Hchi}.
   elim/(size_ind (fun G => #|E(G)|)) : G => G IH.
-  case: (set_0Vmem E(G)) => [E0|[e Ein]].
+  case: (set_0Vmem E(G)) => [E0|[e Ein0]].
   - (* Base case #|E(G)| = 0 *)
     exists #|E(G)|.
     split; first by exact/inj_chrom.
     by rewrite E0 cards0.
   - (* Induction *)
-    have [v [w0] [Edef Evw0]] := edgesP _ Ein; rewrite Edef in Ein; set G' := del_edges [set v; w0].
+    have [v [w0] [Edef0 Ev0]] := edgesP _ Ein0; rewrite Edef0 in Ein0; set G' := del_edges [set v; w0].
     have/IH [k' [[kc'] Hleqk']]: #|E(G')| < #|E(G)|.
-    { by apply: proper_card; exact: del_edges_proper Ein _. }
+    { by apply: proper_card; exact: del_edges_proper Ein0 _. }
     have: k' <= max_degree G + 1.
     { by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg. }
-    pose kc := k_extended_col Ein kc'.
+    pose kc := k_extended_col Ein0 kc'.
     rewrite leq_eqVlt => /orP[/eqP Heqk'| Hltk']; first last.
     - (* if k' < max_degree G + 1, then we are done *) 
       exists (k' + 1).
       by split; [ |rewrite addn1].
-    - pose f0 := k_Fan_of_del_edges Ein kc'.
+    - pose f0 : Fan kc v w0 := k_Fan_of_del_edges Ein0 kc'.
       case Hfmax: (fanmax f0) => [w fmax].
-      have tmp: (max_degree G + 1 <= k' + 1) by rewrite Heqk' (addn1 (max_degree G + 1)).
-      move: (exists_absent_color kc tmp w) => {tmp} [c] Habw.
-      case: (boolP (c \in absent_set kc v))=> Habv.
+      have Hleqk : max_degree G' + 1 <= k'.
+      { apply/(leq_trans _ (eq_leq (esym Heqk'))); rewrite leq_add2r; exact: del_edges_max_deg. } 
+      move: (exists_absent_color kc' Hleqk w) => [c'] Habw'.
+      have Habw := extended_absent Ein0 Habw'.
+      (* move: (exists_absent_color kc Hleq w) => [c] Habw. *)
+      case: (boolP (Some c' \in absent_set kc v))=> [Habv | Hnabv].
       - (* if c is absent at v, we can replace extra color with c *)
-        have Hcap: (c \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv Habw).
+        have Hcap: (Some c' \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv Habw).
         by exists k'; rewrite Heqk'; move: (smaller_coloring fmax Heqk' Hcap).
-      - have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite Hfmax /=. 
-        have := (fanmax_present HfisMax Habv Habw)=> [[wj] Hwj].
-      admit.
+      - have Hleq: (max_degree G + 1 <= k' + 1) by rewrite Heqk' (addn1 (max_degree G + 1)).
+        move: (exists_absent_color kc Hleq v) => [d] Habv.
+        have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite Hfmax /=. 
+        have := (fanmax_present HfisMax Hnabv Habw)=> [[wj] /andP[Einj /andP[Ecj Hfanj]]].
+        have Evj : v -- wj by rewrite in_edges in Einj.
+        move: (Ecj); rewrite -(altpath_edge kc _ d)=> ap0.
+        case Hapmax: (apmax Habv ap0) => [z [pth apmax]].
+        have : wj != last w (val fmax).
+        (* { apply/contra_neq. rewrite -(none_w0_extended _ kc). } *)
+        (* have Hsplit := splitP Hfanj.
+        move: Hfanj=> /splitP -[s1 s2].
+        case/splitP Hsplit: Hfanj=> s1 s2. Print splitr. *)
 Admitted.
 
 
