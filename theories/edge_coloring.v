@@ -742,39 +742,53 @@ Section MaximalFan.
 
 End MaximalFan.
 
-Section AltPath.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (s : seq G) (x y z : G).
-  Implicit Types (ca cb : ColorType) (s : seq G) (p : Path x y) (zx: z -- x) (yz: y -- z).
+Section AltPathOps.
+  Variables (G : sgraph) (ColorType : finType).
+  Implicit Types (c : edge_coloring G ColorType) (ca cb : ColorType) (s : seq G).
 
-  Fixpoint alternates ca cb s : bool := 
+  Fixpoint alternates c ca cb s : bool := 
     match s with 
     | x :: ((y :: tl) as s') =>
-      (c [set x; y] == ca) && alternates cb ca s'
+      (c [set x; y] == ca) && alternates c cb ca s'
     | _ => true
-  end.
+    end.
 
-  Fixpoint next_col ca cb s : ColorType := 
-  match s with 
-  | _ :: s' => next_col cb ca s'
-  | _ => cb
-  end.
+  Fixpoint next_col c ca cb s : ColorType := 
+    match s with 
+    | _ :: s' => next_col c cb ca s'
+    | _ => cb
+    end.
+
+  Fixpoint alternates_swap c ca cb s : edge_coloring G ColorType :=
+    match s with
+    | x :: ((y::tl) as s') =>
+        alternates_swap
+            (recolor_edge c [set x; y] ca)
+            cb ca s'
+    | _ => c
+    end.
+End AltPathOps.
+
+Section AltPath.
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (x y z : G).
+  Implicit Types (ca cb : ColorType) (s : seq G) (p : Path x y) (zx: z -- x) (yz: y -- z).
   
   Lemma alternates_rcons ca cb yz p : 
-    alternates ca cb (nodes (pcat p (edgep yz))) = 
-    alternates ca cb (nodes p) && (c [set y; z] == next_col ca cb (nodes p)).
+    alternates c ca cb (nodes (pcat p (edgep yz))) = 
+    alternates c ca cb (nodes p) && (c [set y; z] == next_col c ca cb (nodes p)).
   Proof.
   Admitted.
 
   Lemma alternate_cons ca cb zx p :
-    alternates ca cb (nodes (pcat (edgep zx) p)) = 
-    (c [set z; x] == ca) && alternates cb ca (nodes p).
+    alternates c ca cb (nodes (pcat (edgep zx) p)) = 
+    (c [set z; x] == ca) && alternates c cb ca (nodes p).
   Proof.
     rewrite nodes_pcat !nodesE.
     by case: (val p).
   Qed.
 
   Lemma alternates_ca_cb ca cb p :
-    ((alternates ca cb (nodes p)) && (alternates cb ca (nodes p))) -> ((ca == cb) || (x == y)).
+    ((alternates c ca cb (nodes p)) && (alternates c cb ca (nodes p))) -> ((ca == cb) || (x == y)).
   Proof.
   Admitted.
     (* move: x; elim p=> [//| y p'] IH. 
@@ -783,13 +797,16 @@ Section AltPath.
     by have ->: (ca == cb) by rewrite -Hca Hcb.
   Qed. *)
 
-  Definition altpath ca cb {v w : G} (p0 : Path v w) := alternates ca cb (nodes p0) && (irred p0).
+  Definition altpath ca cb {v w : G} (p0 : Path v w) := alternates c ca cb (nodes p0) && (irred p0).
 
-  Lemma altpathE ca cb {v w : G} (p0 : Path v w) : altpath ca cb p0 =  alternates ca cb (nodes p0) && (irred p0).
+  Lemma altpathE ca cb {v w : G} (p0 : Path v w) : altpath ca cb p0 =  alternates c ca cb (nodes p0) && (irred p0).
   Proof. by []. Qed.
 
-  Definition altpath_next_col {ca cb} {v w : G} {p0 : Path v w} (ap : altpath ca cb p0) :=
-    next_col ca cb (nodes p0).
+  Definition altpath_next_col {ca cb p} (ap : altpath ca cb p) : ColorType :=
+    next_col c ca cb (nodes p).
+
+  Definition altpath_swap {ca cb p} (ap : altpath ca cb p) : edge_coloring G ColorType := 
+    alternates_swap c ca cb (nodes p).
 
   Lemma altpath_idp ca cb : altpath ca cb (idp x).
   Proof. by rewrite altpathE nodesE irred_idp. Qed.
@@ -806,7 +823,7 @@ Section AltPath.
   Qed.
   
   Lemma altpath_edgeR ca cb p yz :
-    altpath ca cb (pcat p (edgep yz)) = (z \notin p) && (c [set y; z] == next_col ca cb (nodes p)) && altpath ca cb p.
+    altpath ca cb (pcat p (edgep yz)) = (z \notin p) && (c [set y; z] == next_col c ca cb (nodes p)) && altpath ca cb p.
   Proof.
     rewrite !altpathE irred_edgeR alternates_rcons.
     (* by rewrite !andbA (andbC (alternates ca cb (nodes p)) _). (andbAC _ _ (z  \notin p)).  *)
@@ -819,27 +836,51 @@ Section Kempe.
   Implicit Types (y : G).
   Hypothesis start_abs : cb \in absent_set pc x.
   
+  Lemma altpath_swap_proper {y} {p : Path x y} (ap : altpath pc ca cb p) : 
+    is_proper_edge_coloring (altpath_swap ap).
+  Proof.
+  Admitted.
+ 
   Definition valid_altpath_vertex {y} {p : Path x y} (ap : altpath pc ca cb p) (z : G) :=
     (z \in N(y)) && ((proper_to_edge_coloring pc) [set y; z] == altpath_next_col ap).
 
+  Lemma valid_altpath_edge 
+    {y z} {p : Path x y} 
+    {ap : altpath pc ca cb p}
+    (Pz : valid_altpath_vertex ap z) 
+  : y -- z.
+  Proof. 
+  Admitted.
+  
+  Lemma altpath_rcons 
+    {y} {p : Path x y} 
+    (ap : altpath pc ca cb p) 
+    (z : G) 
+    (Pz : valid_altpath_vertex ap z) 
+  :
+    altpath pc ca cb (pcat p (edgep (valid_altpath_edge Pz))).
+  Proof.
+  Admitted.
+  
   Definition is_altmax {y} {p : Path x y} (ap : altpath pc ca cb p) : Prop :=
     altpath_next_col ap \in absent_set pc y.
 
   Equations apmax {y} {p : Path x y} (ap : altpath pc ca cb p) 
-  : {z & {q : Path x z & altpath pc ca cb q}} by wf #|[set: G] :\: [set z in p]| lt :=
+  : {z & {q : Path x z & altpath pc ca cb q}} by wf #|[set: G] :\: ([set v in p])| lt :=
     apmax ap := 
     match pickP (valid_altpath_vertex ap) with
-      | Pick z Pz => existT _ y (existT _ p ap)
-      (* apmax (altpath ca cb (pcat p (edgep yz))) *)
+      | Pick z Pz => apmax (altpath_rcons Pz)
       | Nopick _ => existT _ y (existT _ p ap)
     end.
-  (* Next Obligation. *)
+  Next Obligation.
+    apply/ltP/proper_card/properP.
+    (* rewrite mem_pcat_edgeR.
+    split.
+    - apply/setDS.  *)
+  Admitted.
 
   (*
-  Definition kempe pc x := apmax (idap pc x).
-
-  TO DO: define swap operation. Shouldn't be to complicated - use swap_edge and iterate through path
-  Definition apswap (ap : AltPath c ca cb y z) :=  *)
+  Definition kempe pc x := apmax (idap pc x). *)
 
 End Kempe.
 
