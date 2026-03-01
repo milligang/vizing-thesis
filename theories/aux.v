@@ -87,4 +87,52 @@ Proof.
   by rewrite (@del_edges_edge_neigh G A e) => /andP[-> _].
 Qed.
 
+Definition pathp_edge {G : sgraph} (x u v : G) (s : seq G) :=
+  exists i, (i < size s) && (nth x (x::s) i == u) && (nth x s i == v).
+
+Definition Path_edge {G : sgraph} {x y : G} (p : Path x y) (u v : G) := pathp_edge x u v (tail p).
+
+Section PathEdge.
+  Variables (G : sgraph) (x y z u v : G) (p : Path x y).
+
+  Lemma is_path_edge : Path_edge p u v -> u -- v.
+  Proof.
+    rewrite/Path_edge/pathp_edge=> [[i] /andP[/andP[Hs /eqP <-] /eqP <-]].
+    move: (pathpW (valP p))=> /pathP Hp.
+    exact: Hp x i Hs.
+  Qed.
+
+  Lemma not_path_edge :
+    ~ u -- v -> ~ Path_edge p u v.
+  Proof.
+    apply/contra_not; exact: is_path_edge.
+  Qed.
+
+  Lemma edgep_path_edge (xy : x -- y) :
+    (Path_edge (edgep xy) u v) <-> ((x == u) && (y == v)).
+  Proof.
+    rewrite/Path_edge/pathp_edge /=;
+    split=> [[i]| Heq]; by [case i | exists 0].
+  Qed.
+
+  (* Lemma pcat_tail (q : Path y z) :
+    tail (pcat p q) = tail p ++ (tail q).
+  Proof.
+    by [].
+    rewrite/tail. *)
+
+  Lemma cat_path_edge (q : Path y z) :
+    Path_edge (pcat p q) u v <-> Path_edge p u v \/ Path_edge q u v.
+  Proof.
+    rewrite/Path_edge -[tail (pcat p q)]/((tail p) ++ (tail q)) /pathp_edge size_cat.
+    split=> [[i] /andP[/andP[Hs +] +]|].
+    - rewrite nth_cat; rewrite (nth_cat x (x :: tail p) (tail q) i).
+  Admitted.
+End PathEdge.
+        
+  
+  
+
+
+
   
