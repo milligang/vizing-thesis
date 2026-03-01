@@ -439,7 +439,7 @@ End Recolor.
 
 Section Fan.
   Variable (G : sgraph) (ColorType : finType).
-  Implicit Types (c : edge_coloring G ColorType) (v w : G) (e : {set G}) (f : seq G).
+  Implicit Types (c : edge_coloring G ColorType) (v wk w : G) (e : {set G}) (f : seq G).
 
   (* 1. For all w in the fan centered at v, w is in the neighborhood of v *)
   Definition neigh_prop v f := all (fun w => w \in N(v)) f.
@@ -475,33 +475,54 @@ Section Fan.
   Definition absent_prop c e w := 
     (c e) \in (absent_set c w).
 
-  Definition fanp c f v wk := 
+  Definition fanp c f v w0 wk := 
+    (last wk f == w0) && 
     uniq (wk::f) &&
     neigh_prop v (wk::f) &&
-    w0_prop c [set v; (last wk f)] &&
+    w0_prop c [set v; w0] &&
     path (
       fun x2 => absent_prop c [set v; x2]
     ) wk f.
 
-  Lemma fanp_w0_prop c f v wk : fanp c f v wk -> w0_prop c [set v; (last wk f)].
-  Proof. by case/andP => /andP [_ ->] _. Qed.
+  Lemma fanpW c f v w0 wk : fanp c f v w0 wk -> path (fun x2 => absent_prop c [set v; x2]) wk f.
+  Proof. by case/andP. Qed.
 
-  Lemma fanp_neigh c f v wk : fanp c f v wk -> neigh_prop v (wk::f).
+  Lemma fanp_last c f v w0 wk : fanp c f v w0 wk -> last wk f = w0.
+  Proof. by case/andP=> /andP[/andP[/andP[/eqP-> _] _] _] _. Qed.
+
+  Lemma fanp_w0_prop c f v w0 wk : fanp c f v w0 wk -> w0_prop c [set v; w0].
+  Proof. by case/andP=> /andP [_ ->] _. Qed.
+
+  Lemma fanp_neigh c f v w0 wk : fanp c f v w0 wk -> neigh_prop v (wk::f).
   Proof. by case/andP => /andP [/andP [_ ->] _] _. Qed.
 
   Lemma rev_neigh f v wk : neigh_prop v (wk::f) -> neigh_prop v (rev (wk::f)).
   Proof. by rewrite /neigh_prop all_rev. Qed.
 
-  Definition valid_fan_vertex {c f v wk} (fan : fanp c f v wk) (w : G) :=
+  Definition valid_fan_vertex {c f v w0 wk} (fan : fanp c f v w0 wk) (w : G) :=
     (w \in N(v)) && (w \notin wk::f) && absent_prop c [set v; w] wk.
   
-  Lemma fan_cons {c f v wk} (fan : fanp c f v wk) (w : G) : 
+  Lemma fanp_cons {c f v w0 wk} (fan : fanp c f v w0 wk) (w : G) : 
     valid_fan_vertex fan w ->
-    fanp c (wk::f) v w.
+    fanp c (wk::f) v w0 w.
   Proof. 
     by move: fan;
     rewrite /fanp last_cons /neigh_prop /valid_fan_vertex
-    => /andP[/andP[/andP[Hu Hn]] -> Hp] /andP[/andP[Hin Hnin] Ha].
+    => /andP[/andP[/andP[/andP[Hl Hu] Hn]] -> Hp] /andP[/andP[Hin Hnin] Ha].
+  Qed.
+
+  Lemma sub_fanp 
+    {c f v w0 wk}
+    {f1 f2 : seq G} {w}
+    (Hcat : (wk::f) = f1 ++ (w :: f2))
+  : fanp c f v w0 wk -> fanp c f2 v w0 w.
+  Proof.
+    rewrite/fanp -(last_cons wk wk) Hcat cat_uniq /neigh_prop all_cat -cat_rcons last_cat last_rcons
+    => /andP[/andP[/andP[/andP[-> /andP[_ /andP[_ ->]]] /andP[_ ->]] ->] +].
+    case: f1 Hcat=> [|wk' f1].
+    - by rewrite cat0s; case=> <- <-.
+    - rewrite cat_cons; case=> _ ->.
+      by rewrite -cat_rcons cat_path last_rcons=> /andP[_ ->].
   Qed.
 
 End Fan.
@@ -511,9 +532,9 @@ Section Pack.
   Implicit Types (c : edge_coloring G ColorType) (v w : G).
 
   Section FanDef.
-    Variables (c : edge_coloring G ColorType) (v w : G).
+    Variables (c : edge_coloring G ColorType) (v w0 w : G).
 
-    Record Fan : predArgType := { fval : seq G; _ : fanp c fval v w }.
+    Record Fan : predArgType := { fval : seq G; _ : fanp c fval v w0 w }.
 
     HB.instance Definition _ := [isSub for fval].
     HB.instance Definition _ := [Countable of Fan by <:].
@@ -537,7 +558,7 @@ Section FanOps.
   Lemma Fan_of_proof 
     {v w0 : G} 
     (c_del : edge_coloring (del_edges [set v; w0]) ColorType) 
-  : v -- w0 -> fanp (extended_col c_del) [::] v w0.
+  : v -- w0 -> fanp (extended_col c_del) [::] v w0 w0.
   Proof.
     by rewrite /fanp (w0_prop_extended c_del) -in_opn.
   Qed.
@@ -552,7 +573,7 @@ Section FanOps.
     {k} {v w0 : G} 
     (He : [set v; w0] \in E(G))
     (kc_del : k_edge_coloring (del_edges [set v; w0]) k) 
-  : fanp (k_extended_col He kc_del) [::] v w0.
+  : fanp (k_extended_col He kc_del) [::] v w0 w0.
   Proof.
     rewrite /fanp (w0_prop_extended kc_del) //=.
     by have -> : w0 \in N(v) by move: (He); rewrite in_edges in_opn.
@@ -562,31 +583,53 @@ Section FanOps.
   Definition k_Fan_of_del_edges 
     {k} {v w0 : G}
     (He : [set v; w0] \in E(G))
-    (c_del : k_edge_coloring (del_edges [set v; w0]) k) 
-  := Build_Fan (k_Fan_of_proof He c_del).
-End FanOps.
-
-Section Rotation. 
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v wk : G) (f : Fan c v wk).
-  Implicit Type (w : G).
-
-  Lemma fan_neigh : neigh_prop v (wk::val f).
-  Proof. move: (valP f); exact: fanp_neigh. Qed.
-
-  Lemma fan_w0_prop : w0_prop c [set v; (last wk (val f))].
-  Proof. move: (valP f); exact: fanp_w0_prop. Qed.
+    (kc_del : k_edge_coloring (del_edges [set v; w0]) k) 
+  := Build_Fan (k_Fan_of_proof He kc_del).
 
   (* Lemma none_w0_extended {k : nat} {e} (He : e \in E(G)) (kc_del : k_edge_coloring (del_edges e) k) w
   : ((k_extended_col He kc_del) [set v; w] = None) = (w = (last wk (val f))).
   Proof.
   Admitted. *)
+  (* Lemma w0_none_extended 
+    {k} {v w0 : G}
+    {He : [set v; w0] \in E(G)}
+    {kc_del : k_edge_coloring (del_edges [set v; w0]) k}
+    (f : k_Fan_of_del_edges He kc_del)
+    (w : G)
+  : ((k_extended_col He kc_del) [set v; w] = None) = (w = (last wk (val f))).
+  Proof. 
+    rewrite /w0_prop /extended_col eq_refl.
+    by apply/negP => /imsetP [e' /del_edges1_neq /negbTE ->].
+  Qed. *)
+End FanOps.
+
+Section Rotation. 
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v w0 wk : G) (f : Fan c v w0 wk).
+  Implicit Type (w : G).
+
+  Lemma fanW : path (fun x2 => absent_prop c [set v; x2]) wk (fval f).
+  Proof.  move: (valP f); exact: fanpW. Qed.
+
+  Lemma fan_last : last wk (val f) = w0.
+  Proof. move: (valP f); exact: fanp_last. Qed.
+
+  Lemma fan_neigh : neigh_prop v (wk::val f).
+  Proof. move: (valP f); exact: fanp_neigh. Qed.
+
+  Lemma fan_w0_prop : w0_prop c [set v; w0].
+  Proof. move: (valP f); exact: fanp_w0_prop. Qed.
 
   Lemma in_neigh w : w \in (wk::val f) -> w \in N(v).
   Proof. 
     move: fan_neigh; rewrite/neigh_prop=> /allP H. exact: H.
   Qed.
 
-  Definition fancons {w} (H : valid_fan_vertex (valP f) w) := Build_Fan (fan_cons H).
+  Definition fancons {w} (H : valid_fan_vertex (valP f) w) := Build_Fan (fanp_cons H).
+
+  Lemma sub_fan {f1 f2 : seq G} w (Hcat : (wk::val f) = f1 ++ (w :: f2)) : Fan c v w0 w.
+  Proof.
+    move: (valP f)=> Hf. exact: (Build_Fan (sub_fanp Hcat Hf)). 
+  Qed.
 
   (* Lemma extend_absent :
     extend_fan = None ->   
@@ -604,13 +647,13 @@ Section Rotation.
   Proof.
     rewrite /rotateF; set fs := (rev (wk::val f)).
     have Hws : neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
-    elim: fs c Hws=> [|w0 ws IH] d //= /andP [Hw0 Hws].
-    case: ws IH Hws=> [|w1 wss IH] Hws //.
-    rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //. 
-    move/andP: Hws => [Hw1 _].
-    have He0 : [set v; w0] \in E{v} by rewrite/edge_neigh; apply/imsetP; exists w0.
+    elim: fs c Hws=> [|w1 ws IH] d //= /andP [Hw1 Hws].
+    case: ws IH Hws=> [|w2 wss IH] Hws //.
+    rewrite -(IH (swap_edge d [set v; w1] [set v; w2])) //. 
+    move/andP: Hws => [Hw2 _].
     have He1 : [set v; w1] \in E{v} by rewrite/edge_neigh; apply/imsetP; exists w1.
-    exact: imset_swap_vertex He0 He1.
+    have He2 : [set v; w2] \in E{v} by rewrite/edge_neigh; apply/imsetP; exists w2.
+    exact: imset_swap_vertex He1 He2.
   Qed.
 
   (* Basically the same as above *)
@@ -618,12 +661,12 @@ Section Rotation.
   Proof.
     rewrite/rotateF; set fs := (rev (wk::val f)).
     have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
-    elim: fs c Hws=> [|w0 [|w1 wss] IH] d //= /andP [Hw0 Hws].
-    rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //. 
-    move/andP: Hws => [Hw1 _].
-    have He0: [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
+    elim: fs c Hws=> [|w1 [|w2 wss] IH] d //= /andP [Hw1 Hws].
+    rewrite -(IH (swap_edge d [set v; w1] [set v; w2])) //. 
+    move/andP: Hws => [Hw2 _].
     have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
-    exact: imset_swap He0 He1.
+    have He2: [set v; w2] \in E(G) by rewrite in_opn -in_edges in Hw2.
+    exact: imset_swap He1 He2.
   Qed.
 
   Lemma perm_rot : 
@@ -631,12 +674,12 @@ Section Rotation.
   Proof.
     rewrite /rotateF; set fs := (rev (wk::val f)).
     have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
-    elim: fs c Hws => [|w0 [|w1 wss] IH] d //= /andP [Hw0 Hws].
-    apply: (perm_trans _ (IH (swap_edge d [set v; w0] [set v; w1]) _)) => //.
-    move/andP: Hws => [Hw1 _].
-    have He0: [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
+    elim: fs c Hws => [|w1 [|w2 wss] IH] d //= /andP [Hw1 Hws].
+    apply: (perm_trans _ (IH (swap_edge d [set v; w1] [set v; w2]) _)) => //.
+    move/andP: Hws => [Hw2 _].
     have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
-    exact: perm_swap He0 He1.
+    have He2: [set v; w2] \in E(G) by rewrite in_opn -in_edges in Hw2.
+    exact: perm_swap He1 He2.
   Qed.
   
   
@@ -647,7 +690,7 @@ Section Rotation.
   Proof.
     rewrite/rotateF; set fs := (rev (wk::val f)).
     have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
-    elim: fs c Hws=> [/=|w0 [|w1 wss] IH] d Hws.
+    elim: fs c Hws=> [/=|w1 [|w2 wss] IH] d Hws.
     (* rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //.  *)
     (* move/andP: Hws => [Hw1 _].
     have He0: [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
@@ -656,11 +699,11 @@ Section Rotation.
   Admitted.
 
   (* TO DO: Helper for next lemma, finish inductive step *)
-  Lemma rot_first_last : c [set v; last wk (\val f)] = rotateF [set v; wk].
+  Lemma rot_first_last : c [set v; w0] = rotateF [set v; wk].
   Proof.
-    rewrite /rotateF.
+    rewrite -fan_last /rotateF.
     set fs := \val f.
-    elim: fs c=> [|w0 [|w1 wss] IH] d //=.
+    elim Hf: fs c=> [|w1 [|w2 wss] IH] d //=.
     - rewrite/swap_edge. case: ifP=> [/eqP -> //| H].
       by rewrite eq_refl.
     - admit.
@@ -668,9 +711,9 @@ Section Rotation.
 
   Lemma rot_w0_prop : w0_prop rotateF [set v; wk].
   Proof.
-    have +: w0_prop c [set v; (last wk (val f))] by exact: fan_w0_prop.
+    have +: w0_prop c [set v; w0] by exact: fan_w0_prop.
     rewrite/w0_prop.
-    have Heq: c [E(del_edges [set v; last wk (\val f)])] = rotateF [E(del_edges [set v; wk])] 
+    have Heq: c [E(del_edges [set v; w0])] = rotateF [E(del_edges [set v; wk])] 
       := imset_rot_del_edge rot_first_last. 
     by rewrite rot_first_last Heq.
   Qed.
@@ -700,23 +743,23 @@ Section Rotation.
     is_proper_edge_coloring rotateF.
   Proof.
     rewrite/rotateF; set fs := (rev (wk::val f)).
-    elim: fs c=> [//|w0 ws IH] d Hd.
-    case: ws IH=> [|w1 wss IH] //.
-    specialize (IH (swap_edge d [set v; w0] [set v; w1])).
+    elim: fs c=> [//|w1 ws IH] d Hd.
+    case: ws IH=> [|w2 wss IH] //.
+    specialize (IH (swap_edge d [set v; w1] [set v; w2])).
     (* rewrite -(IH (swap_edge d [set v; w0] [set v; w1])).  *)
   Admitted.
 
 End Rotation.
 
 Section MaximalFan.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v : G).
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v w0 : G).
   Implicit Types (wk : G) (ck : ColorType).
 
-  Definition is_fanmax {wk} (f : Fan c v wk) : Prop :=
+  Definition is_fanmax {wk} (f : Fan c v w0 wk) : Prop :=
     forall w, ~~ valid_fan_vertex (valP f) w.
 
-  Equations fanmax {wk} (f : Fan c v wk) 
-  : {w & Fan c v w} by wf #|N(v) :\: [set x in wk :: val f]| lt :=
+  Equations fanmax {wk} (f : Fan c v w0 wk) 
+  : {w & Fan c v w0 w} by wf #|N(v) :\: [set x in wk :: val f]| lt :=
     fanmax f := 
     match pickP (valid_fan_vertex (valP f)) with
       | Pick w Pw => fanmax (fancons Pw)
@@ -730,7 +773,7 @@ Section MaximalFan.
       by exists w; rewrite 2!inE // in_set1 inE eq_refl Hin.
   Qed.
 
-  Lemma fanmax_is_max {wk} (f : Fan c v wk)
+  Lemma fanmax_is_max {wk} (f : Fan c v w0 wk)
   : is_fanmax (projT2 (fanmax f)).
   Proof.
     rewrite/is_fanmax=> w.
@@ -742,7 +785,7 @@ Section MaximalFan.
 
   (* For ck in A_c(wk) and c[E{v}], if we can't extend f then an edge on the fan is colored ck *)
   Lemma fanmax_present
-    {ck} {wk} (f : Fan c v wk)
+    {ck} {wk} (f : Fan c v w0 wk)
     (Hf : is_fanmax f)
     (Hnab : ck \notin absent_set c v)
     (Hab : ck \in absent_set c wk)
@@ -905,9 +948,9 @@ End Kempe.
 (* TO DO: finish up, nearly there. last little admits Hnotin' and Hprop'' may take a second *)
 (* don't need cj \in c[E(G)] if we already know its in the absent set *)
 Lemma smaller_coloring
-  {G : sgraph} {v wj : G} {k}
+  {G : sgraph} {v w0 wj : G} {k}
   {c : k_edge_coloring G (k + 1)} 
-  (f : Fan c v wj) (cj : projT1 c) :
+  (f : Fan c v w0 wj) (cj : projT1 c) :
   k = max_degree G + 1 ->
   cj \in (absent_set c v :&: absent_set c wj) ->
   k_edge_colorable G (max_degree G + 1).
@@ -954,16 +997,14 @@ Proof.
     by rewrite E0 cards0.
   - (* Induction *)
     have [v [w0] [Edef0 Ev0]] := edgesP _ Ein0; rewrite Edef0 in Ein0; set G' := del_edges [set v; w0].
-    have/IH [k' [[kc'] Hleqk']]: #|E(G')| < #|E(G)|.
-    { by apply: proper_card; exact: del_edges_proper Ein0 _. }
-    have: k' <= max_degree G + 1.
-    { by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg. }
+    have/IH [k' [[kc'] Hleqk']]: #|E(G')| < #|E(G)| by apply: proper_card; exact: del_edges_proper Ein0 _.
+    have: k' <= max_degree G + 1 by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg.
     pose kc := k_extended_col Ein0 kc'.
     rewrite leq_eqVlt => /orP[/eqP Heqk'| Hltk']; first last.
     - (* if k' < max_degree G + 1, then we are done *) 
       exists (k' + 1).
       by split; [ |rewrite addn1].
-    - pose f0 : Fan kc v w0 := k_Fan_of_del_edges Ein0 kc'.
+    - pose f0 : Fan kc v w0 w0 := k_Fan_of_del_edges Ein0 kc'.
       case Hfmax: (fanmax f0) => [w fmax].
       have Hleqk : max_degree G' + 1 <= k'.
       { apply/(leq_trans _ (eq_leq (esym Heqk'))); rewrite leq_add2r; exact: del_edges_max_deg. } 
@@ -977,15 +1018,31 @@ Proof.
       - have Hleq: (max_degree G + 1 <= k' + 1) by rewrite Heqk' (addn1 (max_degree G + 1)).
         move: (exists_absent_color kc Hleq v) => [d] Habv.
         have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite Hfmax /=. 
-        have := (fanmax_present HfisMax Hnabv Habw)=> [[wj] /andP[Einj /andP[Ecj Hfanj]]].
+        have := (fanmax_present HfisMax Hnabv Habw)=> [[wj] /andP[Einj /andP[/eqP Hcj Hfanj]]].
         have Evj : v -- wj by rewrite in_edges in Einj.
-        move: (Ecj); rewrite -(altpath_edge kc _ d)=> ap0.
-        case Hapmax: (apmax Habv ap0) => [z [pth apmax]].
-        have : wj != last w (val fmax).
-        (* { apply/contra_neq. rewrite -(none_w0_extended _ kc). } *)
-        (* have Hsplit := splitP Hfanj.
-        move: Hfanj=> /splitP -[s1 s2].
-        case/splitP Hsplit: Hfanj=> s1 s2. Print splitr. *)
+        have : wj != w0.
+        { 
+          apply: (@contra_neq _ _ ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; wj]) ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; w0]) _ _)=> [-> //|];
+          have /eqP -> : (proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; w0] == None by move/eqP: (w0_col_extended kc').
+          by rewrite Hcj.
+        }
+        (* split fan at wj as f1 and (wj::f2) *)
+        case/splitPr fsplt: (w::val fmax)/Hfanj => [f1 f2 Hnj1].
+        case Hf2: f2 fsplt=> [|wi f2'] fsplt.
+        - (* contradiction if f2 is empty *)
+          by rewrite -(fan_last fmax) -(last_cons w w) fsplt cats1 last_rcons eq_refl.
+        - have Habwi : Some c' \in absent_set kc wi.
+          { 
+            move: fsplt. 
+            by case: f1=> [|wk f1']; [rewrite cat0s|]; 
+            case=> Hw Hfval; have := fanW fmax;
+            rewrite Hfval /absent_prop; [rewrite Hw | rewrite -cat_rcons cat_path last_rcons];
+            rewrite /path Hcj=> /andP[_ +] //; move=> /andP[-> _]. 
+          }
+          rewrite -[wj :: wi :: f2']cat1s catA in fsplt.
+          have fsmallest := sub_fan fsplt.
+          move/eqP: (Hcj); rewrite -(altpath_edge kc _ d)=> ap0.
+          case Hapmax: (apmax Habv ap0) => [z [pth apmax]].
 Admitted.
 
 
