@@ -858,9 +858,9 @@ Section AltPath.
     by have ->: (ca == cb) by rewrite -Hca Hcb.
   Qed. *)
 
-  Definition altpath ca cb {v w : G} (p0 : Path v w) := alternates c ca cb (nodes p0) && (irred p0).
+  Definition altpath ca cb {u v : G} (p0 : Path u v) := alternates c ca cb (nodes p0) && (irred p0).
 
-  Lemma altpathE ca cb {v w : G} (p0 : Path v w) : altpath ca cb p0 =  alternates c ca cb (nodes p0) && (irred p0).
+  Lemma altpathE ca cb {u v : G} (p0 : Path u v) : altpath ca cb p0 = alternates c ca cb (nodes p0) && (irred p0).
   Proof. by []. Qed.
 
   Definition altpath_next_col {ca cb p} (ap : altpath ca cb p) : ColorType :=
@@ -891,6 +891,23 @@ Section AltPath.
   Admitted.
 
 End AltPath.
+
+Lemma altpath_mem 
+  {G : sgraph} {ColorType : finType} 
+  (c : edge_coloring G ColorType) 
+  (ca cb : ColorType)
+  (x y u v : G)
+  (p : Path x y)
+:
+  altpath c ca cb p ->
+  Path_edge p u v -> 
+  (c [set u; v] == ca) || (c [set u; v] == cb).
+Proof.
+  elim: p ca cb=> [_ _ _ /idp_path_edge //|x0 z0 p xz0 IH] ca cb.
+  rewrite altpath_edgeL=> /andP[/andP[Hnin Hc0] Hap] /cat_path_edge.
+  case=> [/edgep_path_edge /andP[/eqP <- /eqP <-]|He]; first by rewrite Hc0.
+  by move/orP: (IH cb ca Hap He)=> [->|->].
+Qed.
 
 Section Kempe.
   Variables (G : sgraph) (ColorType : finType) (pc : proper_edge_coloring G ColorType) (ca cb : ColorType) (x : G). 
@@ -934,50 +951,52 @@ Section Kempe.
     - apply/setDS.  *)
   Admitted.
 
-  Lemma apmax_is_apmax {y} {p : Path x y} (ap : altpath pc ca cb p)
+  Lemma apmax_is_max {y} {p : Path x y} (ap : altpath pc ca cb p)
   : is_apmax (projT2 (projT2 (apmax ap))).
   Proof.
   Admitted.
+
+  (* Lemma ap_sub_apmax 
+    (apmax : altpath pc ca cb q) *)
+
 End Kempe.
 
 Section Invert.
   Variables (G : sgraph) (ColorType : finType) (pc : proper_edge_coloring G ColorType) (ca cb : ColorType) (x y : G) (p : Path x y) (ap : altpath pc ca cb p).
-  Implicit Types (w z : G).
+  Implicit Types (u v : G).
   Hypothesis Ha : is_apmax ap.
 
-  (* Lemma tmp2 w z :
-    w \notin p 
-    z \notin P
+  Definition not_mem_inverted : Prop := 
+    forall u v, ~ Path_edge p u v -> 
+    (proper_to_edge_coloring pc) [set u; v] = (invert ap) [set u; v].
+  
+  Definition mem_inverted : Prop :=
+    forall u v, Path_edge p u v ->
+    (((proper_to_edge_coloring pc) [set u; v] == ca) <-> ((invert ap) [set u; v] == cb)) /\
+    (((proper_to_edge_coloring pc) [set u; v] == cb) <-> ((invert ap) [set u; v] == ca)).
 
-
-  Lemma tmp w z :
-    pc [set w; z] != ca && pc [set w; z] != cb -> 
-    pc [set w; z] = (inverted ap) [set w; z] *)
-
-  (* Definition inverted : Prop :=
-    forall e, e \notin 
-  ∀ e, e ∉ pathEdges P → (color C e = color C' e) *)
-
-(* def isInverted_mem (C C' : EdgeColoring c G) (P : Path C a b x) : Prop :=
-  ∀ e ∈ pathEdges P, (color C e = a ↔ color C' e = b) ∧ (color C e = b ↔ color C' e = a) *)
+  Lemma invert_is_inverted : not_mem_inverted /\ mem_inverted.
+  Proof.
+    rewrite/not_mem_inverted/mem_inverted; split=> u v Hp.
+  Admitted.
 
   Lemma invert_proper : is_proper_edge_coloring (invert ap).
   Proof.
   Admitted.
 
-  Lemma invert_absent_ca {z}
-    (Hz : z \in p)
-    (Habz : cb \in absent_set pc z)
+  Lemma invert_absent_ca {u}
+    (Hu : u \in p)
+    (Habu : cb \in absent_set pc u)
     (Habx : cb \in absent_set pc x)
-  : ca \in absent_set (invert ap) z.
+  : ca \in absent_set (invert ap) u.
   Proof.
   Admitted.
 
-  Lemma invert_absent_cb {z}
-    (Hz : z \in p)
-    (Habz : ca \in absent_set pc z)
+  Lemma invert_absent_cb {u}
+    (Hz : u \in p)
+    (Habu : ca \in absent_set pc u)
     (Habx : ca \in absent_set pc x)
-  : cb \in absent_set (invert ap) z.
+  : cb \in absent_set (invert ap) u.
   Proof.
   Admitted.
 
@@ -1081,10 +1100,9 @@ Proof.
           case Hapmax: (apmax Habv ap0) => [z [pth apmax]].
           pose c := invert apmax.
           case Hpth: (wi \in pth).
-          (* v is an endpint because d was absent here
-            edge (v, wj) is recolored d
-            Some c0 is absent at v 
-          *)
+          (* v is an endpint because d was absent here *)
+          (*  edge (v, wj) is recolored d *)
+          (* Some c0 is absent at v  *)
           - (* wi is in the alternating path 
             it must be an endpoint
             d is absent at wi
