@@ -369,7 +369,7 @@ Section MaximalFan.
   Proof.
     have Hinc: ck \in c[E(G)] by rewrite/absent_set in_setD in Hab; exact: proj2 (andP Hab).
     have Hatv: ck \in c[E{v}] by exact: notin_setD Hinc Hnab.
-    move: (exists_v_of_c Hatv)=> [wj] /andP[Hine /eqP Hc].
+    move/c_in_edge_neigh: Hatv=> [wj] /andP[Hine /eqP Hc].
     exists wj; rewrite/is_fanmax in Hf; move: (Hf wj); rewrite/valid_fan_vertex.
     have -> : wj \in N(v) by rewrite in_opn -in_edges.
     by rewrite /absent_prop Hine Hc Hab eq_refl /= andbT negbK.

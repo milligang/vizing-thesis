@@ -32,13 +32,28 @@ Section EdgeColoring.
   Definition coloring_image c (E : {set {set G}}) : {set ColorType} := c @: E.
   Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
-  Lemma exists_v_of_c c x (c0 : ColorType) : 
-    c0 \in c[E{x}] -> 
-    exists y, ([set x; y] \in E(G)) && (c [set x; y] == c0).
+  Lemma c_in_edge_neigh c x (c0 : ColorType) : 
+    c0 \in c[E{x}] <-> exists y, ([set x; y] \in E(G)) && (c [set x; y] == c0).
   Proof.
-    rewrite /edge_neigh /coloring_image => /imsetP[e] /imsetP[y].
-    rewrite in_opn -in_edges => Hin He /eqP Hc; rewrite He eq_sym in Hc.
-    by exists y. 
+    split.
+    - rewrite /edge_neigh /coloring_image => /imsetP[e] /imsetP[y].
+      rewrite in_opn -in_edges => Hin He /eqP Hc; rewrite He eq_sym in Hc.
+      by exists y.
+    - rewrite /edge_neigh=> [[y] /andP[He /eqP Hc]].
+      apply/imsetP; exists [set x; y]=> //=.
+      apply/imsetP; exists y; by rewrite // in_opn -in_edges He.
+  Qed.
+
+  Lemma c_in_all_edge c (c0 : ColorType) :
+    c0 \in c[E(G)] <-> exists e, ((e \in E(G)) && (c e == c0)).
+  Proof.
+    split.
+    - by rewrite/coloring_image=> /imsetP[e] He /esym /eqP Hc; exists e.
+    - move=> [[e] /andP[/edgesP [x] [y] [He Hxy] Hc]].
+      rewrite -in_edges in Hxy; rewrite He in Hc.
+      have : (c0 \in c[E{x}]) by apply c_in_edge_neigh; exists y.
+      rewrite -2!sub1set=> Hsub. 
+      exact: (subset_trans Hsub (imsetS c (sub_all_edges x))).
   Qed.
 
   Lemma leq_col_deg c x : #|c[E{x}]| <= max_degree G.
