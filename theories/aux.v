@@ -116,26 +116,31 @@ Section PathEdge.
   Qed.
 
   Lemma cat_path_edge (q : Path y z) :
-    Path_edge (pcat p q) u v -> Path_edge p u v \/ Path_edge q u v.
+    Path_edge (pcat p q) u v <-> Path_edge p u v \/ Path_edge q u v.
   Proof.
-    rewrite/Path_edge -[tail (pcat p q)]/((tail p) ++ (tail q)) /pathp_edge size_cat=> [[i] /andP[/andP[Hs +] +]].
-    rewrite nth_cat (nth_cat x (x :: tail p) (tail q) i).
-    case Hi: (i < size (tail p)).
-    - have Hlt : size (tail p) < size (x :: tail p) by [].
-      have -> := leq_ltn_trans (ltnW Hi) Hlt=> Hnl Hnr.
-      left; exists i; by rewrite Hi Hnl Hnr.
-    - move/negbT: Hi; rewrite -leqNgt -cat1s size_cat /= ltnS => Hi Hnl Hnr.
-      right; exists (i - size (tail p)).
-      rewrite -(ltn_subLR (size (tail q)) Hi) in Hs.
-      rewrite Hs (set_nth_default x y Hs) {}Hnr /= andbT.
-      rewrite leq_eqVlt in Hi; move/orP: Hi Hnl=> [/eqP Hi | Hi];
-      [move/esym/eq_leq: (Hi) | move/ltn_geF: (Hi)]=> ->.
-      + have/eqP H0 : (size (tail p) - size (tail p)) == 0 by rewrite subn_eq0.
-        by rewrite -Hi -last_nth path_last /= H0 nth0 => /eqP <-.
-      + rewrite -cat1s nth_cat -[_ < 1]/(_ == 0) subn1 subn_eq0 leqNgt Hi /=.
-        have Hlt : (i - size (tail p) - 1) < size (tail q) by rewrite subn1; exact: (leq_ltn_trans (leq_pred (i - size (tail p))) Hs).
-        by rewrite (set_nth_default x y Hlt) addnC subnDA.
-  Qed.
+    rewrite/Path_edge -[tail (pcat p q)]/((tail p) ++ (tail q)) /pathp_edge size_cat;
+    split=> [[i] /andP[/andP[Hs +] +] |].
+    - rewrite nth_cat (nth_cat x (x :: tail p) (tail q) i).
+      case Hi: (i < size (tail p)).
+      + have Hlt : size (tail p) < size (x :: tail p) by [].
+        have -> := leq_ltn_trans (ltnW Hi) Hlt=> Hnl Hnr.
+        left; exists i; by rewrite Hi Hnl Hnr.
+      + move/negbT: Hi; rewrite -leqNgt -cat1s size_cat /= ltnS => Hi Hnl Hnr.
+        right; exists (i - size (tail p)).
+        rewrite -(ltn_subLR (size (tail q)) Hi) in Hs.
+        rewrite Hs (set_nth_default x y Hs) {}Hnr /= andbT.
+        rewrite leq_eqVlt in Hi; move/orP: Hi Hnl=> [/eqP Hi | Hi];
+        [move/esym/eq_leq: (Hi) | move/ltn_geF: (Hi)]=> ->.
+        - have/eqP H0 : (size (tail p) - size (tail p)) == 0 by rewrite subn_eq0.
+          by rewrite -Hi -last_nth path_last /= H0 nth0 => /eqP <-.
+        - rewrite -cat1s nth_cat -[_ < 1]/(_ == 0) subn1 subn_eq0 leqNgt Hi /=.
+          have Hlt : (i - size (tail p) - 1) < size (tail q) by rewrite subn1; exact: (leq_ltn_trans (leq_pred (i - size (tail p))) Hs).
+          by rewrite (set_nth_default x y Hlt) addnC subnDA.
+    - case; move=> [i] /andP[/andP[Hi Hnl] Hnr].
+      + exists i.
+        admit.
+      + exists (size (tail p) + i).
+  Admitted.
 
 End PathEdge.
 

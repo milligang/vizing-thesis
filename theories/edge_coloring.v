@@ -242,7 +242,7 @@ Section ExtendCol.
     by rewrite (@del_edges_edge_neigh G del_e _ _).
   Qed.
 
-  (* TODO: Should be straightforward, need to figure out which tactic to use8 *)
+  (* TODO: Should be straightforward, need to figure out which tactic to use *)
   Lemma card_extended_col 
     {k : nat} 
     (kc : k_edge_coloring (del_edges del_e) k) 
@@ -303,7 +303,7 @@ Section Recolor.
   Lemma recolor_neq e f c0 : f != e -> (recolor_edge e c0) f = c f.
   Proof. by rewrite /recolor_edge=> /negPf ->. Qed.
 
-  Lemma imset_recolor e c0 : 
+  Lemma del_edges_imset_recolor e c0 : 
     c[E(del_edges e)] = recolor_edge e c0 [E(del_edges e)].
   Proof.
     apply/setP => c1.
@@ -311,6 +311,12 @@ Section Recolor.
     exists e2 => //; case: ifP => /eqP Heq //;
     rewrite Heq in He2; move: (del_edgesN e); rewrite -in_setC => /setCP.
   Qed.
+
+  Lemma imset_recolor e c0 :
+    c0 \in c[E(G)] ->
+    recolor_edge e c0 [E(G)] \subset c[E(G)].
+  Proof.
+  Admitted.
 
   (* TO DO: will likely make a lemma related to absent set, since we will use similar logic for swap_proper_vertex
     but this specifically is needed for the smaller lemma at the end, 
@@ -356,7 +362,7 @@ Section Recolor.
   Proof.
     move=> He.
     rewrite (del_edges1 He).
-    move: (imset_recolor e c0).
+    move: (del_edges_imset_recolor e c0).
     rewrite /coloring_image 2!imsetU1 2!cardsU1 recolor_eq => -> -> -> /=.
     by rewrite add0n add1n subn1.
   Qed.
@@ -866,9 +872,6 @@ Section AltPath.
   Definition altpath_next_col {ca cb p} (ap : altpath ca cb p) : ColorType :=
     next_col c ca cb (nodes p).
 
-  Definition invert {ca cb p} (ap : altpath ca cb p) : edge_coloring G ColorType := 
-    alternates_invert c ca cb (nodes p).
-
   Lemma altpath_idp ca cb : altpath ca cb (idp x).
   Proof. by rewrite altpathE nodesE irred_idp. Qed.
 
@@ -956,12 +959,88 @@ Section Kempe.
   Proof.
   Admitted.
 
-  (* Lemma ap_sub_apmax 
-    (apmax : altpath pc ca cb q) *)
+  Lemma apmax_pcat {y} {p : Path x y} (ap : altpath pc ca cb p) :
+    exists q, projT1 (projT2 (apmax ap)) = pcat p q.
+  Proof.
+  Admitted.
 
 End Kempe.
 
 Section Invert.
+  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
+  Implicit Types (ca cb : ColorType) (x y : G).
+
+  Definition invert 
+    {ca cb x y} 
+    {p : Path x y} 
+    (ap : altpath c ca cb p) 
+  : edge_coloring G ColorType :=
+    alternates_invert c ca cb (nodes p).
+
+  Lemma invert_proper 
+    {ca cb x y} 
+    {p : Path x y} 
+    (ap : altpath c ca cb p) 
+  : 
+    is_proper_edge_coloring c -> 
+    is_proper_edge_coloring (invert ap).
+  Proof.
+  Admitted.
+
+  Lemma imset_invert 
+    {ca cb x y} 
+    {p : Path x y} 
+    (ap : altpath c ca cb p)
+  : ca \in c[E(G)] -> (invert ap) [E(G)] \subset c [E(G)].
+  Proof.
+    rewrite/invert.
+    elim: p ca cb c ap => [|u v q uv IH] ca cb d; 
+    [|rewrite nodes_pcat /edgep]; 
+    rewrite !nodesE // -[val (edgep uv)]/[:: v] /behead altpath_edgeL.
+    (* manually rewrite, otherwise unfolds too far *)
+    rewrite -[alternates_invert d ca cb ([:: u;  v] ++ \val q)]/(alternates_invert (recolor_edge d [set u; v] ca) cb ca (v::val q)).
+    elim: q IH=> [/= _|w z q' wz _] IH; first by exact: imset_recolor.
+    move=>/andP[/andP[Hnu tmp0] Hap]; move: (Hap). 
+    rewrite -nodesE altpath_edgeL=>/andP[/andP[tmp1 /eqP Hwzb] Hap'].
+    have Hcb : cb \in (recolor_edge d [set u; w] ca)[E(G)].
+    {
+      have Hnwz : w != z by move/sg_edgeNeq: (wz); rewrite eq_sym=> /negbT.
+      have : [set w; z] != [set u; w].
+      {
+        apply/eqP; rewrite doubleton_eq_iff; case.
+        - by move=> [_ Hwz]; rewrite Hwz eq_refl in Hnwz.
+        - (* use Hnu and mem lemmas to say u != w *)
+          admit.
+      }  
+    (* have : recolor_neq ([set w; z] != [set u; w]).  
+    have : cb \in d [E(G)] by apply/imsetP; exists [set w; z]; move: (wz); rewrite //= in_edges.   *)
+      admit.
+    }
+    move: (IH cb ca (recolor_edge d [set u; w] ca)).
+  Admitted.
+
+  Lemma card_invert 
+    {ca cb x y} 
+    {p : Path x y} 
+    (ap : altpath c ca cb p)
+  :
+    ca \in c[E(G)] -> #|(invert ap) [E(G)]| <= #|c [E(G)]|.
+  Proof.
+  Admitted.
+
+   (* Definition k_invert 
+    {ca cb p} 
+    (ap : altpath ca cb p)
+    (Hpc : is_proper_edge_coloring c)
+    (Hca : ca \in c[E(G)])
+  : k_edge_coloring G #|c[E(G)]|.
+  Proof.
+    refine (existT _ ColorType (exist _ (exist _ (invert ap) (invert_proper Hpc)) _)).
+    exact: card_invert Hca.
+  Defined. *)
+End Invert.
+
+Section InvertProp.
   Variables (G : sgraph) (ColorType : finType) (pc : proper_edge_coloring G ColorType) (ca cb : ColorType) (x y : G) (p : Path x y) (ap : altpath pc ca cb p).
   Implicit Types (u v : G).
   Hypothesis Ha : is_apmax ap.
@@ -972,22 +1051,22 @@ Section Invert.
   
   Definition mem_inverted : Prop :=
     forall u v, Path_edge p u v ->
-    (((proper_to_edge_coloring pc) [set u; v] == ca) <-> ((invert ap) [set u; v] == cb)) /\
-    (((proper_to_edge_coloring pc) [set u; v] == cb) <-> ((invert ap) [set u; v] == ca)).
+    (((proper_to_edge_coloring pc) [set u; v] = ca) <-> ((invert ap) [set u; v] = cb)) /\
+    (((proper_to_edge_coloring pc) [set u; v] = cb) <-> ((invert ap) [set u; v] = ca)).
 
   Lemma invert_is_inverted : not_mem_inverted /\ mem_inverted.
   Proof.
     rewrite/not_mem_inverted/mem_inverted; split=> u v Hp.
   Admitted.
 
-  Lemma invert_proper : is_proper_edge_coloring (invert ap).
-  Proof.
+  Lemma invert_absent_not_mem {u} (Hu : u \notin p) :
+    absent_set pc u = absent_set (invert ap) u.
+  Proof. 
   Admitted.
 
   Lemma invert_absent_ca {u}
     (Hu : u \in p)
     (Habu : cb \in absent_set pc u)
-    (Habx : cb \in absent_set pc x)
   : ca \in absent_set (invert ap) u.
   Proof.
   Admitted.
@@ -995,12 +1074,11 @@ Section Invert.
   Lemma invert_absent_cb {u}
     (Hz : u \in p)
     (Habu : ca \in absent_set pc u)
-    (Habx : ca \in absent_set pc x)
   : cb \in absent_set (invert ap) u.
   Proof.
   Admitted.
 
-End Invert.
+End InvertProp.
 
 Lemma smaller_coloring
   {G : sgraph} {v w0 wj : G} {k}
@@ -1035,7 +1113,6 @@ Proof.
   by constructor; exists (projT1 c), (exist _ c'' Hprop''); rewrite Hcard''.
 Qed.
 
-(* TO DO *)
 (* see edges_sum_degrees proof for example of induction on edges *)
 Theorem Vizings (G : sgraph) (chi : nat): 
   is_chromatic_index G chi -> 
@@ -1063,61 +1140,67 @@ Proof.
       case Hfmax: (fanmax f0) => [w fmax].
       have Hleqk : max_degree G' + 1 <= k'.
       { apply/(leq_trans _ (eq_leq (esym Heqk'))); rewrite leq_add2r; exact: del_edges_max_deg. } 
-      move: (exists_absent_color kc' Hleqk w) => [c0] Habw'.
-      have Habw := extended_absent Ein0 Habw'.
-      (* move: (exists_absent_color kc Hleq w) => [c] Habw. *)
-      case: (boolP (Some c0 \in absent_set kc v))=> [Habv | Hnabv].
+      move: (exists_absent_color kc' Hleqk w) => [c0] Habw0'.
+      have Habw0 := extended_absent Ein0 Habw0'.
+      case: (boolP (Some c0 \in absent_set kc v))=> [Habv0 | Hnabv0].
       - (* if c is absent at v, we can replace extra color with c *)
-        have Hcap: (Some c0 \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv Habw).
+        have Hcap: (Some c0 \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv0 Habw0).
         by exists k'; rewrite Heqk'; move: (smaller_coloring fmax Heqk' Hcap).
       - have Hleq: (max_degree G + 1 <= k' + 1) by rewrite Heqk' (addn1 (max_degree G + 1)).
-        move: (exists_absent_color kc Hleq v) => [d] Habv.
+        move: (exists_absent_color kc Hleq v) => [c1] Habv1.
         have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite Hfmax /=. 
-        have := (fanmax_present HfisMax Hnabv Habw)=> [[wj] /andP[Einj /andP[/eqP Hcj Hfanj]]].
+        have := (fanmax_present HfisMax Hnabv0 Habw0)=> [[wj] /andP[Einj /andP[/eqP Hkcj Hfanj]]].
         have Evj : v -- wj by rewrite in_edges in Einj.
-        have : wj != w0.
+        have Hneqj0 : wj != w0.
         { 
           apply: (@contra_neq _ _ ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; wj]) ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; w0]) _ _)=> [-> //|];
           have /eqP -> : (proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; w0] == None by move/eqP: (w0_col_extended kc').
-          by rewrite Hcj.
+          by rewrite Hkcj.
         }
         (* split fan at wj as f1 and (wj::f2) *)
         case/splitPr fsplt: (w::val fmax)/Hfanj => [f1 f2 _].
         case Hf2: f2 fsplt=> [|wi f2'] fsplt.
         - (* contradiction if f2 is empty *)
-          by rewrite -(fan_last fmax) -(last_cons w w) fsplt cats1 last_rcons eq_refl.
-        - have Habwi : Some c0 \in absent_set kc wi.
+          by rewrite -(fan_last fmax) -(last_cons w w)  fsplt cats1 last_rcons eq_refl in Hneqj0.
+        - have Habwi0 : Some c0 \in absent_set kc wi.
           { 
             move: fsplt. 
             by case: f1=> [|wk f1']; [rewrite cat0s|]; 
             case=> Hw Hfval; have := fanW fmax;
             rewrite Hfval /absent_prop; [rewrite Hw | rewrite -cat_rcons cat_path last_rcons];
-            rewrite /path Hcj=> /andP[_ +] //; move=> /andP[-> _]. 
+            rewrite /path Hkcj=> /andP[_ +] //; move=> /andP[-> _]. 
           }
           rewrite -[wj :: wi :: f2']cat1s catA in fsplt.
           have fsmallest := sub_fan fsplt.
-          move/eqP: (Hcj); rewrite -(altpath_edge kc _ d)=> ap0.
-          case Hapmax: (apmax Habv ap0) => [z [pth apmax]].
-          pose c := invert apmax.
-          case Hpth: (wi \in pth).
-          (* v is an endpint because d was absent here *)
-          (*  edge (v, wj) is recolored d *)
-          (* Some c0 is absent at v  *)
+          move/eqP: (Hkcj); rewrite -(altpath_edge kc _ c1)=> ap0.
+          case Hapmax: (apmax Habv1 ap0) => [z [pth apm]].
+          have := apmax_pcat Habv1 ap0; rewrite Hapmax /= => [[q] Hq].
+          have HaisMax : is_apmax apm by move: (apmax_is_max Habv1 ap0); rewrite Hapmax /=. 
+          pose c := invert apm; have [HcisInv_nm HcisInv_m] := invert_is_inverted HaisMax.
+          (* need that c is proper and cardinality here *)
+          (* v is an endpint because c1 was absent here *)
+          have Hcj : c [set v; wj] = c1.
+          { 
+            have Hp : Path_edge pth v wj by rewrite Hq; apply cat_path_edge; left; apply edgep_path_edge.
+            move: (HcisInv_m v wj Hp)=> [/iffLR H _]; exact: H Hkcj.
+          }
+          have Habv0 : Some c0 \in absent_set c v by admit.
+          case: (boolP (wi \in pth))=> Hpwi.
           - (* wi is in the alternating path 
-            it must be an endpoint
-            d is absent at wi
-            fmax is still a fan
-            w is not in the fan, because we already have the two endpoints
-            Some c0 is absent at w
-            apply smaller lemma
-          *)
+            it must be an endpoint *)
+            have Habwi1 : c1 \in absent_set c wi := invert_absent_cb HaisMax Hpwi Habwi0.
+            (* fmax is still a fan *)
+            have fmax_c : Fan c v w0 w by admit.
+            have Hpw : w \notin pth by admit. (* because we already have the two endpoints *)
+            rewrite (invert_absent_not_mem HaisMax Hpw) in Habw0.         
+            (* apply smaller lemma *)
+            admit.
           - (* wi is not in the alternating path *)
-          (* absent set of wi does not change
-            Some c0 is absent at wi 
-            the rest of the fan is unchanged
+            rewrite (invert_absent_not_mem HaisMax Hpwi) in Habwi0.
+            (* the rest of the fan is unchanged
             thus fsmallest is still a fan
             apply smaller lemma 
-          *)
+            *)
 Admitted.
 
 
