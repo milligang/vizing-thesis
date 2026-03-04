@@ -369,7 +369,7 @@ Section MaximalFan.
   Proof.
     have Hinc: ck \in c[E(G)] by rewrite/absent_set in_setD in Hab; exact: proj2 (andP Hab).
     have Hatv: ck \in c[E{v}] by exact: notin_setD Hinc Hnab.
-    move/c_in_edge_neigh: Hatv=> [wj] /andP[Hine /eqP Hc].
+    move/c_in_edge_neigh: Hatv=> [wj] Hine Hc.
     exists wj; rewrite/is_fanmax in Hf; move: (Hf wj); rewrite/valid_fan_vertex.
     have -> : wj \in N(v) by rewrite in_opn -in_edges.
     by rewrite /absent_prop Hine Hc Hab eq_refl /= andbT negbK.
@@ -660,7 +660,7 @@ Proof.
   have Hvw : [set v; wj] \in E(G).
   { by move: Hneigh; rewrite in_opn in_edges. }
   pose c' := rotateF f.
-  have Hprop' : is_proper_edge_coloring c' := rot_proper (@is_proper_k_edge_coloring _ _ c).
+  have Hprop' : is_proper_edge_coloring c' := rot_proper (proj2_sig (k_to_proper_coloring c)).
   have Hin' : cj \in c'[E(del_edges [set v; wj])].
   { 
     rewrite in_setI in Hcvw; move/andP: (Hcvw)=> [Hcv _]; move: (Hcv).
@@ -674,7 +674,7 @@ Proof.
   pose c'' := recolor_edge c' [set v; wj] cj.
   have Hprop'' := recolor_proper Hprop' (rot_absent_fan (mem_head wj (val f)) Hcvw).
   move: (replace_col Hvw Hin' Hnotin').
-  rewrite -card_rot (eqP (card_k_col c)).
+  rewrite -card_rot (card_k_col c).
   have ->: k + 1 - 1 = max_degree G + 1 by rewrite Hk addn1 subn1.
   move=> Hcard''.
   by constructor; exists (projT1 c), (exist _ c'' Hprop''); rewrite Hcard''.
@@ -698,22 +698,24 @@ Proof.
     have [v [w0] [Edef0 Ev0]] := edgesP _ Ein0; rewrite Edef0 in Ein0; set G' := del_edges [set v; w0].
     have/IH [k' [[kc'] Hleqk']]: #|E(G')| < #|E(G)| by apply: proper_card; exact: del_edges_proper Ein0 _.
     have: k' <= max_degree G + 1 by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg.
-    pose kc := k_extended_col Ein0 kc'.
     rewrite leq_eqVlt => /orP[/eqP Heqk'| Hltk']; first last.
     - (* if k' < max_degree G + 1, then we are done *) 
-      exists (k' + 1).
-      by split; [ |rewrite addn1].
-    - pose f0 : Fan kc v w0 w0 := k_Fan_of_del_edges Ein0 kc'.
+      pose kc := k_extended_col Ein0 kc'.
+      exists (k' + 1); by split; [ |rewrite addn1].
+    - rewrite Heqk' in kc'; pose kc := k_extended_col Ein0 kc'.
+      pose f0 : Fan kc v w0 w0 := k_Fan_of_del_edges Ein0 kc'.
       case Hfmax: (fanmax f0) => [w fmax].
-      have Hleqk : max_degree G' + 1 <= k'.
-      { apply/(leq_trans _ (eq_leq (esym Heqk'))); rewrite leq_add2r; exact: del_edges_max_deg. } 
+      have Hleqk : max_degree G' + 1 <= max_degree G + 1.
+      { (* apply/(leq_trans _ (eq_leq (esym Heqk'))); *) rewrite leq_add2r; exact: del_edges_max_deg. } 
       move: (exists_absent_color kc' Hleqk w) => [c0] Habw0'.
       have Habw0 := extended_absent Ein0 Habw0'.
+      have Heq : max_degree G + 1 = max_degree G + 1 by [].
       case: (boolP (Some c0 \in absent_set kc v))=> [Habv0 | Hnabv0].
       - (* if c is absent at v, we can replace extra color with c *)
         have Hcap: (Some c0 \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv0 Habw0).
-        by exists k'; rewrite Heqk'; move: (smaller_coloring fmax Heqk' Hcap).
-      - have Hleq: (max_degree G + 1 <= k' + 1) by rewrite Heqk' (addn1 (max_degree G + 1)).
+        by exists (max_degree G + 1); 
+        move: (smaller_coloring fmax Heq Hcap).
+      - have Hleq: (max_degree G + 1 <= (max_degree G + 1) + 1) by rewrite (addn1 (max_degree G + 1)).
         move: (exists_absent_color kc Hleq v) => [c1] Habv1.
         have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite Hfmax /=. 
         have := (fanmax_present HfisMax Hnabv0 Habw0)=> [[wj] /andP[Einj /andP[/eqP Hkcj Hfanj]]].
@@ -744,8 +746,36 @@ Proof.
           have := apmax_pcat Habv1 ap0; rewrite Hapmax /= => [[q] Hq].
           have HaisMax : is_apmax apm by move: (apmax_is_max Habv1 ap0); rewrite Hapmax /=. 
           pose c := invert apm; have [HcisInv_nm HcisInv_m] := invert_is_inverted HaisMax.
-          (* need that c is proper and cardinality here *)
+          (* have Hcard := card_invert apm.  *)
+          (* rewrite card_k_col Heqk' in Hcard. *)
+          have /(card_invert apm) : Some c0 \in kc[E(G)] by apply/c_in_all_edge; exists [set v; wj].
+          (* rewrite card_k_col.
+          rewrite addn1. *)
+          pose Hkcp : proper_edge_coloring G (projT1 kc) :=  
+            (exist _ c (@invert_proper _ _ _ _ _ _ _ _ apm (proj2_sig (k_to_proper_coloring kc)))).
+          rewrite leq_eqVlt card_k_col.
+          (*
+            we know invert doesn't decrease the # of colors used b/c apm is greater than length 1
+            however, it's easier to show we are done if it did than to prove we aren't in that case
+          *)
+          case/orP=> Hi; first last.
+          - exists #|Hkcp [E(G)]|.
+            split; first by constructor; exact (proper_to_k_coloring Hkcp).
+            rewrite -[#|Hkcp [E(G)]|]/(#|invert apm [E(G)]|) -(leq_add2r 1);
+            by rewrite -addn1 in Hi.
+          (* pose Hkci : k_edge_coloring G (max_degree G + 1 + 1) := 
+            proper_to_k_coloring Hkcp; rewrite Hi. *)
+            
+          rewrite -[#|invert apm [E(G)]|]/(#|Hkcp [E(G)]|) in Hi.
+          have Hi' := (eqP Hi).
+          set Hkci := eq_rect _ (k_edge_coloring G) (proper_to_k_coloring Hkcp) _ Hi'.
+          have HColorType : projT1 Hkci = projT1 kc.
+          (* set Hkci : k_edge_coloring G #|invert apm [E(G)]| := proper_to_k_coloring Hkcp. *)
+          (* have HColorType : projT1 Hkci = projT1 kc by rewrite /Hkci /proper_to_k_coloring. *)
+          (* have HColorType : projT1 Hkci = projT1 kc := erel. *)
+          (* move/eqP: Hi=> Hi; rewrite Hi in Hkci. *)
           (* v is an endpint because c1 was absent here *)
+          have 
           have Hcj : c [set v; wj] = c1.
           { 
             have Hp : Path_edge pth v wj by rewrite Hq; apply cat_path_edge; left; apply edgep_path_edge.
@@ -755,11 +785,13 @@ Proof.
           case: (boolP (wi \in pth))=> Hpwi.
           - (* wi is in the alternating path 
             it must be an endpoint *)
-            have Habwi1 : c1 \in absent_set c wi := invert_absent_cb HaisMax Hpwi Habwi0.
+            have Habwi1 : c1 \in absent_set Hkci wi. := invert_absent_cb HaisMax Hpwi Habwi0.
             (* fmax is still a fan *)
-            have fmax_c : Fan c v w0 w by admit.
+            have fmax_c : Fan Hkci v w0 w by admit.
             have Hpw : w \notin pth by admit. (* because we already have the two endpoints *)
-            rewrite (invert_absent_not_mem HaisMax Hpw) in Habw0.         
+            rewrite (invert_absent_not_mem HaisMax Hpw) in Habw0.
+
+            have := smaller_coloring fmax_c Heq.         
             (* apply smaller lemma *)
             admit.
           - (* wi is not in the alternating path *)

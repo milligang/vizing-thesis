@@ -33,27 +33,23 @@ Section EdgeColoring.
   Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
   Lemma c_in_edge_neigh c x (c0 : ColorType) : 
-    c0 \in c[E{x}] <-> exists y, ([set x; y] \in E(G)) && (c [set x; y] == c0).
+    reflect (exists2 y, [set x; y] \in E(G) & c [set x; y] = c0) (c0 \in c[E{x}]).
   Proof.
-    split.
-    - rewrite /edge_neigh /coloring_image => /imsetP[e] /imsetP[y].
-      rewrite in_opn -in_edges => Hin He /eqP Hc; rewrite He eq_sym in Hc.
+    rewrite/edge_neigh; apply/(iffP idP)=>[/imsetP[e] /imsetP[y]|[y] He Hc].
+    - rewrite in_opn -in_edges=> Hin He Hc; rewrite He in Hc.
       by exists y.
-    - rewrite /edge_neigh=> [[y] /andP[He /eqP Hc]].
-      apply/imsetP; exists [set x; y]=> //=.
+    - apply/imsetP; exists [set x; y]=> //=.
       apply/imsetP; exists y; by rewrite // in_opn -in_edges He.
   Qed.
-
+  
   Lemma c_in_all_edge c (c0 : ColorType) :
-    c0 \in c[E(G)] <-> exists e, ((e \in E(G)) && (c e == c0)).
+    reflect (exists2 e, e \in E(G) & c e = c0) (c0 \in c[E(G)]).
   Proof.
-    split.
-    - by rewrite/coloring_image=> /imsetP[e] He /esym /eqP Hc; exists e.
-    - move=> [[e] /andP[/edgesP [x] [y] [He Hxy] Hc]].
-      rewrite -in_edges in Hxy; rewrite He in Hc.
-      have : (c0 \in c[E{x}]) by apply c_in_edge_neigh; exists y.
-      rewrite -2!sub1set=> Hsub. 
-      exact: (subset_trans Hsub (imsetS c (sub_all_edges x))).
+    apply/(iffP idP)=> [/imsetP[e] He /esym|[e] /edgesP [x] [y] [He Hxy]] Hc; first by exists e.
+    rewrite -in_edges in Hxy; rewrite He in Hc.
+    have : (c0 \in c[E{x}]) by apply/c_in_edge_neigh; exists y.
+    rewrite -2!sub1set=> Hsub. 
+    exact: (subset_trans Hsub (imsetS c (sub_all_edges x))).
   Qed.
 
   Lemma leq_col_deg c x : #|c[E{x}]| <= max_degree G.
@@ -98,14 +94,14 @@ Section ChromIdx.
   Coercion k_to_proper_coloring {k} (kc : k_edge_coloring k) : 
     proper_edge_coloring G (projT1 kc) :=
     proj1_sig (projT2 kc).
-  
-  Lemma is_proper_k_edge_coloring {k} (kc : k_edge_coloring k) :
-    is_proper_edge_coloring kc.
-  Proof. exact: proj2_sig (k_to_proper_coloring kc). Qed.
+
+  Definition proper_to_k_coloring 
+    {ColorType : finType} (pc : proper_edge_coloring G ColorType) 
+  : k_edge_coloring #|pc[E(G)]|.
+  Proof. by refine (existT _ ColorType (exist _ pc _)). Defined.
 
   Definition card_k_col {k} (kc : k_edge_coloring k) :
-    #|kc[E(G)]| == k :=
-   proj2_sig (projT2 kc).
+    #|kc[E(G)]| = k := eqP (proj2_sig (projT2 kc)).
 
   (* G is k-colorable if a k-edge-coloring exists. *)
   Definition k_edge_colorable k : Prop := inhabited (k_edge_coloring k).
@@ -223,7 +219,7 @@ Section AbsentSet.
   Proof.
     rewrite addn1=> Hk x; apply/set0Pn.
     rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
-    by rewrite subn_gt0 (eqP (card_k_col kc)) (leq_ltn_trans (leq_col_deg kc x)).
+    by rewrite subn_gt0 (card_k_col kc) (leq_ltn_trans (leq_col_deg kc x)).
   Qed.
   
 End AbsentSet.

@@ -87,7 +87,7 @@ Proof.
   by rewrite (@del_edges_edge_neigh G A e) => /andP[-> _].
 Qed.
 
-Definition pathp_edge {G : sgraph} (x u v : G) (s : seq G) :=
+Definition pathp_edge {G : sgraph} (x u v : G) (s : seq G) : Prop :=
   exists i, (i < size s) && (nth x (x::s) i == u) && (nth x s i == v).
 
 Definition Path_edge {G : sgraph} {x y : G} (p : Path x y) (u v : G) := pathp_edge x u v (tail p).
