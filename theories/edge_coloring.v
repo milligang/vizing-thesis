@@ -97,8 +97,7 @@ Section ChromIdx.
 
   Definition proper_to_k_coloring 
     {ColorType : finType} (pc : proper_edge_coloring G ColorType) 
-  : k_edge_coloring #|pc[E(G)]|.
-  Proof. by refine (existT _ ColorType (exist _ pc _)). Defined.
+  : k_edge_coloring #|pc[E(G)]| := (existT _ ColorType (exist _ pc (eqxx _))).
 
   Definition card_k_col {k} (kc : k_edge_coloring k) :
     #|kc[E(G)]| = k := eqP (proj2_sig (projT2 kc)).
