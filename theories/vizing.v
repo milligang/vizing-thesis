@@ -461,6 +461,19 @@ Section AltPath.
     (* by rewrite !andbA (andbC (alternates ca cb (nodes p)) _). (andbAC _ _ (z  \notin p)).  *)
   Admitted.
 
+  Definition altpath_endpt {ca cb p} (ap : altpath ca cb p) (u : G) :=
+    (ca \in absent_set c u) \/ (cb \in absent_set c u). 
+
+  Lemma altpath_endptP {ca cb p} (ap : altpath ca cb p) (u : G) :
+    (ca \in absent_set c u) \/ (cb \in absent_set c u) -> altpath_endpt ap u.
+  Proof. by []. Qed.
+
+  Lemma altpath_two_endpts {ca cb p} (ap : altpath ca cb p) (u v : G) :
+    altpath_endpt ap z /\ altpath_endpt ap u /\ altpath_endpt ap v ->
+    (z \notin p ) \/ (u \notin p) \/ (v \notin p).
+  Proof.
+  Admitted.
+
 End AltPath.
 
 Lemma altpath_mem 
@@ -645,40 +658,17 @@ Section InvertProp.
   Proof.
   Admitted.
 
-End InvertProp.
+  Lemma invert_fan_nodes {u v : G} (f1 : Fan pc x v u) (f2 : Fan (invert ap) x v u):
+    (u :: val f1) = (u :: val f2).
+  Proof.
+  Admitted.
 
-Lemma smaller_coloring2
-  {G : sgraph} {v w0 wj : G} {k}
-  {c : k_edge_coloring G (k + 1)} 
-  (f : Fan c v w0 wj) (cj : projT1 c) :
-  k = max_degree G + 1 ->
-  cj \in (absent_set c v :&: absent_set c wj) ->
-  k_edge_colorable G (max_degree G + 1).
-Proof.
-  move=> Hk Hcvw.
-  have Hneigh : wj \in N(v) := (in_neigh (mem_head wj (val f))).
-  have Hvw : [set v; wj] \in E(G).
-  { by move: Hneigh; rewrite in_opn in_edges. }
-  pose c' := rotateF f.
-  have Hprop' : is_proper_edge_coloring c' := rot_proper (proj2_sig (k_to_proper_coloring c)).
-  have Hin' : cj \in c'[E(del_edges [set v; wj])].
-  { 
-    rewrite in_setI in Hcvw; move/andP: (Hcvw)=> [Hcv _]; move: (Hcv).
-    rewrite /absent_set (imset_rot f) (imset_rot_vertex f) /coloring_image/c'=> /setDP[/imsetP [ej Hej] Hcj _].
-    rewrite (del_edges1 Hvw) in_setU1 in Hej; rewrite (rot_absent_center f) in Hcv.
-    have Hneq: ej != [set v; wj] by move: (absent_edge Hcv Hneigh); rewrite Hcj; apply contra_neq=> ->.
-    rewrite (negbTE Hneq) orFb in Hej.
-    by apply/imsetP; exists ej.
-  }
-  have Hnotin': c'[set v; wj] \notin c'[E(del_edges [set v; wj])] by exact: rot_w0_prop.
-  pose c'' := recolor_edge c' [set v; wj] cj.
-  have Hprop'' := recolor_proper Hprop' (rot_absent_fan (mem_head wj (val f)) Hcvw).
-  move: (replace_col Hvw Hin' Hnotin').
-  rewrite -card_rot (card_k_col c).
-  have ->: k + 1 - 1 = max_degree G + 1 by rewrite Hk addn1 subn1.
-  move=> Hcard''.
-  by constructor; exists (projT1 c), (exist _ c'' Hprop''); rewrite Hcard''.
-Qed.
+  Lemma invert_fan {u v : G} (f : Fan pc x v u) : 
+    cb \in absent_set pc x -> Fan (invert ap) x v u.
+  Proof.
+  Admitted.
+
+End InvertProp.
 
 Lemma smaller_coloring
   {G : sgraph} {v w0 wj : G} {k}
@@ -713,7 +703,6 @@ Proof.
   by constructor; exists (projT1 c), (exist _ c'' Hprop''); rewrite Hcard''.
 Qed.
 
-(* see edges_sum_degrees proof for example of induction on edges *)
 Theorem Vizings (G : sgraph) (chi : nat): 
   is_chromatic_index G chi -> 
   max_degree G <= chi <= max_degree G + 1.
@@ -737,21 +726,25 @@ Proof.
       exists (k' + 1); by split; [ |rewrite addn1].
     (* now, k' = max_degree G + 1 *)
     rewrite Heqk' in kc'; pose kc := k_extended_col Ein0 kc'.
+    (* create a maximal fan from w0 to w *)
     pose f0 : Fan kc v w0 w0 := k_Fan_of_del_edges Ein0 kc'.
     case Hfmax: (fanmax f0) => [w fmax].
+    have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite Hfmax /=.
     have Hleqk : max_degree G' + 1 <= max_degree G + 1.
-    { (* apply/(leq_trans _ (eq_leq (esym Heqk'))); *) rewrite leq_add2r; exact: del_edges_max_deg. } 
+    { rewrite leq_add2r; exact: del_edges_max_deg. } 
+    (* there exists some color c0 absent at w *)
     move: (exists_absent_color kc' Hleqk w) => [c0] Habw0'.
     have Habw0 := extended_absent Ein0 Habw0'.
     have Heq : max_degree G + 1 + 1 = max_degree G + 1 + 1 by [].
     case: (boolP (Some c0 \in absent_set kc v))=> [Habv0 | Hnabv0].
-    - (* if c is absent at v, we can replace extra color with c *)
+    - (* if c0 is absent at v, we can replace extra color with c0 *)
       have Hcap: (Some c0 \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv0 Habw0).
       by exists (max_degree G + 1); move: (smaller_coloring fmax Heq Hcap).
     (* Otherwise, we will need to create a fan and rotate *)
     have Hleq: (max_degree G + 1 <= (max_degree G + 1) + 1) by rewrite (addn1 (max_degree G + 1)).
-    move: (exists_absent_color kc Hleq v) => [c1] Habv1.
-    have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite Hfmax /=. 
+    (* There does exists some color c1 absent at v *)
+    move: (exists_absent_color kc Hleq v) => [c1] Habv1. 
+    (* There also exists an edge v--wj colored c0, where wj != w0 is in the fan *)
     have := (fanmax_present HfisMax Hnabv0 Habw0)=> [[wj] /andP[Einj /andP[/eqP Hkcj Hfanj]]].
     have Evj : v -- wj by rewrite in_edges in Einj.
     have Hneqj0 : wj != w0.
@@ -761,21 +754,22 @@ Proof.
       by rewrite Hkcj.
     }
     (* split fan at wj as f1 and (wj::f2) *)
-    case/splitPr fsplt: (w::val fmax)/Hfanj => [f1 f2 _].
-    case Hf2: f2 fsplt=> [|wi f2'] fsplt.
+    case/splitPr fsplit: (w::val fmax)/Hfanj => [f1 f2 _].
+    case Hf2: f2 fsplit=> [|wi f2'] fsplit.
     - (* contradiction if f2 is empty *)
-      by rewrite -(fan_last fmax) -(last_cons w w) fsplt cats1 last_rcons eq_refl in Hneqj0.
+      by rewrite -(fan_last fmax) -(last_cons w w) fsplit cats1 last_rcons eq_refl in Hneqj0.
     (* so f2 is non-empty, i.e. wi != w0 *)
     have Habwi0 : Some c0 \in absent_set kc wi.
     { 
-      move: fsplt. 
+      move: fsplit. 
       by case: f1=> [|wk f1']; [rewrite cat0s|]; 
       case=> Hw Hfval; have := fanW fmax;
       rewrite Hfval /absent_prop; [rewrite Hw | rewrite -cat_rcons cat_path last_rcons];
       rewrite /path Hkcj=> /andP[_ +] //; move=> /andP[-> _]. 
     }
-    rewrite -[wj :: wi :: f2']cat1s catA in fsplt.
-    have fsmallest := sub_fan fsplt.
+    rewrite -[wj :: wi :: f2']cat1s catA in fsplit.
+    have fsmallest := sub_fan fsplit.
+    (* Construct c0 c1 Kempe Chain starting with v--wj *)
     move/eqP: (Hkcj); rewrite -(altpath_edge kc _ c1)=> ap0.
     case Hapmax: (apmax Habv1 ap0) => [z [pth apm]].
     have Hpv : v \in pth by exact: path_begin.
@@ -786,10 +780,6 @@ Proof.
     pose Hkcp : proper_edge_coloring G (projT1 kc) :=  
       (exist _ c (@invert_proper _ _ _ _ _ _ _ _ apm (proj2_sig (k_to_proper_coloring kc)))).
     rewrite leq_eqVlt card_k_col.
-    (*
-      we know invert doesn't decrease the # of colors used b/c apm is greater than length 1
-      however, it's easier to show we are done if it did than to prove we aren't in that case
-    *)
     case/orP=> Hi; first last.
     - exists #|Hkcp [E(G)]|.
       split; first by constructor; exact (proper_to_k_coloring Hkcp).
@@ -804,21 +794,28 @@ Proof.
       have Hp : Path_edge pth v wj by rewrite Hq; apply cat_path_edge; left; apply edgep_path_edge.
       move: (HcisInv_m v wj Hp)=> [/iffLR H _]; exact: H Hkcj.
     }
+    have Hkci_fmax : Fan Hkci v w0 w := invert_fan HaisMax fmax Habv1.
     have Habv0 : Some c0 \in absent_set Hkci v := invert_absent_ca HaisMax Hpv Habv1.
     case: (boolP (wi \in pth))=> Hpwi; exists (max_degree G + 1).
-    - (* wi is in the alternating path -> it must be an endpoint *)
-      (* have Habwi1 : c1 \in absent_set Hkci wi := invert_absent_cb HaisMax Hpwi Habwi0. *)
-      have Hkci_fmax : Fan Hkci v w0 w by admit.
-      have Hpw : w \notin pth by admit. (* because we already have the two endpoints *)
+    - (* wi is in the path of apm *)
+      have Hpw : w \notin pth by 
+        case
+          (altpath_two_endpts
+            (conj (altpath_endptP apm (or_intror Habv1))
+            (conj (altpath_endptP apm (or_introl Habwi0))
+                  (altpath_endptP apm (or_introl Habw0)))
+          )); 
+        [rewrite Hpv| case; [rewrite Hpwi|]].
       rewrite (invert_absent_not_mem HaisMax Hpw) in Habw0.
       have Hcap: (Some c0 \in absent_set Hkci v :&: absent_set Hkci w) by apply/setIP/(conj Habv0 Habw0).
       by have := (smaller_coloring Hkci_fmax Heq Hcap).
     - (* wi is not in the alternating path *)
       rewrite (invert_absent_not_mem HaisMax Hpwi) in Habwi0.
-      have Hkci_fsmallest : Fan Hkci v w0 wi by admit.
+      rewrite (invert_fan_nodes HaisMax fmax Hkci_fmax) in fsplit.
+      have Hkci_fsmallest : Fan Hkci v w0 wi := sub_fan fsplit.
       have Hcap: (Some c0 \in absent_set Hkci v :&: absent_set Hkci wi) by apply/setIP/(conj Habv0 Habwi0).
       by have := (smaller_coloring Hkci_fsmallest Heq Hcap).
-Admitted.
+Qed.
 
 
 
