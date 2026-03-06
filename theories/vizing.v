@@ -24,14 +24,6 @@ Section Fan.
   Definition w0_prop 
     {ColorType} (c : edge_coloring G ColorType) e 
   := c e \notin c[E(del_edges e)].
-    
-  (* Definition w0_prop2 c e := 
-    [forall (h : {set G} | (h \in E(G)) && (e != h)), c e != c h]. *)
-
-  (* Todo: decide which w0_prop to use, they are equivalent *)
-    (* Lemma w0_props c e : reflect (w0_prop1 c e) (w0_prop2 c e). *)
-  (* Proof.  *)
-  (* Admitted. *)
 
   Lemma w0_prop_extended {e} (c_del : edge_coloring (del_edges e) ColorType)
   : w0_prop (extended_col c_del) e.
@@ -204,15 +196,6 @@ Section Rotation.
   Proof.
     move: (valP f)=> Hf. exact: (Build_Fan (sub_fanp Hcat Hf)). 
   Qed.
-
-  (* Lemma extend_absent :
-    extend_fan = None ->   
-    (forall wi, ~~ ((wi \in (wk :: val f)) && (c [set v; wi] == c [set v; wk]))) ->
-    absent_prop c [set v; wk] v.
-  Proof.
-    rewrite/extend_fan.
-    case: pickP=> [//|+ _].
-  Admitted. *)
 
   Definition rotateF : edge_coloring G ColorType :=
     rotate c (rev (wk::val f)) v.

@@ -285,17 +285,7 @@ Section ExtendCol.
   : Some c0 \in absent_set (k_extended_col kc) x.
   Proof.
   Admitted.
-  (* arguably, could also work for matchings not just single edge *)
-  (* Lemma del_edges_coloring (k : nat) :
-    k_edge_colorable (del_edges del_e) k -> k_edge_colorable G (k + 1).
-  Proof. 
-    (* move=> Hpe [[ColorType [Hpc Hcard]]]. *)
-    (* pose c' := extended_col Hpc. *)
-    (* have Hp': is_proper_edge_coloring c' := proper_extended_col He. *)
-      (* rewrite /c'. *)
-    (* constructor. rewrite/k_edge_coloring. *)
-    (* exists (option ColorType). *)
-  Admitted. *)
+  
 End ExtendCol.
 
 Section Recolor.
@@ -354,13 +344,6 @@ Section Recolor.
     move: (Hp _ _ _ He1 He2). *)
   Admitted.
 
-  (* not needed right now *)
-  (* Lemma del_edges_col c0 e : 
-    (c0 \in c[E(G)]) ->
-    (c0 != c e) ->
-    (c0 \in c[E(del_edges e)]).
-  Proof.
-  Admitted. *)
 
   Lemma replace_col e c0 : 
     e \in E(G) ->  
