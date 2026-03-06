@@ -627,15 +627,16 @@ Section InvertProp.
   Proof. 
     have : pc [E{G;u}] = invert ap [E{G;u}].
     {
-      (* apply/setP=> c0.
-      apply/imsetP/imsetP; move=> [e Hin ->]; exists e=> //.
-      move: Hin; rewrite/edge_neigh=> /imsetP [v] Hn ->.
-      have := vert_not_in_path.
-      move: invert_is_inverted=> [Hnm _].   *)
-      admit.
+      apply/setP=> c0.
+      apply/imsetP/imsetP; move=> [e Hin ->]; exists e=> //;
+      move: Hin; rewrite/edge_neigh=> /imsetP [v] Hn ->;
+      have Hp := (vert_not_in_path _ _ _ _ v _ (or_introl Hu));
+      move: invert_is_inverted=> [+ _];
+      rewrite/not_mem_inverted=> Hnm;
+      by have := Hnm u v Hp.  
     }
     by rewrite/absent_set=> -> ->.
-  Admitted.
+  Qed.
 
   Lemma invert_absent_ca {u}
     (Hu : u \in p)

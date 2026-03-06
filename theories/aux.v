@@ -109,11 +109,18 @@ Section PathEdge.
   Qed.
 
   Lemma vert_not_in_path :
-    (u \notin p) || (v \notin p) -> ~ Path_edge p u v.
+    (u \notin p) \/ (v \notin p) -> ~ Path_edge p u v.
   Proof.
-    case/orP=> [Hu | Hv] [i /andP[/andP[Hs Hnl] Hnr]];
-    [have : u \in p | have : v \in p].
-  Admitted.
+    case=> Hn [i /andP[/andP[Hs /eqP Hnl] /eqP Hnr]];
+    [have Hin : u \in p | have /(mem_tail x) Hin : v \in tail p].
+    - have /(mem_nth x) : i < size (x :: tail p) by
+        move/(ltn_addr 1): Hs; 
+        rewrite [size (tail p) + 1]addnC -[1 + size (tail p)]/(size([::x]) + size (tail p)) -size_cat.
+      by rewrite Hnl -nodesE.
+    - by rewrite Hin in Hn.
+    - rewrite -Hnr; exact: (mem_nth x Hs).
+    - by rewrite -nodesE in Hin; rewrite Hin in Hn.
+  Qed.
 
   Lemma edgep_path_edge (xy : x -- y) :
     (Path_edge (edgep xy) u v) <-> ((x == u) && (y == v)).
