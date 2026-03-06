@@ -717,33 +717,29 @@ Proof.
     split; first by exact/inj_chrom.
     by rewrite E0 cards0.
   - (* Induction *)
-    have [v [w0] [Edef0 Ev0]] := edgesP _ Ein0; rewrite Edef0 in Ein0; set G' := del_edges [set v; w0].
-    have/IH [k' [[kc'] Hleqk']]: #|E(G')| < #|E(G)| by apply: proper_card; exact: del_edges_proper Ein0 _.
-    have: k' <= max_degree G + 1 by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg.
+    have [v [w0] [Edef0 Ev0]] := edgesP _ Ein0; rewrite {}Edef0 in Ein0; set G' := del_edges [set v; w0].
+    have{}/IH [k' [[kc'] Hleqk']]: #|E(G')| < #|E(G)| by apply: proper_card; exact: del_edges_proper Ein0 _.
+    have : k' <= max_degree G + 1 by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg.
     rewrite leq_eqVlt => /orP[/eqP Heqk'| Hltk']; first last.
     - (* if k' < max_degree G + 1, then we are done *) 
       pose kc := k_extended_col Ein0 kc'.
-      exists (k' + 1); by split; [ |rewrite addn1].
+      exists (k' + 1); by split; [|rewrite addn1].
     (* now, k' = max_degree G + 1 *)
-    rewrite Heqk' in kc'; pose kc := k_extended_col Ein0 kc'.
+    rewrite {}Heqk' in kc'; pose kc := k_extended_col Ein0 kc'.
     (* create a maximal fan from w0 to w *)
     pose f0 : Fan kc v w0 w0 := k_Fan_of_del_edges Ein0 kc'.
-    case Hfmax: (fanmax f0) => [w fmax].
-    have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite Hfmax /=.
-    have Hleqk : max_degree G' + 1 <= max_degree G + 1.
-    { rewrite leq_add2r; exact: del_edges_max_deg. } 
+    case Hfmax : (fanmax f0) => [w fmax].
+    have HfisMax : is_fanmax fmax by move: (fanmax_is_max f0); rewrite {}Hfmax /=.
+    have Hleqk : max_degree G' + 1 <= max_degree G + 1 by rewrite leq_add2r; exact: del_edges_max_deg. 
     (* there exists some color c0 absent at w *)
     move: (exists_absent_color kc' Hleqk w) => [c0] Habw0'.
     have Habw0 := extended_absent Ein0 Habw0'.
-    have Heq : max_degree G + 1 + 1 = max_degree G + 1 + 1 by [].
     case: (boolP (Some c0 \in absent_set kc v))=> [Habv0 | Hnabv0].
     - (* if c0 is absent at v, we can replace extra color with c0 *)
-      have Hcap: (Some c0 \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv0 Habw0).
-      by exists (max_degree G + 1); move: (smaller_coloring fmax Heq Hcap).
+      have Hcap : (Some c0 \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv0 Habw0).
+      by exists (max_degree G + 1); move: (smaller_coloring fmax erefl Hcap).
     (* Otherwise, we will need to create a fan and rotate *)
-    have Hleq: (max_degree G + 1 <= (max_degree G + 1) + 1) by rewrite (addn1 (max_degree G + 1)).
-    (* There does exists some color c1 absent at v *)
-    move: (exists_absent_color kc Hleq v) => [c1] Habv1. 
+    move: (exists_absent_color kc (leq_addr _ (max_degree G + 1)) v) => [c1] Habv1. 
     (* There also exists an edge v--wj colored c0, where wj != w0 is in the fan *)
     have := (fanmax_present HfisMax Hnabv0 Habw0)=> [[wj] /andP[Einj /andP[/eqP Hkcj Hfanj]]].
     have Evj : v -- wj by rewrite in_edges in Einj.
@@ -805,16 +801,16 @@ Proof.
             (conj (altpath_endptP apm (or_introl Habwi0))
                   (altpath_endptP apm (or_introl Habw0)))
           )); 
-        [rewrite Hpv| case; [rewrite Hpwi|]].
+        [rewrite Hpv | case; [rewrite Hpwi|]].
       rewrite (invert_absent_not_mem HaisMax Hpw) in Habw0.
-      have Hcap: (Some c0 \in absent_set Hkci v :&: absent_set Hkci w) by apply/setIP/(conj Habv0 Habw0).
-      by have := (smaller_coloring Hkci_fmax Heq Hcap).
+      have Hcap : (Some c0 \in absent_set Hkci v :&: absent_set Hkci w) by apply/setIP/(conj Habv0 Habw0).
+      by have := (smaller_coloring Hkci_fmax erefl Hcap).
     - (* wi is not in the alternating path *)
       rewrite (invert_absent_not_mem HaisMax Hpwi) in Habwi0.
-      rewrite (invert_fan_nodes HaisMax fmax Hkci_fmax) in fsplit.
+      rewrite {}(invert_fan_nodes HaisMax fmax Hkci_fmax) in fsplit.
       have Hkci_fsmallest : Fan Hkci v w0 wi := sub_fan fsplit.
-      have Hcap: (Some c0 \in absent_set Hkci v :&: absent_set Hkci wi) by apply/setIP/(conj Habv0 Habwi0).
-      by have := (smaller_coloring Hkci_fsmallest Heq Hcap).
+      have Hcap : (Some c0 \in absent_set Hkci v :&: absent_set Hkci wi) by apply/setIP/(conj Habv0 Habwi0).
+      by have := (smaller_coloring Hkci_fsmallest erefl Hcap).
 Qed.
 
 
