@@ -108,6 +108,13 @@ Section PathEdge.
     apply/contra_not; exact: is_path_edge.
   Qed.
 
+  Lemma vert_not_in_path :
+    (u \notin p) || (v \notin p) -> ~ Path_edge p u v.
+  Proof.
+    case/orP=> [Hu | Hv] [i /andP[/andP[Hs Hnl] Hnr]];
+    [have : u \in p | have : v \in p].
+  Admitted.
+
   Lemma edgep_path_edge (xy : x -- y) :
     (Path_edge (edgep xy) u v) <-> ((x == u) && (y == v)).
   Proof.
