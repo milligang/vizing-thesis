@@ -151,22 +151,6 @@ Section FanOps.
     (He : [set v; w0] \in E(G))
     (kc_del : k_edge_coloring (del_edges [set v; w0]) k) 
   := Build_Fan (k_Fan_of_proof He kc_del).
-
-  (* Lemma none_w0_extended {k : nat} {e} (He : e \in E(G)) (kc_del : k_edge_coloring (del_edges e) k) w
-  : ((k_extended_col He kc_del) [set v; w] = None) = (w = (last wk (val f))).
-  Proof.
-  Admitted. *)
-  (* Lemma w0_none_extended 
-    {k} {v w0 : G}
-    {He : [set v; w0] \in E(G)}
-    {kc_del : k_edge_coloring (del_edges [set v; w0]) k}
-    (f : k_Fan_of_del_edges He kc_del)
-    (w : G)
-  : ((k_extended_col He kc_del) [set v; w] = None) = (w = (last wk (val f))).
-  Proof. 
-    rewrite /w0_prop /extended_col eq_refl.
-    by apply/negP => /imsetP [e' /del_edges1_neq /negbTE ->].
-  Qed. *)
 End FanOps.
 
 Section Rotation. 
@@ -395,6 +379,7 @@ Section AltPath.
     alternates c ca cb (nodes (pcat p (edgep yz))) = 
     alternates c ca cb (nodes p) && (c [set y; z] == next_col c ca cb (nodes p)).
   Proof.
+    elim: p yz.
   Admitted.
 
   Lemma alternate_cons ca cb zx p :
@@ -440,9 +425,8 @@ Section AltPath.
   Lemma altpath_edgeR ca cb p yz :
     altpath ca cb (pcat p (edgep yz)) = (z \notin p) && (c [set y; z] == next_col c ca cb (nodes p)) && altpath ca cb p.
   Proof.
-    rewrite !altpathE irred_edgeR alternates_rcons.
-    (* by rewrite !andbA (andbC (alternates ca cb (nodes p)) _). (andbAC _ _ (z  \notin p)).  *)
-  Admitted.
+    by rewrite !altpathE irred_edgeR alternates_rcons !andbA (andbC (alternates c ca cb (nodes p)) _) (andbAC _ _ (z  \notin p)) (andbC _ (z  \notin p)).
+  Qed.
 
   Definition altpath_endpt {ca cb p} (ap : altpath ca cb p) (u : G) :=
     (ca \in absent_set c u) \/ (cb \in absent_set c u). 
@@ -486,10 +470,10 @@ Section Kempe.
   Lemma valid_altpath_edge 
     {y z} {p : Path x y} 
     {ap : altpath pc ca cb p}
-    (Pz : valid_altpath_vertex ap z) 
-  : y -- z.
+  : valid_altpath_vertex ap z -> y -- z.
   Proof. 
-  Admitted.
+    by rewrite/valid_altpath_vertex in_opn=> /andP[-> _].
+  Qed.
   
   Lemma altpath_rcons 
     {y} {p : Path x y} 
@@ -498,6 +482,7 @@ Section Kempe.
     (Pz : valid_altpath_vertex ap z) 
   : altpath pc ca cb (pcat p (edgep (valid_altpath_edge Pz))).
   Proof.
+    rewrite altpath_edgeR. move: Pz=> /andP[Hn Hc].
   Admitted.
   
   Definition is_apmax {y} {p : Path x y} (ap : altpath pc ca cb p) : Prop :=

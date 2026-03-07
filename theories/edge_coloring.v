@@ -198,11 +198,6 @@ Section AbsentSet.
     (c : edge_coloring G ColorType) x :=
     setD (c[E(G)]) (c[E{x}]).
 
-  (* still deciding on definitions further down, tbd which of these three will be needed *)
-  (* Lemma absent_col {ColorType: finType} (c : edge_coloring G ColorType) (c0 : ColorType) x :
-    c0 \in absent_set c x <-> [pick e in E{x} | c e == c0] == None.
-  Proof. split=> H. Admitted. *)
-
   Lemma absent_edge {ColorType : finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
     c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
   Proof.
@@ -281,8 +276,7 @@ Section ExtendCol.
     {kc : k_edge_coloring (del_edges del_e) k}
     {c0 : projT1 kc}
     {x : G}
-    (H : c0 \in absent_set kc x)
-  : Some c0 \in absent_set (k_extended_col kc) x.
+  : c0 \in absent_set kc x -> Some c0 \in absent_set (k_extended_col kc) x.
   Proof.
   Admitted.
   
@@ -384,30 +378,6 @@ Section Recolor.
     - do 2 move=> _ -> //.
     - move=> _ /eqP -> //.
   Qed.
-
-  (* TO DO: would be nice bc more info than previous, but longer and not sure how to finish *)
-  Lemma perm_swap e f : 
-    e \in E(G) -> 
-    f \in E(G) ->
-    perm_eq [seq c e' | e' <- enum E(G)] 
-            [seq (swap_edge e f) e' | e' <- enum E(G)].
-  Proof.
-    move=> He Hf.
-    apply/permP=> x.
-    rewrite !count_map.
-    have Hcount : forall P e' s, e' \in s -> count P s = count P (rem e' s) + (e'  \in s) && P e'.
-    { 
-      move=> P e' s He'; rewrite count_rem subnK //.
-      case pe': (P e')=> //=.
-      rewrite He' -has_count.
-      by apply/hasP; exists e'; try rewrite mem_enum. 
-    }
-    rewrite -mem_enum in He.
-    rewrite !(Hcount _ _ _ He) /=.
-    case Hef: (e == f).
-    - by rewrite (swap_edge_eq Hef) (eq_count (fun e' => congr1 x (swap_edge_eq Hef e'))).
-    - admit.
-  Admitted.
 
   (* Same proof as above*)
   Lemma imset_swap_vertex e f (x : G) :
