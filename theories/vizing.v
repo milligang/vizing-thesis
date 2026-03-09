@@ -209,20 +209,6 @@ Section Rotation.
     have He2: [set v; w2] \in E(G) by rewrite in_opn -in_edges in Hw2.
     exact: imset_swap He1 He2.
   Qed.
-
-  Lemma perm_rot : 
-    perm_eq [seq c e | e <- enum E(G)] [seq rotateF e | e <- enum E(G)].
-  Proof.
-    rewrite /rotateF; set fs := (rev (wk::val f)).
-    have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
-    elim: fs c Hws => [|w1 [|w2 wss] IH] d //= /andP [Hw1 Hws].
-    apply: (perm_trans _ (IH (swap_edge d [set v; w1] [set v; w2]) _)) => //.
-    move/andP: Hws => [Hw2 _].
-    have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
-    have He2: [set v; w2] \in E(G) by rewrite in_opn -in_edges in Hw2.
-    exact: perm_swap He1 He2.
-  Qed.
-  
   
   (* TO DO: could be more general too, bc will need to prove base case anyways *)
   Lemma imset_rot_del_edge (e0 e1 : {set G}) : 

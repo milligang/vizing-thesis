@@ -1,4 +1,4 @@
-digraph escaped_graph {
+digraph graph_filtered {
   graph [ratio=0.5]
   node [style=filled]
 vizing_apmax_graph_correct [label="apmax_graph_correct", URL=<vizing.html#apmax_graph_correct>, fillcolor="#F070D1"] ;
@@ -73,21 +73,6 @@ vizing_k_Fan_of_proof [label="k_Fan_of_proof", URL=<vizing.html#k_Fan_of_proof>,
 vizing_Fan_of_del_edges [label="Fan_of_del_edges", URL=<vizing.html#Fan_of_del_edges>, peripheries=3, fillcolor="#F070D1"] ;
 vizing_Fan_of_proof [label="Fan_of_proof", URL=<vizing.html#Fan_of_proof>, fillcolor="#7FFFD4"] ;
 vizing_rotate [label="rotate", URL=<vizing.html#rotate>, fillcolor="#F070D1"] ;
-vizing_vizing_Fan__canonical__choice_SubCountable [label="vizing_Fan__canonical__choice_SubCountable", URL=<vizing.html#vizing_Fan__canonical__choice_SubCountable>, peripheries=3, fillcolor="#F070D1"] ;
-vizing_vizing_Fan__canonical__choice_Countable [label="vizing_Fan__canonical__choice_Countable", URL=<vizing.html#vizing_Fan__canonical__choice_Countable>, peripheries=3, fillcolor="#F070D1"] ;
-vizing_HB_unnamed_mixin_9 [label="HB_unnamed_mixin_9", URL=<vizing.html#HB_unnamed_mixin_9>, fillcolor="#F070D1"] ;
-vizing_vizing_Fan__canonical__choice_SubChoice [label="vizing_Fan__canonical__choice_SubChoice", URL=<vizing.html#vizing_Fan__canonical__choice_SubChoice>, peripheries=3, fillcolor="#F070D1"] ;
-vizing_vizing_Fan__canonical__choice_Choice [label="vizing_Fan__canonical__choice_Choice", URL=<vizing.html#vizing_Fan__canonical__choice_Choice>, peripheries=3, fillcolor="#F070D1"] ;
-vizing_HB_unnamed_mixin_8 [label="HB_unnamed_mixin_8", URL=<vizing.html#HB_unnamed_mixin_8>, fillcolor="#F070D1"] ;
-vizing_vizing_Fan__canonical__eqtype_SubEquality [label="vizing_Fan__canonical__eqtype_SubEquality", URL=<vizing.html#vizing_Fan__canonical__eqtype_SubEquality>, peripheries=3, fillcolor="#F070D1"] ;
-vizing_vizing_Fan__canonical__eqtype_Equality [label="vizing_Fan__canonical__eqtype_Equality", URL=<vizing.html#vizing_Fan__canonical__eqtype_Equality>, peripheries=3, fillcolor="#F070D1"] ;
-vizing_HB_unnamed_mixin_7 [label="HB_unnamed_mixin_7", URL=<vizing.html#HB_unnamed_mixin_7>, fillcolor="#F070D1"] ;
-vizing_choice_Countable__to__choice_Choice_isCountable [label="choice_Countable__to__choice_Choice_isCountable", URL=<vizing.html#choice_Countable__to__choice_Choice_isCountable>, peripheries=3, fillcolor="#F070D1"] ;
-vizing_choice_Countable__to__eqtype_hasDecEq [label="choice_Countable__to__eqtype_hasDecEq", URL=<vizing.html#choice_Countable__to__eqtype_hasDecEq>, peripheries=3, fillcolor="#F070D1"] ;
-vizing_choice_Countable__to__choice_hasChoice [label="choice_Countable__to__choice_hasChoice", URL=<vizing.html#choice_Countable__to__choice_hasChoice>, peripheries=3, fillcolor="#F070D1"] ;
-vizing_HB_unnamed_factory_3 [label="HB_unnamed_factory_3", URL=<vizing.html#HB_unnamed_factory_3>, fillcolor="#F070D1"] ;
-vizing_vizing_Fan__canonical__eqtype_SubType [label="vizing_Fan__canonical__eqtype_SubType", URL=<vizing.html#vizing_Fan__canonical__eqtype_SubType>, fillcolor="#F070D1"] ;
-vizing_HB_unnamed_factory_1 [label="HB_unnamed_factory_1", URL=<vizing.html#HB_unnamed_factory_1>, fillcolor="#F070D1"] ;
 vizing_fval [label="fval", URL=<vizing.html#fval>, fillcolor="#F070D1"] ;
 vizing_Build_Fan [label="Build_Fan", URL=<vizing.html#Build_Fan>, fillcolor="#7FAAFF"] ;
 vizing_Fan [label="Fan", URL=<vizing.html#Fan>, fillcolor="#E2CDFA"] ;
@@ -161,6 +146,7 @@ vizing_apmax_elim [label="apmax_elim", URL=<vizing.html#apmax_elim>, fillcolor="
   vizing_alternates_rcons -> vizing_next_col [] ;
   vizing_alternates_rcons -> vizing_alternates [] ;
   vizing_fanmax_present -> vizing_is_fanmax [] ;
+  vizing_fanmax_present -> vizing_fval [] ;
   vizing_fanmax_is_max -> vizing_FunctionalElimination_fanmax [] ;
   vizing_fanmax_is_max -> vizing_is_fanmax [] ;
   vizing_FunctionalInduction_fanmax -> vizing_fanmax_graph_correct [] ;
@@ -179,7 +165,8 @@ vizing_apmax_elim [label="apmax_elim", URL=<vizing.html#apmax_elim>, fillcolor="
   vizing_fanmax -> vizing_fanmax_functional [] ;
   vizing_fanmax_functional -> vizing_fanmax_obligations_obligation_1 [] ;
   vizing_fanmax_obligations_obligation_1 -> vizing_fancons [] ;
-  vizing_is_fanmax -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
+  vizing_fanmax_obligations_obligation_1 -> vizing_fval [] ;
+  vizing_is_fanmax -> vizing_Fan [] ;
   vizing_is_fanmax -> vizing_valid_fan_vertex [] ;
   vizing_rot_proper -> vizing_rotateF [] ;
   vizing_rot_absent_fan -> vizing_rotateF [] ;
@@ -198,19 +185,21 @@ vizing_apmax_elim [label="apmax_elim", URL=<vizing.html#apmax_elim>, fillcolor="
   vizing_imset_rot_vertex -> vizing_fan_neigh [] ;
   vizing_imset_rot_vertex -> vizing_rev_neigh [] ;
   vizing_rotateF -> vizing_rotate [] ;
-  vizing_rotateF -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
-  vizing_sub_fan -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
+  vizing_rotateF -> vizing_Fan [] ;
+  vizing_sub_fan -> vizing_Build_Fan [] ;
+  vizing_sub_fan -> vizing_Fan [] ;
   vizing_sub_fan -> vizing_sub_fanp [] ;
-  vizing_fancons -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
+  vizing_fancons -> vizing_Build_Fan [] ;
+  vizing_fancons -> vizing_Fan [] ;
   vizing_fancons -> vizing_fanp_cons [] ;
   vizing_in_neigh -> vizing_fan_neigh [] ;
-  vizing_fan_w0_prop -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
+  vizing_fan_w0_prop -> vizing_Fan [] ;
   vizing_fan_w0_prop -> vizing_fanp_w0_prop [] ;
-  vizing_fan_neigh -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
+  vizing_fan_neigh -> vizing_Fan [] ;
   vizing_fan_neigh -> vizing_fanp_neigh [] ;
-  vizing_fan_last -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
+  vizing_fan_last -> vizing_Fan [] ;
   vizing_fan_last -> vizing_fanp_last [] ;
-  vizing_fanW -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
+  vizing_fanW -> vizing_fval [] ;
   vizing_fanW -> vizing_fanpW [] ;
   vizing_k_Fan_of_del_edges -> vizing_k_Fan_of_proof [] ;
   vizing_k_Fan_of_del_edges -> vizing_Build_Fan [] ;
@@ -222,28 +211,6 @@ vizing_apmax_elim [label="apmax_elim", URL=<vizing.html#apmax_elim>, fillcolor="
   vizing_Fan_of_del_edges -> vizing_Fan [] ;
   vizing_Fan_of_proof -> vizing_fanp [] ;
   vizing_Fan_of_proof -> vizing_w0_prop_extended [] ;
-  vizing_vizing_Fan__canonical__choice_SubCountable -> vizing_HB_unnamed_mixin_9 [] ;
-  vizing_vizing_Fan__canonical__choice_SubCountable -> vizing_HB_unnamed_mixin_8 [] ;
-  vizing_vizing_Fan__canonical__choice_SubCountable -> vizing_HB_unnamed_mixin_7 [] ;
-  vizing_vizing_Fan__canonical__choice_Countable -> vizing_HB_unnamed_mixin_9 [] ;
-  vizing_vizing_Fan__canonical__choice_Countable -> vizing_HB_unnamed_mixin_8 [] ;
-  vizing_vizing_Fan__canonical__choice_Countable -> vizing_HB_unnamed_mixin_7 [] ;
-  vizing_HB_unnamed_mixin_9 -> vizing_HB_unnamed_factory_3 [] ;
-  vizing_vizing_Fan__canonical__choice_SubChoice -> vizing_HB_unnamed_mixin_8 [] ;
-  vizing_vizing_Fan__canonical__choice_SubChoice -> vizing_HB_unnamed_mixin_7 [] ;
-  vizing_vizing_Fan__canonical__choice_Choice -> vizing_HB_unnamed_mixin_8 [] ;
-  vizing_vizing_Fan__canonical__choice_Choice -> vizing_HB_unnamed_mixin_7 [] ;
-  vizing_HB_unnamed_mixin_8 -> vizing_HB_unnamed_factory_3 [] ;
-  vizing_vizing_Fan__canonical__eqtype_SubEquality -> vizing_HB_unnamed_mixin_7 [] ;
-  vizing_vizing_Fan__canonical__eqtype_Equality -> vizing_HB_unnamed_mixin_7 [] ;
-  vizing_HB_unnamed_mixin_7 -> vizing_HB_unnamed_factory_3 [] ;
-  vizing_choice_Countable__to__choice_Choice_isCountable -> vizing_HB_unnamed_factory_3 [] ;
-  vizing_choice_Countable__to__eqtype_hasDecEq -> vizing_HB_unnamed_factory_3 [] ;
-  vizing_choice_Countable__to__choice_hasChoice -> vizing_HB_unnamed_factory_3 [] ;
-  vizing_HB_unnamed_factory_3 -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
-  vizing_vizing_Fan__canonical__eqtype_SubType -> vizing_HB_unnamed_factory_1 [] ;
-  vizing_HB_unnamed_factory_1 -> vizing_fval [] ;
-  vizing_HB_unnamed_factory_1 -> vizing_Build_Fan [] ;
   vizing_fval -> vizing_Fan [] ;
   vizing_Build_Fan -> vizing_fanp [] ;
   vizing_Fan -> vizing_fanp [] ;
@@ -289,7 +256,7 @@ vizing_apmax_elim [label="apmax_elim", URL=<vizing.html#apmax_elim>, fillcolor="
   vizing_invert_fan -> vizing_Fan [] ;
   vizing_invert_fan_nodes -> vizing_invert [] ;
   vizing_invert_fan_nodes -> vizing_is_apmax [] ;
-  vizing_invert_fan_nodes -> vizing_vizing_Fan__canonical__eqtype_SubType [] ;
+  vizing_invert_fan_nodes -> vizing_Fan [] ;
   vizing_invert_absent_cb -> vizing_invert [] ;
   vizing_invert_absent_cb -> vizing_is_apmax [] ;
   vizing_invert_absent_ca -> vizing_invert [] ;
@@ -313,5 +280,5 @@ vizing_apmax_elim [label="apmax_elim", URL=<vizing.html#apmax_elim>, fillcolor="
   vizing_apmax_elim -> vizing_apmax_graph_correct [] ;
   vizing_apmax_elim -> vizing_apmax_graph_rect [] ;
 subgraph cluster_vizing { label="vizing"; fillcolor="#FFFFC3"; labeljust=l; style=filled 
-vizing_apmax_elim; vizing_FunctionalElimination_apmax; vizing_FunctionalInduction_apmax; vizing_apmax_is_max; vizing_apmax_pcat; vizing_invert; vizing_invert_proper; vizing_imset_invert; vizing_card_invert; vizing_not_mem_inverted; vizing_mem_inverted; vizing_invert_is_inverted; vizing_invert_absent_not_mem; vizing_invert_absent_ca; vizing_invert_absent_cb; vizing_invert_fan_nodes; vizing_invert_fan; vizing_smaller_coloring; vizing_Vizings; vizing_neigh_prop; vizing_w0_prop; vizing_w0_prop_extended; vizing_w0_col_extended; vizing_absent_prop; vizing_fanp; vizing_fanpW; vizing_fanp_last; vizing_fanp_w0_prop; vizing_fanp_neigh; vizing_rev_neigh; vizing_valid_fan_vertex; vizing_fanp_cons; vizing_sub_fanp; vizing_Fan; vizing_Build_Fan; vizing_fval; vizing_HB_unnamed_factory_1; vizing_vizing_Fan__canonical__eqtype_SubType; vizing_HB_unnamed_factory_3; vizing_choice_Countable__to__choice_hasChoice; vizing_choice_Countable__to__eqtype_hasDecEq; vizing_choice_Countable__to__choice_Choice_isCountable; vizing_HB_unnamed_mixin_7; vizing_vizing_Fan__canonical__eqtype_Equality; vizing_vizing_Fan__canonical__eqtype_SubEquality; vizing_HB_unnamed_mixin_8; vizing_vizing_Fan__canonical__choice_Choice; vizing_vizing_Fan__canonical__choice_SubChoice; vizing_HB_unnamed_mixin_9; vizing_vizing_Fan__canonical__choice_Countable; vizing_vizing_Fan__canonical__choice_SubCountable; vizing_rotate; vizing_Fan_of_proof; vizing_Fan_of_del_edges; vizing_k_Fan_of_proof; vizing_k_Fan_of_del_edges; vizing_fanW; vizing_fan_last; vizing_fan_neigh; vizing_fan_w0_prop; vizing_in_neigh; vizing_fancons; vizing_sub_fan; vizing_rotateF; vizing_imset_rot_vertex; vizing_imset_rot; vizing_imset_rot_del_edge; vizing_rot_first_last; vizing_rot_w0_prop; vizing_card_rot; vizing_rot_absent_center; vizing_rot_absent_fan; vizing_rot_proper; vizing_is_fanmax; vizing_fanmax_obligations_obligation_1; vizing_fanmax_obligations; vizing_fanmax_functional; vizing_fanmax; vizing_fanmax_unfold; vizing_fanmax_unfold_eq; vizing_fanmax_equation_1; vizing_fanmax_graph; vizing_fanmax_graph_equation_1; vizing_fanmax_graph_rect; vizing_fanmax_graph_correct; vizing_fanmax_elim; vizing_FunctionalElimination_fanmax; vizing_FunctionalInduction_fanmax; vizing_fanmax_is_max; vizing_fanmax_present; vizing_alternates; vizing_next_col; vizing_alternates_invert; vizing_alternates_rcons; vizing_alternate_cons; vizing_alternates_ca_cb; vizing_altpath; vizing_altpathE; vizing_altpath_next_col; vizing_altpath_idp; vizing_altpath_edge; vizing_altpath_edgeL; vizing_altpath_edgeR; vizing_altpath_endpt; vizing_altpath_endptP; vizing_altpath_two_endpts; vizing_altpath_mem; vizing_valid_altpath_vertex; vizing_valid_altpath_edge; vizing_altpath_rcons; vizing_is_apmax; vizing_apmax_obligations_obligation_1; vizing_apmax_obligations; vizing_apmax_functional; vizing_apmax; vizing_apmax_unfold; vizing_apmax_unfold_eq; vizing_apmax_obligations_obligation_1_hint; vizing_apmax_equation_1; vizing_apmax_graph; vizing_apmax_graph_equation_1; vizing_apmax_graph_rect; vizing_apmax_graph_correct; };
+vizing_apmax_elim; vizing_FunctionalElimination_apmax; vizing_FunctionalInduction_apmax; vizing_apmax_is_max; vizing_apmax_pcat; vizing_invert; vizing_invert_proper; vizing_imset_invert; vizing_card_invert; vizing_not_mem_inverted; vizing_mem_inverted; vizing_invert_is_inverted; vizing_invert_absent_not_mem; vizing_invert_absent_ca; vizing_invert_absent_cb; vizing_invert_fan_nodes; vizing_invert_fan; vizing_smaller_coloring; vizing_Vizings; vizing_neigh_prop; vizing_w0_prop; vizing_w0_prop_extended; vizing_w0_col_extended; vizing_absent_prop; vizing_fanp; vizing_fanpW; vizing_fanp_last; vizing_fanp_w0_prop; vizing_fanp_neigh; vizing_rev_neigh; vizing_valid_fan_vertex; vizing_fanp_cons; vizing_sub_fanp; vizing_Fan; vizing_Build_Fan; vizing_fval; vizing_rotate; vizing_Fan_of_proof; vizing_Fan_of_del_edges; vizing_k_Fan_of_proof; vizing_k_Fan_of_del_edges; vizing_fanW; vizing_fan_last; vizing_fan_neigh; vizing_fan_w0_prop; vizing_in_neigh; vizing_fancons; vizing_sub_fan; vizing_rotateF; vizing_imset_rot_vertex; vizing_imset_rot; vizing_imset_rot_del_edge; vizing_rot_first_last; vizing_rot_w0_prop; vizing_card_rot; vizing_rot_absent_center; vizing_rot_absent_fan; vizing_rot_proper; vizing_is_fanmax; vizing_fanmax_obligations_obligation_1; vizing_fanmax_obligations; vizing_fanmax_functional; vizing_fanmax; vizing_fanmax_unfold; vizing_fanmax_unfold_eq; vizing_fanmax_equation_1; vizing_fanmax_graph; vizing_fanmax_graph_equation_1; vizing_fanmax_graph_rect; vizing_fanmax_graph_correct; vizing_fanmax_elim; vizing_FunctionalElimination_fanmax; vizing_FunctionalInduction_fanmax; vizing_fanmax_is_max; vizing_fanmax_present; vizing_alternates; vizing_next_col; vizing_alternates_invert; vizing_alternates_rcons; vizing_alternate_cons; vizing_alternates_ca_cb; vizing_altpath; vizing_altpathE; vizing_altpath_next_col; vizing_altpath_idp; vizing_altpath_edge; vizing_altpath_edgeL; vizing_altpath_edgeR; vizing_altpath_endpt; vizing_altpath_endptP; vizing_altpath_two_endpts; vizing_altpath_mem; vizing_valid_altpath_vertex; vizing_valid_altpath_edge; vizing_altpath_rcons; vizing_is_apmax; vizing_apmax_obligations_obligation_1; vizing_apmax_obligations; vizing_apmax_functional; vizing_apmax; vizing_apmax_unfold; vizing_apmax_unfold_eq; vizing_apmax_obligations_obligation_1_hint; vizing_apmax_equation_1; vizing_apmax_graph; vizing_apmax_graph_equation_1; vizing_apmax_graph_rect; vizing_apmax_graph_correct; };
 } /* END */
