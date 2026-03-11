@@ -321,23 +321,34 @@ Section Recolor.
     is_proper_edge_coloring (recolor_edge [set x; y] c0).
   Proof.
     rewrite/recolor_edge in_setI=> Hp /andP[Hax Hay].
-    move: Hp=> Hp z e1 e2.
-    case: (x =P y)=> [-> |/eqP Hxy].
-    - case: ifP=> [/eqP -> |_ He1]; 
-      case: ifP=> [/eqP ->|_];
-      try (by move: He1; exact: (Hp z));
-      by move=> H; have := subsetP (sub_all_edges z) _ H;
-      rewrite in_edges sg_irrefl.
-    case Hx1: (e1 \in E{x}); case Hy1: (e1 \in E{y});
-    case Hx2: (e2 \in E{x}); case Hy2: (e2 \in E{y}).
-    have [-> A2]:= edge_neigh_edge _ _ _ Hx1 Hy1 Hxy.
-    rewrite eq_refl.
-  (*     
-    case Heq2: (e2 == [set x; y]).
-    - move/eqP: Heq1 => ->; move/eqP: Heq2 => -> //.
-    move: (Hp _ _ _ He1 He2). *)
-  Admitted.
-
+    move: Hp=> Hp z e1 e2 Hz1 Hz2.
+    move: (Hz1) (Hz2); rewrite/edge_neigh=> /imsetP [w1] Hw1 Ezw1 /imsetP [w2] Hw2 Ezw2.
+    rewrite Ezw1 Ezw2.
+    case: ifP=> /eqP /doubleton_eq_iff; 
+    [case; move=> [H1 H2]|rewrite 4!(rwP eqP) !(rwP andP) (rwP orP) (rwP negP) negb_or];
+    (case: ifP=> /eqP /doubleton_eq_iff; 
+    [case; move=> [H3 H4]| rewrite 4!(rwP eqP) 2!(rwP andP) (rwP orP) (rwP negP) negb_or]);
+    rewrite doubleton_eq_iff 5!(rwP eqP) 2!(rwP andP) (rwP orP).
+    - by rewrite H2 H4 3!eq_refl. 
+    - by rewrite H2 H4 -H3 H1 2!eq_refl.
+    - rewrite -H1 in Hax=> _ /eqP Hc0.
+      have Hcontra := absent_edge Hax Hw2. 
+      by rewrite Hc0 eqxx in Hcontra.
+    - by rewrite 2!eq_refl H2 -H3 H1 -H4 eq_refl.
+    - by rewrite H2 H4 3!eq_refl.
+    - rewrite -H1 in Hay=> _ /eqP Hc0.
+      have Hcontra := absent_edge Hay Hw2. 
+      by rewrite Hc0 eqxx in Hcontra.
+    - rewrite -H3 in Hax=> _ /eqP Hc0.
+      have Hcontra := absent_edge Hax Hw1. 
+      by rewrite Hc0 eqxx in Hcontra.
+    - rewrite -H3 in Hay=> _ /eqP Hc0.
+      have Hcontra := absent_edge Hay Hw1. 
+      by rewrite Hc0 eqxx in Hcontra.
+    - rewrite Ezw1 in Hz1; rewrite Ezw2 in Hz2.
+      rewrite eq_refl=> _ _ /eqP /(Hp z _ _ Hz1 Hz2) /doubleton_eq_left ->.
+      by rewrite eq_refl.
+  Qed.
 
   Lemma replace_col e c0 : 
     e \in E(G) ->  

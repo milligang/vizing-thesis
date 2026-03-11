@@ -6,10 +6,10 @@ theories/basics.vo theories/basics.glob theories/basics.v.beautified theories/ba
 theories/basics.vos theories/basics.vok theories/basics.required_vos: theories/basics.v /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
 theories/edge_coloring.vo theories/edge_coloring.glob theories/edge_coloring.v.beautified theories/edge_coloring.required_vo: theories/edge_coloring.v theories/aux.vo /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
 theories/edge_coloring.vos theories/edge_coloring.vok theories/edge_coloring.required_vos: theories/edge_coloring.v theories/aux.vos /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
-theories/erestrict.vo theories/erestrict.glob theories/erestrict.v.beautified theories/erestrict.required_vo: theories/erestrict.v theories/aux.vo theories/edge_coloring.vo theories/fans.vo /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
-theories/erestrict.vos theories/erestrict.vok theories/erestrict.required_vos: theories/erestrict.v theories/aux.vos theories/edge_coloring.vos theories/fans.vos /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
 theories/fans.vo theories/fans.glob theories/fans.v.beautified theories/fans.required_vo: theories/fans.v theories/aux.vo theories/edge_coloring.vo /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
 theories/fans.vos theories/fans.vok theories/fans.required_vos: theories/fans.v theories/aux.vos theories/edge_coloring.vos /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
+theories/kempe.vo theories/kempe.glob theories/kempe.v.beautified theories/kempe.required_vo: theories/kempe.v theories/aux.vo theories/edge_coloring.vo theories/fans.vo /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
+theories/kempe.vos theories/kempe.vok theories/kempe.required_vos: theories/kempe.v theories/aux.vos theories/edge_coloring.vos theories/fans.vos /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
 theories/tmp.vo theories/tmp.glob theories/tmp.v.beautified theories/tmp.required_vo: theories/tmp.v /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
 theories/tmp.vos theories/tmp.vok theories/tmp.required_vos: theories/tmp.v /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker
 theories/vizing.vo theories/vizing.glob theories/vizing.v.beautified theories/vizing.required_vo: theories/vizing.v theories/alternate_path.vo theories/aux.vo theories/edge_coloring.vo theories/fans.vo /Users/milligan/.opam/coq-8.19/lib/rocq-runtime/rocqworker

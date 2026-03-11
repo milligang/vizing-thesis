@@ -281,10 +281,10 @@ Section AltPathOps.
         apply/setP=> c0.
         apply/imsetP/imsetP; move=> [e Hin ->]; exists e=> //;
         move: Hin; rewrite/edge_neigh=> /imsetP [v] Hn ->;
-        have Hp := (vert_not_in_path _ _ _ _ v _ (or_introl Hu));
+        have Hp := (vert_not_in_path (or_introl Hu));
         move: invert_is_inverted=> [+ _];
         rewrite/not_mem_inverted=> Hnm;
-        by have := Hnm u v Hp.  
+        by have := Hnm u v (Hp v).  
       }
       by rewrite/absent_set=> -> ->.
     Qed.
