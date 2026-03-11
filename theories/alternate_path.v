@@ -12,7 +12,7 @@ Unset Printing Implicit Defensive.
 
 Section AltPathOps.
     Variables (G : sgraph) (ColorType : finType).
-    Implicit Types (c : edge_coloring G ColorType) (ca cb : ColorType) (s : seq G).
+    Implicit Types (c : edgeColoringType G ColorType) (ca cb : ColorType) (s : seq G).
   
     Fixpoint alternates c ca cb s : bool := 
       match s with 
@@ -27,7 +27,7 @@ Section AltPathOps.
       | _ => cb
       end.
   
-    Fixpoint alternates_invert c ca cb s : edge_coloring G ColorType :=
+    Fixpoint alternates_invert c ca cb s : edgeColoringType G ColorType :=
       match s with
       | x :: ((y::tl) as s') =>
           alternates_invert
@@ -38,7 +38,7 @@ Section AltPathOps.
   End AltPathOps.
   
   Section AltPath.
-    Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (x y z : G).
+    Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType) (x y z : G).
     Implicit Types (ca cb : ColorType) (s : seq G) (p : Path x y) (zx: z -- x) (yz: y -- z).
     
     Lemma alternates_rcons ca cb yz p : 
@@ -111,7 +111,7 @@ Section AltPathOps.
   
   Lemma altpath_mem 
     {G : sgraph} {ColorType : finType} 
-    (c : edge_coloring G ColorType) 
+    (c : edgeColoringType G ColorType) 
     (ca cb : ColorType)
     (x y u v : G)
     (p : Path x y) :
@@ -126,7 +126,7 @@ Section AltPathOps.
   Qed.
   
   Section Kempe.
-    Variables (G : sgraph) (ColorType : finType) (pc : proper_edge_coloring G ColorType) (ca cb : ColorType) (x : G). 
+    Variables (G : sgraph) (ColorType : finType) (pc : properEdgeColoringType G ColorType) (ca cb : ColorType) (x : G). 
     Implicit Types (y : G).
     Hypothesis start_abs : cb \in absent_set pc x.
    
@@ -181,14 +181,14 @@ Section AltPathOps.
   End Kempe.
   
   Section Invert.
-    Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
+    Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType).
     Implicit Types (ca cb : ColorType) (x y : G).
   
     Definition invert 
       {ca cb x y} 
       {p : Path x y} 
       (ap : altpath c ca cb p) 
-    : edge_coloring G ColorType :=
+    : edgeColoringType G ColorType :=
       alternates_invert c ca cb (nodes p).
   
     Lemma invert_proper 
@@ -247,7 +247,7 @@ Section AltPathOps.
       (ap : altpath ca cb p)
       (Hpc : is_proper_edge_coloring c)
       (Hca : ca \in c[E(G)])
-    : k_edge_coloring G #|c[E(G)]|.
+    : kEdgeColoringType G #|c[E(G)]|.
     Proof.
       refine (existT _ ColorType (exist _ (exist _ (invert ap) (invert_proper Hpc)) _)).
       exact: card_invert Hca.
@@ -255,7 +255,7 @@ Section AltPathOps.
   End Invert.
   
   Section InvertProp.
-    Variables (G : sgraph) (ColorType : finType) (pc : proper_edge_coloring G ColorType) (ca cb : ColorType) (x y : G) (p : Path x y) (ap : altpath pc ca cb p).
+    Variables (G : sgraph) (ColorType : finType) (pc : properEdgeColoringType G ColorType) (ca cb : ColorType) (x y : G) (p : Path x y) (ap : altpath pc ca cb p).
     Implicit Types (u v : G).
     Hypothesis Ha : is_apmax ap.
   

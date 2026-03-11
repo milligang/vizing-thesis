@@ -12,7 +12,7 @@ Unset Printing Implicit Defensive.
 
 Lemma smaller_coloring
   {G : sgraph} {v w0 wj : G} {k}
-  {c : k_edge_coloring G k} 
+  {c : kEdgeColoringType G k} 
   (f : Fan c v w0 wj) (cj : projT1 c) :
   k = max_degree G + 1 + 1 ->
   cj \in (absent_set c v :&: absent_set c wj) ->
@@ -59,8 +59,8 @@ Proof.
   - (* Induction *)
     have [v [w0] [Edef0 _]] := edgesP _ Ein0; rewrite {}Edef0 in Ein0; set G' := del_edges [set v; w0].
     have{}/IH [k' [[kc'] Hleqk']]: #|E(G')| < #|E(G)| by apply: proper_card; exact: del_edges_proper Ein0 _.
-    have : k' <= max_degree G + 1 by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg.
-    rewrite leq_eqVlt => /orP[/eqP Heqk'| Hltk']; first last.
+    have: k' <= max_degree G + 1 by apply/(leq_trans Hleqk'); rewrite leq_add2r; exact: del_edges_max_deg.
+    rewrite leq_eqVlt=> /orP[/eqP Heqk'| Hltk']; first last.
     - (* if k' < max_degree G + 1, then we are done *) 
       pose kc := k_extended_col Ein0 kc'.
       exists (k' + 1); by split; [|rewrite addn1].
@@ -111,8 +111,8 @@ Proof.
     have Hpv : v \in pth by exact: path_begin.
     have := apmax_pcat Habv1 ap0; rewrite Hapmax /= => [[q] Hq].
     have HaisMax : is_apmax apm by move: (apmax_is_max Habv1 ap0); rewrite {}Hapmax /=. 
-    have /(imset_invert apm) /eqVproper : Some c0 \in kc[E(G)] by apply/c_in_all_edge; exists [set v; wj].
-    pose Hkcp : proper_edge_coloring G (projT1 kc) :=  
+    have /(imset_invert apm) /eqVproper : Some c0 \in kc[E(G)] by apply/in_c_all_edgeP; exists [set v; wj].
+    pose Hkcp : properEdgeColoringType G (projT1 kc) :=  
       (exist _ (invert apm) (@invert_proper _ _ _ _ _ _ _ _ apm (proj2_sig (k_to_proper_coloring kc)))).
     case=> Hsi; first last.
     - exists #|Hkcp [E(G)]|.
@@ -121,7 +121,7 @@ Proof.
       rewrite card_k_col -[#|Hkcp [E(G)]|]/(#|invert apm [E(G)]|)=> Hsi.
       by rewrite -(leq_add2r 1); rewrite -addn1 in Hsi.
     have Hi : #|Hkcp [E(G)]| == (max_degree G  + 1 + 1) by rewrite Hsi card_k_col.
-    pose Hkci : k_edge_coloring G (max_degree G + 1 + 1) := existT _ (projT1 kc) (exist _ Hkcp Hi).
+    pose Hkci : kEdgeColoringType G (max_degree G + 1 + 1) := existT _ (projT1 kc) (exist _ Hkcp Hi).
     (* v is an endpint because c1 was absent here *)
     have Hcj : (invert apm) [set v; wj] = c1.
     {

@@ -12,7 +12,7 @@ Unset Printing Implicit Defensive.
 
 Section Fan.
   Variable (G : sgraph) (ColorType : finType).
-  Implicit Types (c : edge_coloring G ColorType) (v wk w : G) (e : {set G}) (f : seq G).
+  Implicit Types (c : edgeColoringType G ColorType) (v wk w : G) (e : {set G}) (f : seq G).
 
   (* 1. For all w in the fan centered at v, w is in the neighborhood of v *)
   Definition neigh_prop v f := all (fun w => w \in N(v)) f.
@@ -21,19 +21,19 @@ Section Fan.
     (v, w0) is a distinct color from the rest of the edges in the graph *)
   (* Todo: two equivalent definitions, choose one *)
   Definition w0_prop 
-    {ColorType} (c : edge_coloring G ColorType) e 
+    {ColorType} (c : edgeColoringType G ColorType) e 
   := c e \notin c[E(del_edges e)].
 
-  Lemma w0_prop_extended {e} (c_del : edge_coloring (del_edges e) ColorType)
-  : w0_prop (extended_col c_del) e.
+  Lemma w0_prop_extended {e} (c_del : edgeColoringType (del_edges e) ColorType)
+  : w0_prop (extendedColType c_del) e.
   Proof. 
-    rewrite /w0_prop /extended_col eq_refl.
+    rewrite /w0_prop /extendedColType eq_refl.
     by apply/negP => /imsetP [e' /del_edges1_neq /negbTE ->].
   Qed.
 
-  Lemma w0_col_extended {e} (c_del : edge_coloring (del_edges e) ColorType)
-  : (extended_col c_del) e = None.
-  Proof. by rewrite /extended_col eq_refl. Qed.
+  Lemma w0_col_extended {e} (c_del : edgeColoringType (del_edges e) ColorType)
+  : (extendedColType c_del) e = None.
+  Proof. by rewrite /extendedColType eq_refl. Qed.
 
     (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
     the color of (v, w_{i+1} is absent at w_i) *)
@@ -94,10 +94,10 @@ End Fan.
 
 Section Pack.
   Variables (G : sgraph) (ColorType : finType).
-  Implicit Types (c : edge_coloring G ColorType) (v w : G).
+  Implicit Types (c : edgeColoringType G ColorType) (v w : G).
 
   Section FanDef.
-    Variables (c : edge_coloring G ColorType) (v w0 w : G).
+    Variables (c : edgeColoringType G ColorType) (v w0 w : G).
 
     Record Fan : predArgType := { fval : seq G; _ : fanp c fval v w0 w }.
 
@@ -109,9 +109,9 @@ End Pack.
 
 Section FanOps.
   Variables (G : sgraph) (ColorType : finType).
-  Implicit Types (k : nat) (c : edge_coloring G ColorType) (fs : seq G).
+  Implicit Types (k : nat) (c : edgeColoringType G ColorType) (fs : seq G).
 
-  Fixpoint rotate c fs (v : G) : edge_coloring G ColorType :=
+  Fixpoint rotate c fs (v : G) : edgeColoringType G ColorType :=
     match fs with
     | w0 :: ((w1::tl) as ws) =>
         rotate
@@ -122,8 +122,8 @@ Section FanOps.
 
   Lemma Fan_of_proof 
     {v w0 : G} 
-    (c_del : edge_coloring (del_edges [set v; w0]) ColorType) 
-  : v -- w0 -> fanp (extended_col c_del) [::] v w0 w0.
+    (c_del : edgeColoringType (del_edges [set v; w0]) ColorType) 
+  : v -- w0 -> fanp (extendedColType c_del) [::] v w0 w0.
   Proof.
     by rewrite /fanp (w0_prop_extended c_del) -in_opn.
   Qed.
@@ -131,13 +131,13 @@ Section FanOps.
   Definition Fan_of_del_edges 
     {v w0 : G}
     (He : v -- w0)
-    (c_del : edge_coloring (del_edges [set v; w0]) ColorType)
+    (c_del : edgeColoringType (del_edges [set v; w0]) ColorType)
   := Build_Fan (Fan_of_proof c_del He).
 
   Lemma k_Fan_of_proof
     {k} {v w0 : G} 
     (He : [set v; w0] \in E(G))
-    (kc_del : k_edge_coloring (del_edges [set v; w0]) k) 
+    (kc_del : kEdgeColoringType (del_edges [set v; w0]) k) 
   : fanp (k_extended_col He kc_del) [::] v w0 w0.
   Proof.
     rewrite /fanp (w0_prop_extended kc_del) //=.
@@ -148,12 +148,12 @@ Section FanOps.
   Definition k_Fan_of_del_edges 
     {k} {v w0 : G}
     (He : [set v; w0] \in E(G))
-    (kc_del : k_edge_coloring (del_edges [set v; w0]) k) 
+    (kc_del : kEdgeColoringType (del_edges [set v; w0]) k) 
   := Build_Fan (k_Fan_of_proof He kc_del).
 End FanOps.
 
 Section Rotation. 
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v w0 wk : G) (f : Fan c v w0 wk).
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType) (v w0 wk : G) (f : Fan c v w0 wk).
   Implicit Type (w : G).
 
   Lemma fanW : path (fun x2 => absent_prop c [set v; x2]) wk (fval f).
@@ -180,7 +180,7 @@ Section Rotation.
     move: (valP f)=> Hf. exact: (Build_Fan (sub_fanp Hcat Hf)). 
   Qed.
 
-  Definition rotateF : edge_coloring G ColorType :=
+  Definition rotateF : edgeColoringType G ColorType :=
     rotate c (rev (wk::val f)) v.
 
   Lemma imset_rot_vertex : c[E{v}] = rotateF[E{v}].
@@ -278,7 +278,7 @@ Section Rotation.
 End Rotation.
 
 Section MaximalFan.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (v w0 : G).
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType) (v w0 : G).
   Implicit Types (wk : G) (ck : ColorType).
 
   Definition is_fanmax {wk} (f : Fan c v w0 wk) : Prop :=
@@ -321,7 +321,7 @@ Section MaximalFan.
   Proof.
     have Hinc: ck \in c[E(G)] by rewrite/absent_set in_setD in Hab; exact: proj2 (andP Hab).
     have Hatv: ck \in c[E{v}] by exact: notin_setD Hinc Hnab.
-    move/c_in_edge_neigh: Hatv=> [wj] Hine Hc.
+    move/in_c_edge_neighP: Hatv=> [wj] Hine Hc.
     exists wj; rewrite/is_fanmax in Hf; move: (Hf wj); rewrite/valid_fan_vertex.
     have -> : wj \in N(v) by rewrite in_opn -in_edges.
     by rewrite /absent_prop Hine Hc Hab eq_refl /= andbT negbK.

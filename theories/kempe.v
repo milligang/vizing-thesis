@@ -11,14 +11,14 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
 Section KempeGraph.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType) (ca cb : ColorType).
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType) (ca cb : ColorType).
 
   Definition kempe_pred := [pred e : {set G} | (c e == ca) || (c e == cb)].
 
-  Definition kempe_graph : sgraph := erestrict kempe_pred.
+  Definition kempeGraphType : sgraph := erestrict kempe_pred.
   
   Lemma kempe_edgeE (x y : G) :
-    @edge_rel kempe_graph x y =
+    @edge_rel kempeGraphType x y =
     ((c [set x; y] == ca) || (c [set x; y] == cb)) && (x -- y).
   Proof. by []. Qed.
 

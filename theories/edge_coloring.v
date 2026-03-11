@@ -15,24 +15,24 @@ Section EdgeColoring.
   Implicit Type (x : G).
 
   (* An edge coloring function assigns edges in E(G) to colors *)
-  Definition edge_coloring : Type := {set G} -> ColorType.
-  Implicit Type (c : edge_coloring).
+  Definition edgeColoringType : Type := {set G} -> ColorType.
+  Implicit Type (c : edgeColoringType).
   
   Definition is_proper_edge_coloring c : Prop := 
     forall (x : G),
     {in E{x}&, forall (e1 e2 : {set G}), c e1 = c e2 -> e1 = e2}.
 
-  Definition proper_edge_coloring : Type := { c | is_proper_edge_coloring c }.
-  Implicit Type (pc : proper_edge_coloring).
+  Definition properEdgeColoringType : Type := { c | is_proper_edge_coloring c }.
+  Implicit Type (pc : properEdgeColoringType).
 
   Coercion proper_to_edge_coloring
-    pc : edge_coloring := proj1_sig pc.
+    pc : edgeColoringType := proj1_sig pc.
 
   (* TO THINK: Should we remove this notation? It matches the write-up, but may just add confusion for the rocq code *)
   Definition coloring_image c (E : {set {set G}}) : {set ColorType} := c @: E.
   Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
 
-  Lemma c_in_edge_neigh c x (c0 : ColorType) : 
+  Lemma in_c_edge_neighP c x (c0 : ColorType) : 
     reflect (exists2 y, [set x; y] \in E(G) & c [set x; y] = c0) (c0 \in c[E{x}]).
   Proof.
     rewrite/edge_neigh; apply/(iffP idP)=>[/imsetP[e] /imsetP[y]|[y] He Hc].
@@ -42,12 +42,12 @@ Section EdgeColoring.
       apply/imsetP; exists y; by rewrite // in_opn -in_edges He.
   Qed.
   
-  Lemma c_in_all_edge c (c0 : ColorType) :
+  Lemma in_c_all_edgeP c (c0 : ColorType) :
     reflect (exists2 e, e \in E(G) & c e = c0) (c0 \in c[E(G)]).
   Proof.
     apply/(iffP idP)=> [/imsetP[e] He /esym|[e] /edgesP [x] [y] [He Hxy]] Hc; first by exists e.
     rewrite -in_edges in Hxy; rewrite He in Hc.
-    have : (c0 \in c[E{x}]) by apply/c_in_edge_neigh; exists y.
+    have: (c0 \in c[E{x}]) by apply/in_c_edge_neighP; exists y.
     rewrite -2!sub1set=> Hsub. 
     exact: (subset_trans Hsub (imsetS c (sub_all_edges x))).
   Qed.
@@ -55,8 +55,7 @@ Section EdgeColoring.
   Lemma leq_col_deg c x : #|c[E{x}]| <= max_degree G.
   Proof. 
     apply: (leq_trans (leq_imset_card _ _)).
-    rewrite card_edge_neigh.
-    rewrite /max_degree.
+    rewrite card_edge_neigh /max_degree.
     exact: leq_bigmax_cond.
   Qed.
 
@@ -68,7 +67,7 @@ Section EdgeColoring.
 
   Lemma leq_vertex_graph c x : #|c[E{x}]| <= #|c[E(G)]|.
   Proof.
-    apply: subset_leq_card (imsetS c (sub_all_edges x)).
+    exact: subset_leq_card (imsetS c (sub_all_edges x)).
   Qed.
 
   Lemma leq_maxdeg_pcol pc : max_degree G <= #|pc[E(G)]|.
@@ -87,23 +86,23 @@ Section ChromIdx.
   Implicit Types (k chi : nat).
   
   (* A k-edge-coloring is a proper coloring which uses exactly k colors *)
-  Definition k_edge_coloring k : Type := 
+  Definition kEdgeColoringType k : Type := 
     { ColorType : finType &
-      { c : proper_edge_coloring G ColorType | #|c[E(G)]| == k } }.
+      { c : properEdgeColoringType G ColorType | #|c[E(G)]| == k } }.
 
-  Coercion k_to_proper_coloring {k} (kc : k_edge_coloring k) : 
-    proper_edge_coloring G (projT1 kc) :=
+  Coercion k_to_proper_coloring {k} (kc : kEdgeColoringType k) : 
+    properEdgeColoringType G (projT1 kc) :=
     proj1_sig (projT2 kc).
 
   Definition proper_to_k_coloring 
-    {ColorType : finType} (pc : proper_edge_coloring G ColorType) 
-  : k_edge_coloring #|pc[E(G)]| := (existT _ ColorType (exist _ pc (eqxx _))).
+    {ColorType : finType} (pc : properEdgeColoringType G ColorType) 
+  : kEdgeColoringType #|pc[E(G)]| := (existT _ ColorType (exist _ pc (eqxx _))).
 
-  Definition card_k_col {k} (kc : k_edge_coloring k) :
+  Definition card_k_col {k} (kc : kEdgeColoringType k) :
     #|kc[E(G)]| = k := eqP (proj2_sig (projT2 kc)).
 
   (* G is k-colorable if a k-edge-coloring exists. *)
-  Definition k_edge_colorable k : Prop := inhabited (k_edge_coloring k).
+  Definition k_edge_colorable k : Prop := inhabited (kEdgeColoringType k).
 
   (* The chromatic index chi is the smallest k such that G is k-colorable *)
   Definition is_chromatic_index chi : Prop :=
@@ -114,8 +113,8 @@ Section ChromIdx.
     is_chromatic_index chi -> 
     max_degree G <= chi.
   Proof. 
-    do 3![elim] => ColorType H _. 
-    elim: H=> c /eqP <-.
+    do 3![elim]=> ColorType is_chiEC _. 
+    elim: is_chiEC=> ? /eqP <-.
     by rewrite leq_maxdeg_pcol.
   Qed.
 
@@ -125,11 +124,11 @@ Section ChromIdx.
     k_edge_colorable k ->
     chi <= k.
   Proof.
-    move=> [Hchi_color Hchi_min] Hk.
+    move=> [Hchi_color Hchi_min] kc.
     rewrite leqNgt.
-    apply/negP => Hlt.
-    have Hneg : ~ k_edge_colorable k := Hchi_min _ Hlt.
-    exact: Hneg Hk.
+    apply/negP=> Hlt.
+    have nkc : ~ k_edge_colorable k := Hchi_min _ Hlt.
+    exact: nkc kc.
   Qed.
 
   Lemma chi_upper_bound_trans k chi :   
@@ -137,54 +136,50 @@ Section ChromIdx.
     (exists n, k_edge_colorable n /\ n <= k) ->
     chi <= k.
   Proof.
-    move=> Hchi [n] [Hk Hltn].
-    have Hltk : chi <= n by exact/chi_upper_bound.
-    exact (leq_trans Hltk Hltn).
+    move=> ? [n] [? n_lt_k].
+    have chi_lt_n : chi <= n by exact/chi_upper_bound.
+    exact (leq_trans chi_lt_n n_lt_k).
   Qed.
 
   (* ----  One-to-one Coloring ---- *)
 
   (* TO THINK: we could use Program Definition, is this better? Should we do this elsewhere too? *)
-  (* Program Definition in_edge_coloring2 : proper_edge_coloring G {set G} := 
+  (* Program Definition in_edge_coloring2 : properEdgeColoringType G {set G} := 
     fun e => e. *)
 
   (* injective coloring: each edge is a color *)
-  Definition inj_edge_coloring : edge_coloring G {set G} :=
+  Definition injEdgeColoringType : edgeColoringType G {set G} :=
     fun e => e.
 
-  Definition proper_inj_coloring : proper_edge_coloring G {set G}.
+  Definition proper_inj_coloring : properEdgeColoringType G {set G}.
   Proof.
-    exists inj_edge_coloring.
+    exists injEdgeColoringType.
     by move=> _ e1 e2 _ _ eq.
   Defined.
 
   Lemma imset_inj : proper_inj_coloring[E(G)] = E(G). 
   Proof.
-    apply/setP => e.
-    apply/imsetP/idP.
-    - move=> [e' He' ->].
-      by rewrite /proper_inj_coloring /inj_edge_coloring /=.
-    - move=> He.
-      exists e => //.
+    apply/setP=> e.
+    apply/imsetP/idP=> [[e'] He' -> |He]; last by exists e.
+    by rewrite /proper_inj_coloring /injEdgeColoringType.
   Qed.
 
-  Definition inj_k_coloring : k_edge_coloring #|E(G)|.
+  Definition inj_k_coloring : kEdgeColoringType #|E(G)|.
   Proof.
-    exists {set G}, proper_inj_coloring. by rewrite imset_inj.
+    exists {set G}, proper_inj_coloring; by rewrite imset_inj.
   Defined.
 
   (* Thus, all graphs have a k-edge-coloring with k = #|E(G)|*)
   Lemma inj_chrom : k_edge_colorable #|E(G)|.
   Proof.
-    constructor. exact inj_k_coloring.
+    constructor; exact inj_k_coloring.
   Qed.
 
   (* If chi is a chromatic index of G, then chi <= |E(G)| *)
-  Corollary chromatic_index_le_edges chi :
-    is_chromatic_index chi -> chi <= #|E(G)|.
+  Corollary chromatic_index_le_edges chi (is_chi : is_chromatic_index chi) :
+    chi <= #|E(G)|.
   Proof.
-    move=> Hchi. 
-    apply (chi_upper_bound Hchi inj_chrom).
+    exact: (chi_upper_bound is_chi inj_chrom).
   Qed.
 
   (* TO THINK: could also prove chromatic index exists and is unique *)
@@ -195,23 +190,23 @@ Section AbsentSet.
   Implicit Types (x y : G).
 
   Definition absent_set {ColorType : finType} 
-    (c : edge_coloring G ColorType) x :=
+    (c : edgeColoringType G ColorType) x :=
     setD (c[E(G)]) (c[E{x}]).
 
-  Lemma absent_edge {ColorType : finType} (c : edge_coloring G ColorType) (c0 : ColorType) x y :
+  Lemma absent_edge {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y :
     c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
   Proof.
-    move=> /setDP[_ /memPnC Hnin] Hn.
-    have Hin : c [set x; y] \in c[E{x}].
+    move=> /setDP[_ /memPnC Hnin] ?.
+    have in_cneigh : c [set x; y] \in c[E{x}].
     { by apply/imsetP; exists [set x; y]; first by apply/imsetP; exists y. }
-    by apply Hnin.
+    apply Hnin; exact: in_cneigh.
   Qed.
 
-  Proposition exists_absent_color {k : nat} (kc : k_edge_coloring G k):
+  Proposition exists_absent_color {k : nat} (kc : kEdgeColoringType G k):
     max_degree G + 1 <= k ->
     forall x : G, exists c, c \in (absent_set kc x).
   Proof.
-    rewrite addn1=> Hk x; apply/set0Pn.
+    rewrite addn1=> ? x; apply/set0Pn.
     rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
     by rewrite subn_gt0 (card_k_col kc) (leq_ltn_trans (leq_col_deg kc x)).
   Qed.
@@ -221,21 +216,21 @@ End AbsentSet.
 Section ExtendCol. 
   Variables (G : sgraph) (del_e : {set G}) (He : del_e \in E(G)).
 
-  Definition extended_col 
+  Definition extendedColType 
     {ColorType : finType}
-    (c : edge_coloring (del_edges del_e) ColorType)
-  : edge_coloring G (option ColorType) :=
+    (c : edgeColoringType (del_edges del_e) ColorType)
+  : edgeColoringType G (option ColorType) :=
     fun e => if e == del_e then None else Some (c e).
 
   Lemma proper_extended_col
     {ColorType : finType}
-    (pc : proper_edge_coloring (del_edges del_e) ColorType)
-  : is_proper_edge_coloring (extended_col pc).
+    (pc : properEdgeColoringType (del_edges del_e) ColorType)
+  : is_proper_edge_coloring (extendedColType pc).
   Proof.
     move:pc => [c Hp] x f0 f1 Hf0 Hf1.
-    rewrite/extended_col.
+    rewrite /extendedColType.
     case H00: (f0 == del_e); case H10 : (f1 == del_e) => //.
-    - move/eqP: H00 => ->; move/eqP: H10 => -> //.
+    - move/eqP: H00=> ->; move/eqP: H10 => -> //.
     move=> [Heq]; apply (Hp x); last by [];
     move/negbT: H00=> H00; move/negbT: H10=> H10;
     move/(subsetP (sub_all_edges x)): (Hf0)=> Hf0G;
@@ -248,10 +243,10 @@ Section ExtendCol.
   (* TODO: Should be straightforward, need to figure out which tactic to use *)
   Lemma card_extended_col 
     {k : nat} 
-    (kc : k_edge_coloring (del_edges del_e) k) 
-  : #|extended_col kc[E(G)]| = k + 1.
+    (kc : kEdgeColoringType (del_edges del_e) k) 
+  : #|extendedColType kc[E(G)]| = k + 1.
   Proof. 
-    rewrite/extended_col/coloring_image.
+    rewrite /extendedColType /coloring_image.
     rewrite (del_edges1 He).
     rewrite imsetU1 eq_refl.
     (* under eq_imset => e. rewrite (del_edges1_neq). *)
@@ -260,20 +255,20 @@ Section ExtendCol.
     (* exists (option CT), (proper_extended_col pc). *)
   Admitted.
 
-  (* extended_col of a k-edge-coloring produces a (k+1)-edge-coloring *)
+  (* extendedColType of a k-edge-coloring produces a (k+1)-edge-coloring *)
   Definition k_extended_col 
     {k : nat}
-    (kc : k_edge_coloring (del_edges del_e) k)
-  : k_edge_coloring G (k + 1).
+    (kc : kEdgeColoringType (del_edges del_e) k)
+  : kEdgeColoringType G (k + 1).
   Proof.
     exists (option (projT1 kc)), 
-    (exist _ (extended_col kc) (@proper_extended_col _ kc));
+    (exist _ (extendedColType kc) (@proper_extended_col _ kc));
     by rewrite (card_extended_col kc). 
   Defined.
 
   Lemma extended_absent 
     {k : nat}
-    {kc : k_edge_coloring (del_edges del_e) k}
+    {kc : kEdgeColoringType (del_edges del_e) k}
     {c0 : projT1 kc}
     {x : G}
   : c0 \in absent_set kc x -> Some c0 \in absent_set (k_extended_col kc) x.
@@ -283,10 +278,10 @@ Section ExtendCol.
 End ExtendCol.
 
 Section Recolor.
-  Variables (G : sgraph) (ColorType : finType) (c : edge_coloring G ColorType).
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType).
   Implicit Types (e f : {set G}).
 
-  Definition recolor_edge e c0 : edge_coloring G ColorType :=
+  Definition recolor_edge e c0 : edgeColoringType G ColorType :=
     fun edge => if edge == e then c0 else c edge.
 
   Lemma recolor_eq e c0 : (recolor_edge e c0) e = c0.
@@ -310,11 +305,6 @@ Section Recolor.
   Proof.
   Admitted.
 
-  (* TO DO: will likely make a lemma related to absent set, since we will use similar logic for swap_proper_vertex
-    but this specifically is needed for the smaller lemma at the end, 
-    mostly just LOTS of case work now though reasonably straightforward
-    some of the cases are relatively similar
-  *)
   Lemma recolor_proper (x y : G) c0 :
     is_proper_edge_coloring c ->
     c0 \in (absent_set c x :&: absent_set c y) ->
@@ -363,7 +353,7 @@ Section Recolor.
     by rewrite add0n add1n subn1.
   Qed.
 
-  Definition swap_edge e f : edge_coloring G ColorType :=
+  Definition swap_edge e f : edgeColoringType G ColorType :=
     fun edge => 
       if edge == e then c f
       else if edge == f then c e
@@ -399,7 +389,7 @@ Section Recolor.
     move=> He0 He1; apply/setP=> c0.
     apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
     exists (if e2 == e then f else if e2 == f then e else e2) => //;
-    repeat case: ifP => //; repeat move=> /eqP -> //; try rewrite eq_refl //.
+    repeat case: ifP=> //; repeat move=> /eqP -> //; try rewrite eq_refl //.
     - do 2 move=> _ -> //.
     - move=> _ /eqP -> //.
   Qed.
