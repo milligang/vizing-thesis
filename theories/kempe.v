@@ -1,7 +1,7 @@
 From HB Require Import structures.
 From mathcomp Require Import all_boot.
 From GraphTheory Require Import edone preliminaries digraph sgraph.
-Require Import aux edge_coloring fans.
+Require Import aux spath edge_coloring fans.
 From Equations Require Import Equations.
 
 Set Warnings "-notation-overridden, -notation-incompatible-prefix".
@@ -101,18 +101,25 @@ Section InvertChain.
       if (c e == ca) then cb else ca
     else c e.
 
-  Lemma imset_eq_invert : 
+  Lemma imset_invert_sub : 
     ca \in c[E(G)] -> 
     cb \in c[E(G)] ->
-    c[E(G)] = invertedChain[E(G)].
+    invertedChain[E(G)] \subset c[E(G)].
   Proof.
-  Admitted.
+    rewrite /invertedChain=> /in_c_all_edgeP [ea] ea_in_e ea_ca /in_c_all_edgeP [eb] eb_in_e eb_cb.
+    apply/subsetP=> c0 /in_c_all_edgeP [e] e_in_e <-. 
+    apply/in_c_all_edgeP.
+    case e_in_chain: ((e \in E(kempe_graph c ca cb)) && (e \subset chain)); last by exists e; rewrite // e_in_chain.
+    move: e_in_chain; rewrite mem_kempe=> /andP[/andP[_ /orP[/eqP ->|/eqP ->]] e_in_chain];
+    [rewrite eq_refl | case ca_cb : (cb == ca); last by exists ea]; by exists eb.
+  Qed.
 
   Lemma not_kempe_edge e :
-    (e \notin E(kempe_graph c ca cb)) || ~~ (e \subset chain) ->
+    (e \notin E(kempe_graph c ca cb)) \/ ~ (e \subset chain) ->
     c e = invertedChain e.
   Proof.
-  Admitted.
+    by case=> [|/negP] not_in; rewrite /invertedChain (negbTE not_in).
+  Qed.
 
   Lemma is_kempe_edge e : 
     (e \in E(kempe_graph c ca cb)) -> 
@@ -120,7 +127,11 @@ Section InvertChain.
     (c e = ca <-> invertedChain e = cb) /\
     (c e = cb <-> invertedChain e = ca).
   Proof.
-  Admitted.
+    rewrite /invertedChain mem_kempe=> /andP[-> /orP[e_c | e_c]] ->;
+    split; split; move/eqP: (e_c)=> ->; rewrite eq_refl //= orbT /=;
+    first by move=> ->; rewrite eq_refl.
+    all: case eq_ab: (cb == ca); by move/eqP: eq_ab.
+  Qed.
 
   Lemma in_inverted_absent (u : G) :
     u \in chain -> 

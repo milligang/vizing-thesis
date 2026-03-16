@@ -1,7 +1,7 @@
 From HB Require Import structures.
 From mathcomp Require Import all_boot.
 From GraphTheory Require Import edone preliminaries digraph sgraph.
-Require Import aux edge_coloring fans.
+Require Import aux spath edge_coloring fans.
 From Equations Require Import Equations.
 
 Set Warnings "-notation-overridden, -notation-incompatible-prefix".

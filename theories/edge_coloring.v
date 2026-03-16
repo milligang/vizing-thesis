@@ -363,8 +363,8 @@ Section Recolor.
     c e \notin c[E(del_edges e)] -> 
     #|recolor_edge e c0 [E(G)]| = #|c[E(G)]| - 1.
   Proof.
-    move=> He.
-    rewrite (del_edges1 He).
+    move=> e_in_e.
+    rewrite (del_edges1 e_in_e).
     move: (del_edges_imset_recolor e c0).
     rewrite /coloring_image 2!imsetU1 2!cardsU1 recolor_eq => -> -> -> /=.
     by rewrite add0n add1n subn1.
