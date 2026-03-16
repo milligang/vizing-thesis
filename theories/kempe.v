@@ -141,10 +141,23 @@ Section InvertChain.
   Proof. 
   Admitted.
 
-  Lemma inverted_fan {u v : G} (f : Fan c x v u) : 
+  Lemma inverted_fan {u v : G} (fan : Fan c x v u) : 
     is_proper_edge_coloring c ->   
     (ca \in absent_set c x) \/ (cb \in absent_set c x) -> 
-    Fan (invertedChain) x v u.
+    exists ifan : Fan (invertedChain) x v u, fval fan = fval ifan.
+  Proof.
+  Admitted.
+
+  Definition chain_endpt (u : G) :=
+    (ca \in absent_set c u) \/ (cb \in absent_set c u). 
+
+  Lemma chain_endptP (u : G) :
+    (ca \in absent_set c u) \/ (cb \in absent_set c u) -> chain_endpt u.
+  Proof. by []. Qed.
+
+  Proposition chain_two_endpts (u v w : G) :
+    chain_endpt u /\ chain_endpt v /\ chain_endpt w ->
+    (u \notin chain) \/ (v \notin chain) \/ (w \notin chain).
   Proof.
   Admitted.
 

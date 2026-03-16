@@ -192,7 +192,7 @@ Proof.
   have := (fanmax_present is_fmax Hnabv0 Habw0)=> [[wj] /andP[Einj /andP[/eqP Hkcj Hfanj]]] {is_fmax Hnabv0}.
   have Evj : v -- wj by rewrite in_edges in Einj.
   (* split fan at wj as f1 and (wj::f2) *)
-  case/splitPr fsplit: (w::val fmax)/Hfanj => [f1 f2 _].
+  case/splitPr fsplit: (w::fval fmax)/Hfanj=> [f1 f2 _].
   case: f2 fsplit=> [|wi f2'] fsplit.
   - (* contradiction if f2 is empty *)
     have Hneqj0 : wj != w0.
@@ -203,7 +203,7 @@ Proof.
     }
     by rewrite -(fan_last fmax) -(last_cons w w) fsplit cats1 last_rcons eq_refl in Hneqj0.
   (* so f2 is non-empty, i.e. wi != w0 *)
-  have Habwi0 : Some ck \in absent_set kc wi.
+  have kc_wia_ck : Some ck \in absent_set kc wi.
   { 
     move: fsplit. 
     by case: f1=> [|wk f1']; [rewrite cat0s|]; 
@@ -216,10 +216,11 @@ Proof.
 
   (* Construct ck cv Kempe Chain containing v *)
   pose chain := kempe_chain kc (Some ck) cv v.
+  have chain_refl : chain = kempe_chain kc (Some ck) cv v by [].
   set ic := invertedChain (kempe_chain kc (Some ck) cv v).
-  have imset_kc_ic : kc[E(G)] = ic[E(G)] := imset_eq_invert erefl (absent_in_imset Habwi0) (absent_in_imset Habv1).
+  have imset_kc_ic : kc[E(G)] = ic[E(G)] := imset_eq_invert chain_refl (absent_in_imset kc_wia_ck) (absent_in_imset Habv1).
   set ipc : properEdgeColoringType G (projT1 kc) :=  
-    (exist _ (ic) (@inverted_proper _ _ _ _ _ _ chain erefl (proj2_sig (k_to_proper_coloring kc)))).
+    (exist _ (ic) (inverted_proper chain_refl (proj2_sig (k_to_proper_coloring kc)))).
   have card_ic : #|ic[E(G)]| == (max_degree G  + 1 + 1) by rewrite -imset_kc_ic card_k_col.
   pose ikc : kEdgeColoringType G (max_degree G + 1 + 1) := existT _ (projT1 kc) (exist _ ipc card_ic).
   have v_in_v := (@in_component_of (kempe_graph kc (Some ck) cv) v).
@@ -230,22 +231,29 @@ Proof.
     split; first by exact: v_in_v.
     by apply (@edge_in_component (kempe_graph kc (Some ck) cv) _).
   }
-  have ic_vwj_cv : ic [set v; wj] = cv by apply (iffLR (proj1 (is_kempe_edge erefl vwj_in_kempe vwj_in_chain))). 
-  have ikc_fmax : Fan ikc v w0 w := @inverted_fan _ _ _ _ _ _ chain erefl _ _ fmax (proj2_sig (k_to_proper_coloring kc)) (or_intror Habv1).
+  have ic_vwj_cv : ic [set v; wj] = cv by apply (iffLR (proj1 (is_kempe_edge chain_refl vwj_in_kempe vwj_in_chain))). 
+  have [ikc_fmax fvalmax] : (exists _ : Fan ikc v w0 w, _) := @inverted_fan _ _ _ _ _ _ chain erefl _ _ fmax (proj2_sig (k_to_proper_coloring kc)) (or_intror Habv1).
   have ic_va_ck : Some ck \in absent_set ikc v.
   {
-    have [_ H] := @in_inverted_absent _ _ _ _ _ _ chain erefl _ v_in_v.
+    have [_ H] := in_inverted_absent chain_refl v_in_v.
     by apply H.
   }
-  case: (boolP (wi \in chain))=> wi_nin_v; exists (max_degree G + 1).
-  - have w_nin_v : w \notin chain by admit.
-    rewrite (notin_inverted_absent erefl w_nin_v imset_kc_ic) in Habw0.
+  case: (boolP (wi \in chain))=> wi_in_v; exists (max_degree G + 1).
+  - have w_nin_v : w \notin chain by 
+    case
+      (chain_two_endpts chain_refl
+        (conj (chain_endptP (or_intror Habv1))
+        (conj (chain_endptP (or_introl kc_wia_ck))
+              (chain_endptP (or_introl Habw0)))
+      )); 
+    [rewrite v_in_v | case; [rewrite wi_in_v|]].
+    rewrite (notin_inverted_absent chain_refl w_nin_v imset_kc_ic) in Habw0.
     have Hcap : (Some ck \in absent_set ikc v :&: absent_set ikc w) by apply/setIP/(conj ic_va_ck Habw0).
     by have := (smaller_coloring ikc_fmax erefl Hcap).
-  - rewrite (notin_inverted_absent erefl wi_nin_v imset_kc_ic) in Habwi0.
-    rewrite {}(invert_fan_nodes HaisMax fmax ikc_fmax) in fsplit.
+  - rewrite (notin_inverted_absent chain_refl wi_in_v imset_kc_ic) in kc_wia_ck.
+    rewrite -[\val fmax]/(fval fmax) fvalmax in fsplit.
     have ikc_fsmallest : Fan ikc v w0 wi := sub_fan fsplit.
-    have Hcap : (Some ck \in absent_set ikc v :&: absent_set ikc wi) by apply/setIP/(conj Habv0 Habwi0).
+    have Hcap : (Some ck \in absent_set ikc v :&: absent_set ikc wi) by apply/setIP/(conj ic_va_ck kc_wia_ck).
     by have := (smaller_coloring ikc_fsmallest erefl Hcap).
 Qed.
 
