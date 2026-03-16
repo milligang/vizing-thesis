@@ -46,6 +46,14 @@ Section KempeGraph.
 
   Lemma in_chain x : x \in kempe_chain x.
   Proof. exact: in_component_of. Qed.
+
+  Lemma edge_in_component (H : sgraph) (u v : H) :
+    [set u; v] \in E(H) -> v \in component_of u.
+  Proof.
+    rewrite in_edges=> /edgep p.
+    by apply/components_pblockP; exists p.
+  Qed.
+
 End KempeGraph.
 
 Section InvertGraph.
@@ -84,40 +92,68 @@ Section InvertGraph.
 End InvertGraph. 
 
 Section InvertChain.
-  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType) (ca cb : ColorType) (x : G).
-  Let kc := kempe_chain c ca cb x.
-  
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType) (ca cb : ColorType) (x : G) (chain : {set kempe_graph c ca cb}).
+  Hypothesis chain_x : chain = kempe_chain c ca cb x.
+
   (* techincally, just e \in subset kc could be enough, but this will be easier to reason about *)
   Definition invertedChain (e : {set G}) :=
-    if ((e \in E(kempe_graph c ca cb)) && (e \subset kc)) then 
+    if ((e \in E(kempe_graph c ca cb)) && (e \subset chain)) then 
       if (c e == ca) then cb else ca
     else c e.
 
-  Lemma sub_imset_eq_invert : 
-    c[E(G)] :\: ([set ca] :|: [set cb]) = invertedChain[E(G)] :\: ([set ca] :|: [set cb]).
-  Proof.
-  Admitted.
-
   Lemma imset_eq_invert : 
-    ca \in c[E(G)] -> cb \in c[E(G)] ->
+    ca \in c[E(G)] -> 
+    cb \in c[E(G)] ->
     c[E(G)] = invertedChain[E(G)].
   Proof.
   Admitted.
 
   Lemma not_kempe_edge e :
-    e \notin E(kempe_graph c ca cb) -> c e = invertedChain e.
+    (e \notin E(kempe_graph c ca cb)) || ~~ (e \subset chain) ->
+    c e = invertedChain e.
   Proof.
   Admitted.
 
-  Lemma is_kempe_edge e : e \in E(G) ->
+  Lemma is_kempe_edge e : 
+    (e \in E(kempe_graph c ca cb)) -> 
+    (e \subset chain) -> 
     (c e = ca <-> invertedChain e = cb) /\
     (c e = cb <-> invertedChain e = ca).
   Proof.
   Admitted.
 
+  Lemma in_inverted_absent (u : G) :
+    u \in chain -> 
+    (ca \in absent_set c u <-> cb \in absent_set invertedChain u) /\
+    (cb \in absent_set c u <-> ca \in absent_set invertedChain u).
+  Proof.
+  Admitted.
+
+  Lemma notin_inverted_absent (u : G) :
+    u \notin chain -> 
+    c[E(G)] = invertedChain[E(G)] ->
+    absent_set c u = absent_set invertedChain u.
+  Proof.
+  Admitted.
+
   Lemma inverted_proper : 
-    is_proper_edge_coloring c -> is_proper_edge_coloring invertedEdgeColoring.
+    is_proper_edge_coloring c -> is_proper_edge_coloring invertedChain.
   Proof. 
   Admitted.
+
+  Lemma inverted_fan {u v : G} (f : Fan c x v u) : 
+    is_proper_edge_coloring c ->   
+    (ca \in absent_set c x) \/ (cb \in absent_set c x) -> 
+    Fan (invertedChain) x v u.
+  Proof.
+  Admitted.
+
+  (*
+  x and y both degree 1 in chain
+  path from x to y
+  z also degree 1, wts not in chain
+  suppose it is, then path x z and path y z (both irred)
+  
+  *)
 
 End InvertChain.

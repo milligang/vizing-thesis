@@ -115,20 +115,25 @@ Section EdgeNeighboorhood.
       by rewrite in_opn in Hw.
   Qed.
 
+  Lemma edge_neigh_self {G : sgraph} {x y : G} (xy : x -- y) : [set x; y] \in E{x}.
+  Proof.
+    rewrite /edge_neigh; apply/imsetP; exists y;
+    by rewrite -in_opn in xy.
+  Qed.
+
   Lemma edge_neigh_edge {G : sgraph} (x y : G) (e : {set G}) : 
     ((e \in E{x}) && (e \in E{y}) && (x != y)) <-> (e == [set x; y]) && x -- y.
   Proof.
-    split=> [/andP[/andP[/imsetP[z1] Hn1 He1 /imsetP[z2] Hn2 He2]]| /andP[/eqP Heq Heg]].
+    split=> [/andP[/andP[/imsetP[z1] Hn1 He1 /imsetP[z2] Hn2 He2]]| /andP[/eqP Heq xy]].
     - rewrite He2 in He1.
       case: (iffLR (doubleton_eq_iff y z2 x z1) He1);
       move=> [Hxy Hz]; first by rewrite Hxy eqxx.
       rewrite in_opn -Hxy in Hn1; rewrite Hz setUC in He2.
       by move/eqP: He2.
-    - move: (Heg)=> /sg_edgeNeq ->.
-      rewrite/edge_neigh /=; apply/andP; split; [apply/andP; split| by []]; apply/imsetP.
-      + by exists y; move: Heg; rewrite -in_opn.
-      + exists x; first by move: Heg; rewrite sg_sym -in_opn.
-        rewrite Heq. by apply/doubleton_eq_iff; right.
+    - move: (xy)=> /sg_edgeNeq ->.
+      rewrite Heq (edge_neigh_self xy).
+      have -> : [set x; y] = [set y; x] by apply/doubleton_eq_iff; right.
+      by rewrite sg_sym in xy; rewrite (edge_neigh_self xy).
   Qed.
 
   Lemma del_edges_edge_neigh (G : sgraph) (A e : {set G}) (x : G) : 

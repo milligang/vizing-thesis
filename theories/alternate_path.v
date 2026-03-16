@@ -242,16 +242,6 @@ Section Invert.
   Proof.
   Admitted.
 
-    (* Definition k_invert 
-    {ca cb p} 
-    (ap : altpath ca cb p)
-    (Hpc : is_proper_edge_coloring c)
-    (Hca : ca \in c[E(G)])
-  : kEdgeColoringType G #|c[E(G)]|.
-  Proof.
-    refine (existT _ ColorType (exist _ (exist _ (invert ap) (invert_proper Hpc)) _)).
-    exact: card_invert Hca.
-  Defined. *)
 End Invert.
 
 Section InvertProp.

@@ -28,6 +28,17 @@ Section EdgeColoring.
   Coercion proper_to_edge_coloring
     pc : edgeColoringType := proj1_sig pc.
 
+  Lemma single_colored_proper pc {x y z : G} (xy : x -- y) (xz : x -- z) (c0 : ColorType) : 
+    (sval pc) [set x; y] = c0 -> 
+    ((sval pc) [set x; z] = c0) <-> (y = z).
+  Proof.
+    have := (proj2_sig pc); rewrite/is_proper_edge_coloring=> is_pc xy_c0.
+    specialize (is_pc x [set x; y] [set x; z]).
+    split=> [z_eq| <- //].
+    rewrite z_eq in is_pc.
+    by apply/(doubleton_eq_left x)/is_pc; try apply/edge_neigh_self.
+  Qed.
+
   (* TO THINK: Should we remove this notation? It matches the write-up, but may just add confusion for the rocq code *)
   Definition coloring_image c (E : {set {set G}}) : {set ColorType} := c @: E.
   Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
@@ -192,6 +203,12 @@ Section AbsentSet.
   Definition absent_set {ColorType : finType} 
     (c : edgeColoringType G ColorType) x :=
     setD (c[E(G)]) (c[E{x}]).
+
+  Lemma absent_in_imset {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x :
+    c0 \in absent_set c x -> c0 \in c[E(G)].
+  Proof.
+    by move=>/setDP [? _].
+  Qed.
 
   Lemma absent_edge {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y :
     c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
