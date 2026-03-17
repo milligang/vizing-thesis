@@ -245,9 +245,31 @@ Proof.
     by apply H.
   }
   case: (boolP (wi \in chain))=> wi_in_v; exists (max_degree G + 1).
-  - have w_nin_v : w \notin chain by 
+  - have /andP[vNwi /andP[wiNw vNw]] : [&& v != wi, wi != w & v != w].
+    {
+      have w_in_f : w \in w::val fmax by rewrite in_cons eq_refl.  
+      have eq_fmax : val fmax = behead ((f1 ++ [:: wj]) ++ wi :: f2') by rewrite -fsplit.
+      have wi_in_fmax : wi \in val fmax. 
+      {
+        rewrite eq_fmax; case: f1 fsplit eq_fmax=> [|hd tl] _; first by rewrite cat0s cat1s /behead in_cons eq_refl.
+        by rewrite -catA cat_cons /behead catA mem_cat in_cons eq_refl.
+      }
+      have wi_in_f : wi \in w::val fmax by rewrite in_cons wi_in_fmax.
+      have := fan_uniq fmax; rewrite cons_uniq=> /andP[w_nin_fmax _].
+      case: (boolP (v != wi))=> [vNwi|/negbNE /eqP vEwi];
+      [rewrite andTb; case: (boolP (wi != w))=> [wiNw|/negbNE /eqP wiEw];
+        [rewrite andTb; case: (boolP (v != w))=> [vNw|/negbNE /eqP vEw]=> //;
+          have := in_neigh w_in_f;
+          rewrite in_opn vEw=> /sg_edgeNeq /eqP; contradiction
+        | rewrite andFb; rewrite wiEw in wi_in_fmax; by rewrite (wi_in_fmax) in w_nin_fmax]
+      |
+        rewrite andFb; have := in_neigh wi_in_f; 
+        rewrite in_opn vEwi=> /sg_edgeNeq /eqP; contradiction
+      ].
+    }
+    have w_nin_v : w \notin chain by 
     case
-      (chain_two_endpts chain_refl
+      (chain_two_endpts chain_refl vNwi wiNw vNw
         (conj (chain_endptP (or_intror Habv1))
         (conj (chain_endptP (or_introl kc_wia_ck))
               (chain_endptP (or_introl Habw0)))

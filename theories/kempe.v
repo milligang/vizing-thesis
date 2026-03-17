@@ -196,7 +196,12 @@ Section KempeProper.
 
   Lemma inverted_proper : 
     is_proper_edge_coloring (invertedChain chain).
-  Proof. 
+  Proof.
+    have := proj2_sig pc. 
+    rewrite /is_proper_edge_coloring /invertedChain => is_pc u e1 e2.
+    specialize (is_pc u e1 e2).
+    case: ifP=> [|/negbT]; [case: ifP=> /eqP c_e1|]; (case: ifP; [case: ifP=> /eqP c_e2|]).
+    -
   Admitted.
 
   Definition chain_endpt u :=

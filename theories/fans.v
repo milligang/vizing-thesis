@@ -55,6 +55,9 @@ Section Fan.
   Lemma fanp_last c f v w0 wk : fanp c f v w0 wk -> last wk f = w0.
   Proof. by case/andP=> /andP[/andP[/andP[/eqP-> _] _] _] _. Qed.
 
+  Lemma fanp_uniq c f v w0 wk : fanp c f v w0 wk -> uniq (wk::f).
+  Proof. by case/andP=> /andP[/andP[/andP[_ ->] _] _]. Qed.
+
   Lemma fanp_w0_prop c f v w0 wk : fanp c f v w0 wk -> w0_prop c [set v; w0].
   Proof. by case/andP=> /andP [_ ->] _. Qed.
 
@@ -161,6 +164,9 @@ Section Rotation.
 
   Lemma fan_last : last wk (val f) = w0.
   Proof. move: (valP f); exact: fanp_last. Qed.
+
+  Lemma fan_uniq : uniq (wk::val f).
+  Proof. move: (valP f); exact: fanp_uniq. Qed.
 
   Lemma fan_neigh : neigh_prop v (wk::val f).
   Proof. move: (valP f); exact: fanp_neigh. Qed.
