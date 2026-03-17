@@ -44,9 +44,6 @@ Section KempeGraph.
   (* A kempe chain is a single component of a kempe graph containing a given vertex *)
   Definition kempe_chain x := @component_of kempe_graph x.
 
-  Lemma in_chain x : x \in kempe_chain x.
-  Proof. exact: in_component_of. Qed.
-
   Lemma edge_in_component (H : sgraph) (u v : H) :
     [set u; v] \in E(H) -> v \in component_of u.
   Proof.
@@ -197,11 +194,23 @@ Section KempeProper.
   Lemma inverted_proper : 
     is_proper_edge_coloring (invertedChain chain).
   Proof.
-    have := proj2_sig pc. 
-    rewrite /is_proper_edge_coloring /invertedChain => is_pc u e1 e2.
-    specialize (is_pc u e1 e2).
-    case: ifP=> [|/negbT]; [case: ifP=> /eqP c_e1|]; (case: ifP; [case: ifP=> /eqP c_e2|]).
-    -
+    have := proj2_sig pc.
+    rewrite /is_proper_edge_coloring /invertedChain => is_pc u e1 e2 e1_in_e e2_in_e.
+    specialize (is_pc u e1 e2 e1_in_e e2_in_e).
+    case: ifP=> [|/negbT]; [case: ifP=> /eqP c_e1|]; (case: ifP; [case: ifP=> [/eqP c_e2|c_e2]|]).
+    - move=> _ _ _; apply: is_pc.
+      have -> : sval pc e1 = ca by exact: c_e1.
+      by have -> : sval pc e2 = ca by exact: c_e2.
+    - rewrite mem_kempe c_e2=> contra _ aEb. rewrite aEb c_e2 andbF // in contra. 
+    - move=> + e1_in_C c_e2.
+      move: e1_in_e e2_in_e; rewrite mem_edge_graph=> /andP[e2_in_G u_in_e2].
+      (* have e2_in_K : e2  \in E(kempe_graph pc ca cb) by rewrite mem_kempe e2_in_G c_e2 eq_refl.
+      rewrite e2_in_K /=.
+      move/edgesP: (e2_in_G)=> [w] [y]. *)
+
+      (* Lemma edge_in_component (H : sgraph) (u v : H) :
+      [set u; v] \in E(H) -> v \in component_of u.
+    edge_in_component *)
   Admitted.
 
   Definition chain_endpt u :=
