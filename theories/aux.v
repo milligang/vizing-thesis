@@ -121,6 +121,17 @@ Section EdgeNeighboorhood.
     by rewrite -in_opn in xy.
   Qed.
 
+  Lemma mem_edge_graph {G : sgraph} (x : G) (e : {set G}) :
+    (e \in E{G;x}) = (e \in E(G)) && (x \in e).
+  Proof.
+    rewrite /edge_neigh.
+    apply/imsetP/andP => [[y Hy ->] | [/edgesP [u [v [-> uv]]] Hx]];
+    first by rewrite !inE eqxx in_edges -in_opn.
+    case/set2P : Hx => ?; subst; [exists v | exists u]; try rewrite in_opn; rewrite //;
+    first by rewrite sg_sym.
+    by apply/doubleton_eq_iff; right.
+  Qed. 
+
   Lemma edge_neigh_edge {G : sgraph} (x y : G) (e : {set G}) : 
     ((e \in E{x}) && (e \in E{y}) && (x != y)) <-> (e == [set x; y]) && x -- y.
   Proof.
