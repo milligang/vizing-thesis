@@ -168,7 +168,7 @@ Section KempeProper.
     exact: Hc.
   Qed.
 
-  Lemma deg_kempe u : 
+  Lemma max_deg_kempe u : 
     #|N(kempe_graph pc ca cb;u)| <= 2.
   Proof.
     rewrite -card_edge_neigh.
@@ -177,6 +177,21 @@ Section KempeProper.
     - rewrite cards2; by case: (ca == cb).
     apply/subset_leq_card/subsetP=> col /imsetP [e + ->].
     by rewrite !inE mem_edge_graph (@mem_kempe G _ pc ca cb _)=> /andP[/andP[_ ->] _].
+  Qed.
+
+  Lemma min_deg_kempe u v :
+    u \in chain -> v \in chain -> u != v -> 0 < #|N(kempe_graph pc ca cb;u)| /\ 0 < #|N(kempe_graph pc ca cb;v)|.
+  Proof.
+    rewrite chain_x /kempe_chain=> /same_component comp_u v_in uNv.
+    have u_connect : connected (@component_of (kempe_graph pc ca cb) u) := @connected_component_of (kempe_graph pc ca cb) u.
+    have u_in_u : u \in @component_of (kempe_graph pc ca cb) u := @in_component_of (kempe_graph pc ca cb) u.
+    have v_in_u : v \in @component_of (kempe_graph pc ca cb) u by rewrite -comp_u in v_in.
+    case: (path_in_connected u_connect u_in_u v_in_u)=> p Ip _.
+    split; apply/card_gt0P.
+    - case: (splitL p uNv)=> w [+] _.
+      by exists w; rewrite in_opn.
+    - case: (splitR p uNv) => w [_] [wv] _.
+      by exists w; rewrite in_opn sg_sym.
   Qed.
 
   Lemma inverted_proper : 
@@ -214,32 +229,21 @@ Section KempeProper.
     chain_endpt u /\ chain_endpt v /\ chain_endpt w ->
     (u \notin chain) \/ (v \notin chain) \/ (w \notin chain).
   Proof.
-    move=> uNv vNw uNw [/deg_chain_endpt degu [/deg_chain_endpt degv /deg_chain_endpt degw]].
-    rewrite chain_x.
-    case: (boolP (u \in kempe_chain pc ca cb x)) => [u_in|u_nin]; last by left.
-    case: (boolP (v \in kempe_chain pc ca cb x)) => [v_in|v_nin]; last by right; left.
-    case: (boolP (w \in kempe_chain pc ca cb x)) => [w_in|w_nin]; last by right; right.
-    move: (u_in) (v_in) (w_in); rewrite /kempe_chain=> /same_component comp_u.
-    rewrite -comp_u=> /components_pblockP [p].
+    case: (boolP (u \in chain)) => [u_in|u_nin]; last by left.
+    case: (boolP (v \in chain)) => [v_in|v_nin]; last by right; left.
+    case: (boolP (w \in chain)) => [w_in|w_nin]; last by right; right.
+    move=> uNv vNw uNw [/deg_chain_endpt + [/deg_chain_endpt + /deg_chain_endpt +]].
+    rewrite leq_eqVlt (@leq_eqVlt #|N(kempe_graph pc ca cb;v)| _) (@leq_eqVlt #|N(kempe_graph pc ca cb;w)| _ ) 
+            ltnNge (@ltnNge #|N(kempe_graph pc ca cb;v)| _) (@ltnNge #|N(kempe_graph pc ca cb;w)| _ ). 
+    have [[-> ->] [_ ->]] := conj (min_deg_kempe u_in v_in uNv) (min_deg_kempe u_in w_in uNw).
+    move: (u_in) (v_in) (w_in); rewrite chain_x /kempe_chain 3!orbF => /same_component comp_u + + /eqP degu /eqP degv /eqP degw.
+    have u_in_u : u \in (@component_of (kempe_graph pc ca cb)) u by exact: (@in_component_of (kempe_graph pc ca cb) u).
+    have u_connect : connected (@component_of (kempe_graph pc ca cb) u) by exact: connected_component_of.
+    rewrite -comp_u=> v_in_u w_in_u.
+    have [p Ip p_in_u] := path_in_connected u_connect u_in_u v_in_u.
+    have [q Iq q_in_u] := path_in_connected u_connect u_in_u w_in_u.
+    have [y /ltn_geF] := @shared_interior3 (kempe_graph pc ca cb) _ _ _ _ _ degu degv degw uNv vNw uNw Ip Iq.
+    by have -> := max_deg_kempe y.
+  Qed.
 
-    have := shared_interior3 
-    Proposition shared_interior3 
-    (G : sgraph) 
-    (x y z : G) 
-    (p : Path x y) 
-    (q : Path x z) 
-    :
-    #|N(x)| = 1 -> #|N(y)| = 1 -> #|N(z)| = 1 ->
-    x != y -> y != z -> x != z ->
-    irred p -> irred q ->
-    exists w : G, 3 <= #|N(w)|.
-  Admitted.
-
-  (*
-  x and y both degree 1 in chain
-  path from x to y
-  z also degree 1, wts not in chain
-  suppose it is, then path x z and path y z (both irred)
-  
-  *)
 End KempeProper.

@@ -219,7 +219,7 @@ Proof.
   have chain_refl : chain = kempe_chain kc (Some ck) cv v by [].
   set ic := invertedChain (kempe_chain kc (Some ck) cv v).
   set ipc : properEdgeColoringType G (projT1 kc) :=  
-    (exist _ (ic) (inverted_proper chain_refl (proj2_sig (k_to_proper_coloring kc)))).
+    (exist _ (ic) (inverted_proper chain_refl)).
   have /eqVproper [/esym imset_kc_ic | imset_kc_ic] : ic[E(G)] \subset kc[E(G)] := 
     imset_invert_sub chain (absent_in_imset kc_wia_ck) (absent_in_imset Habv1); first last.
   - exists #|ipc [E(G)]|.
@@ -238,7 +238,7 @@ Proof.
     by apply (@edge_in_component (kempe_graph kc (Some ck) cv) _).
   }
   have ic_vwj_cv : ic [set v; wj] = cv by apply (iffLR (proj1 (is_kempe_edge vwj_in_kempe vwj_in_chain))). 
-  have [ikc_fmax fvalmax] : (exists _ : Fan ikc v w0 w, _) := @inverted_fan _ _ _ _ _ _ chain erefl _ _ fmax (proj2_sig (k_to_proper_coloring kc)) (or_intror Habv1).
+  have [ikc_fmax fvalmax] : (exists _ : Fan ikc v w0 w, _) := inverted_fan chain_refl fmax (or_intror Habv1).
   have ic_va_ck : Some ck \in absent_set ikc v.
   {
     have [_ H] := in_inverted_absent chain_refl v_in_v.

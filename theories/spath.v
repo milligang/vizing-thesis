@@ -57,7 +57,7 @@ Proposition shared_interior3
     x != y -> y != z -> x != z ->
     irred p -> irred q ->
     exists w : G, 3 <= #|N(w)|.
-    Proof.
+Proof.
     move=> /eq_leq degx /eq_leq degy /eq_leq degz xNy yNz xNz Ip Iq.
     have z_nin_p : z \notin p by have := deg1_internal degz Ip; rewrite !inE negb_and negb_or eq_sym xNz eq_sym yNz.
     have y_nin_q : y \notin q by have := deg1_internal degy Iq; rewrite !inE negb_and negb_or eq_sym xNy yNz.
