@@ -132,6 +132,14 @@ Section EdgeNeighboorhood.
     by apply/doubleton_eq_iff; right.
   Qed. 
 
+  Lemma edgesSetP {G : sgraph} (x : G) (e : {set G}) :
+    reflect (exists y, e = [set x;y] /\ x -- y) (e \in E{G;x}).
+  Proof.
+    apply: (iffP imsetP) => [[y]|[y] [E xy]];
+    first by rewrite in_opn; exists y.
+    exists y; by rewrite // in_opn.
+  Qed.
+
   Lemma edge_neigh_edge {G : sgraph} (x y : G) (e : {set G}) : 
     ((e \in E{x}) && (e \in E{y}) && (x != y)) <-> (e == [set x; y]) && x -- y.
   Proof.

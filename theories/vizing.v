@@ -230,14 +230,6 @@ Proof.
   have card_ic : #|ic[E(G)]| == (max_degree G  + 1 + 1) by rewrite -imset_kc_ic card_k_col.
   pose ikc : kEdgeColoringType G (max_degree G + 1 + 1) := existT _ (projT1 kc) (exist _ ipc card_ic).
   have v_in_v := (@in_component_of (kempe_graph kc (Some ck) cv) v).
-  have vwj_in_kempe : ([set v; wj] \in E(kempe_graph kc (Some ck) cv)) by rewrite mem_kempe Einj Hkcj eq_refl.
-  have vwj_in_chain : ([set v; wj] \subset chain).
-  {
-    apply/subUsetP; rewrite 2!sub1set.
-    split; first by exact: v_in_v.
-    by apply (@edge_in_component (kempe_graph kc (Some ck) cv) _).
-  }
-  have ic_vwj_cv : ic [set v; wj] = cv by apply (iffLR (proj1 (is_kempe_edge vwj_in_kempe vwj_in_chain))). 
   have [ikc_fmax fvalmax] : (exists _ : Fan ikc v w0 w, _) := inverted_fan chain_refl fmax (or_intror Habv1).
   have ic_va_ck : Some ck \in absent_set ikc v.
   {

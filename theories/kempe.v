@@ -196,22 +196,45 @@ Section KempeProper.
   Proof.
     have := proj2_sig pc.
     rewrite /is_proper_edge_coloring /invertedChain => is_pc u e1 e2 e1_in_e e2_in_e.
-    specialize (is_pc u e1 e2 e1_in_e e2_in_e).
-    case: ifP=> [|/negbT]; [case: ifP=> /eqP c_e1|]; (case: ifP; [case: ifP=> [/eqP c_e2|c_e2]|]).
-    - move=> _ _ _; apply: is_pc.
-      have -> : sval pc e1 = ca by exact: c_e1.
-      by have -> : sval pc e2 = ca by exact: c_e2.
-    - rewrite mem_kempe c_e2=> contra _ aEb. rewrite aEb c_e2 andbF // in contra. 
-    - move=> + e1_in_C c_e2.
-      move: e1_in_e e2_in_e; rewrite mem_edge_graph=> /andP[e2_in_G u_in_e2].
-      (* have e2_in_K : e2  \in E(kempe_graph pc ca cb) by rewrite mem_kempe e2_in_G c_e2 eq_refl.
-      rewrite e2_in_K /=.
-      move/edgesP: (e2_in_G)=> [w] [y]. *)
-
-      (* Lemma edge_in_component (H : sgraph) (u v : H) :
-      [set u; v] \in E(H) -> v \in component_of u.
-    edge_in_component *)
-  Admitted.
+    specialize (is_pc u e1 e2 e1_in_e e2_in_e);
+    case e1_in_K: (e1  \in E(kempe_graph pc ca cb)); case e1_in_C: (e1 \subset chain);
+    case e2_in_K: (e2  \in E(kempe_graph pc ca cb)); case e2_in_C: (e2 \subset chain)=> /=;
+    try by exact: is_pc.
+    - move: e1_in_K e2_in_K; rewrite 2!mem_kempe.
+      case: ifP=> /eqP c_e1 /andP[e1_in_G /= /eqP ca_cb_e1]; [move: c_e1 | move: ca_cb_e1];
+      case: ifP=> /eqP c_e2 + /andP[e2_in_G /= /eqP ca_cb_e2] ca_cb;
+      rewrite -?ca_cb -?ca_cb_e2 -?c_e2; exact: is_pc.
+    - have contra : e2 \subset chain.
+      {
+        move: e1_in_e e2_in_e e1_in_K e2_in_K e1_in_C e2_in_C
+          => /edgesSetP [y1] [uy1 _] /edgesSetP [y2] [uy2 _].
+        rewrite uy1 uy2 2!subUset 3!sub1set chain_x /kempe_chain
+          => /edge_in_component _ /edge_in_component y2_in_u /andP[u_in_x _] _.
+        have <- := (@same_component (kempe_graph pc ca cb) u x u_in_x).
+        by rewrite (@in_component_of (kempe_graph pc ca cb) u) y2_in_u.
+      }
+      by rewrite contra in e2_in_C.
+    1,2: 
+      move: e2_in_e e2_in_K;
+      rewrite mem_kempe mem_edge_graph=> /andP[-> _] /negbT;
+      rewrite /= negb_or=> /andP[ca_e2 cb_e2];
+      case: ifP=> _ contra; move: ca_e2 cb_e2; by rewrite contra eq_refl.
+    - have contra : e1 \subset chain.
+      {
+        move: e1_in_e e2_in_e e1_in_K e2_in_K e1_in_C e2_in_C
+          => /edgesSetP [y1] [uy1 _] /edgesSetP [y2] [uy2 _].
+        rewrite uy1 uy2 2!subUset 3!sub1set chain_x /kempe_chain
+          => /edge_in_component y1_in_u /edge_in_component _ _ /andP[u_in_x _].
+        have <- := (@same_component (kempe_graph pc ca cb) u x u_in_x).
+        by rewrite (@in_component_of (kempe_graph pc ca cb) u) y1_in_u.
+      }
+      by rewrite contra in e1_in_C.
+    all:
+      move: e1_in_e e1_in_K;
+      rewrite mem_kempe mem_edge_graph=> /andP[-> _] /negbT;
+      rewrite /= negb_or=> /andP[ca_e1 cb_e1];
+      case: ifP=> _ contra; move: ca_e1 cb_e1; by rewrite contra eq_refl.
+  Qed.
 
   Definition chain_endpt u :=
     (ca \in absent_set pc u) \/ (cb \in absent_set pc u).
