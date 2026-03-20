@@ -289,7 +289,10 @@ Section Rotation.
     have abs_fs: path (fun x2 x1 => absent_prop c [set v; x1] x2) w0 fs := fanW_rev; rewrite /absent_prop in abs_fs.
     have w0p: w0_prop c [set v; w0] := fan_w0_prop; rewrite /w0_prop in w0p.
     elim: fs c w0 abs_fs w0p nps => [//|w1 [|w2 wss] IH] d x0 /andP[abs_w01 abs_fs] x0p /andP[x0_at_v /andP[w1_at_v nps]] pc_d.
-    - rewrite/rotate. apply/(swap_proper_vertex pc_d _ abs_w01 x0_at_v w1_at_v).
+    - rewrite/rotate. apply/(swap_proper_vertex pc_d (absent_del_edge _ _ _ _) abs_w01 x0_at_v w1_at_v); rewrite //=; first by rewrite in_edges -in_opn.
+      + admit.
+      + admit.
+    apply: (IH (swap_edge d [set v; x0] [set v; w1]) w1).
   Admitted.
 
 End Rotation.

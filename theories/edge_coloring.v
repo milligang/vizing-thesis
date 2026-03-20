@@ -219,7 +219,7 @@ Section AbsentSet.
     apply Hnin; exact: in_cneigh.
   Qed.
 
-  Lemma absent_del_edge {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y z :
+  Lemma absent_del_edge {ColorType : finType} (c : edgeColoringType G ColorType) x y z :
     [set x; y] \in E(G) -> x != z -> y != z ->
     c [set x; y] \notin c[E(del_edges [set x; y])] ->
     c [set x; y] \in absent_set c z.
@@ -435,6 +435,25 @@ Section Recolor.
     repeat case: ifP=> //; repeat move=> /eqP -> //; try rewrite eq_refl //.
     - do 2 move=> _ -> //.
     - move=> _ /eqP -> //.
+  Qed.
+
+  Lemma imset_swap_nin e f (x : G) :
+    x \notin e -> x \notin f ->
+    c[E{x}] = (swap_edge e f)[E{x}].
+  Proof.
+    move=> x_nin_e x_nin_f; apply/setP=> c0.
+    apply/imsetP/imsetP; move=> [e2 e2_in_G ->]; rewrite /swap_edge;
+    exists e2=> //; move: e2_in_G; rewrite mem_edge_graph=> /andP[_ x_in_e2];
+    by (case: ifP=> [/eqP contra|]; [by rewrite contra in x_in_e2; rewrite x_in_e2 in x_nin_e|]);
+       (case: ifP=> [/eqP contra|]; [by rewrite contra in x_in_e2; rewrite x_in_e2 in x_nin_f|]).
+  Qed.
+
+  Lemma swap_absent_nin (e f : {set G}) (x : G) :
+    x \notin e -> x \notin f -> e \in E(G) -> f \in E(G) ->
+    absent_set (swap_edge e f) x = absent_set c x.
+  Proof.
+    rewrite/absent_set=> x_nin_e x_nin_f e_in_G f_in_G.
+    by rewrite (imset_swap e_in_G f_in_G) (imset_swap_nin x_nin_e x_nin_f).
   Qed.
 
   Lemma swap_proper_vertex (x y z : G) :
