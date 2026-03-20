@@ -278,7 +278,6 @@ Section Rotation.
     elim: fs c=> [//|w1 ws IH] d Hd.
     case: ws IH=> [|w2 wss IH] //.
     specialize (IH (swap_edge d [set v; w1] [set v; w2])).
-    (* rewrite -(IH (swap_edge d [set v; w0] [set v; w1])).  *)
   Admitted.
 
 End Rotation.

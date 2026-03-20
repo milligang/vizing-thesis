@@ -8,42 +8,42 @@ Unset Strict Implicit.
 Unset Printing Implicit Defensive.
 
 Section PathHelpers.
-Variables (G : sgraph) (x y z : G) (p : Path x y).
+    Variables (G : sgraph) (x y z : G) (p : Path x y).
 
-Lemma inInteriorP :
-    reflect (z \in interior p) ((z != x) && (z != y) && (z \in p)).
-Proof. rewrite !inE negb_or; exact: idP. Qed.
+    Lemma inInteriorP :
+        reflect (z \in interior p) ((z != x) && (z != y) && (z \in p)).
+    Proof. rewrite !inE negb_or; exact: idP. Qed.
 
-Lemma isplitInternal : 
-    irred p -> z \in interior p ->
-    exists (u v : G) (uz : u -- z) (zv : z -- v) (p1 : Path x u) (p2 : Path v y),
-    p = pcat (pcat p1 (edgep uz)) (pcat (edgep zv) p2) /\ u != v.
-Proof.
-    move=> Ip /inInteriorP /andP[/andP[xNz zNy] z_in_p]; rewrite eq_sym in xNz.
-    case/(isplitP Ip) def_p1 : _ / z_in_p => [pl pr Ipl Ipr Iz].
-    case: (splitR pl xNz) Ipl => u [pl'] [uz] El Ipl. 
-    case: (splitL pr zNy) Ipr => v [zv] [pr'] [Er _] Ipr.
-    exists u, v, uz, zv, pl', pr'.
-    split; first by rewrite El Er.
-    (* by contradiction if u = v *)
-    apply/eqP=> eq_uv.
-    have u_in_pl : u \in pl by rewrite El mem_pcat_edgeR path_end.
-    have u_in_pr : u \in pr by rewrite eq_uv Er mem_pcat_edgeL path_begin.
-    have := Iz u u_in_pl u_in_pr.
-    by have /eqP := sg_edgeNeq uz.
-Qed.
+    Lemma isplitInternal : 
+        irred p -> z \in interior p ->
+        exists (u v : G) (uz : u -- z) (zv : z -- v) (p1 : Path x u) (p2 : Path v y),
+        p = pcat (pcat p1 (edgep uz)) (pcat (edgep zv) p2) /\ u != v.
+    Proof.
+        move=> Ip /inInteriorP /andP[/andP[xNz zNy] z_in_p]; rewrite eq_sym in xNz.
+        case/(isplitP Ip) def_p1 : _ / z_in_p => [pl pr Ipl Ipr Iz].
+        case: (splitR pl xNz) Ipl => u [pl'] [uz] El Ipl. 
+        case: (splitL pr zNy) Ipr => v [zv] [pr'] [Er _] Ipr.
+        exists u, v, uz, zv, pl', pr'.
+        split; first by rewrite El Er.
+        (* by contradiction if u = v *)
+        apply/eqP=> eq_uv.
+        have u_in_pl : u \in pl by rewrite El mem_pcat_edgeR path_end.
+        have u_in_pr : u \in pr by rewrite eq_uv Er mem_pcat_edgeL path_begin.
+        have := Iz u u_in_pl u_in_pr.
+        by have /eqP := sg_edgeNeq uz.
+    Qed.
 
-Lemma deg1_internal : #|N(z)| <= 1 -> irred p -> z \notin interior p. 
-Proof.
-    move=> /leq_gtF deg1 Ip; apply/negP=> z_in_p.
-    have [u [v] [uz] [zv] [p1] [p2] [pc uNv]] := isplitInternal Ip z_in_p.
-    suff : 2 <= #|N(z)|; first by rewrite deg1.
-    rewrite -(ltn_add2r 1) addn1.
-    have -> : 2 = #|[set u; v]| by rewrite cards2 uNv.
-    rewrite addn1 ltnS. 
-    apply/subset_leqif_cards.
-    by rewrite subUset 2!sub1set 2!in_opn sg_sym.
-Qed.
+    Lemma deg1_internal : #|N(z)| <= 1 -> irred p -> z \notin interior p. 
+    Proof.
+        move=> /leq_gtF deg1 Ip; apply/negP=> z_in_p.
+        have [u [v] [uz] [zv] [p1] [p2] [pc uNv]] := isplitInternal Ip z_in_p.
+        suff : 2 <= #|N(z)|; first by rewrite deg1.
+        rewrite -(ltn_add2r 1) addn1.
+        have -> : 2 = #|[set u; v]| by rewrite cards2 uNv.
+        rewrite addn1 ltnS. 
+        apply/subset_leqif_cards.
+        by rewrite subUset 2!sub1set 2!in_opn sg_sym.
+    Qed.
 
 End PathHelpers.
 

@@ -219,6 +219,14 @@ Section AbsentSet.
     apply Hnin; exact: in_cneigh.
   Qed.
 
+  Lemma absent_edge_sym {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y :
+    c0 \in absent_set c x -> x \in N(y) -> c0 != c [set y; x].
+  Proof. 
+    have -> : [set y; x] = [set x; y] by rewrite doubleton_eq_iff; right.
+    rewrite in_opn sg_sym -in_opn.
+    exact: absent_edge. 
+  Qed.
+
   Proposition exists_absent_color {k : nat} (kc : kEdgeColoringType G k):
     max_degree G + 1 <= k ->
     forall x : G, exists c, c \in (absent_set kc x).
@@ -411,14 +419,73 @@ Section Recolor.
     - move=> _ /eqP -> //.
   Qed.
 
-  (* TO DO: finish the rot_proper first, then complete this helper *)
   Lemma swap_proper_vertex (x y z : G) :
     is_proper_edge_coloring c ->
     (c [set x; y]) \in absent_set c z ->
     (c [set x; z]) \in absent_set c y ->
+    y \in N(x) -> z \in N(x) ->
     is_proper_edge_coloring (swap_edge [set x; y] [set x; z]).
   Proof.
-  Admitted.
+    rewrite /is_proper_edge_coloring /swap_edge
+      => pc abs_z abs_y y_at_x z_at_x u e1 e2  /edgesSetP [v1] [def_e1 uv1] /edgesSetP [v2] [def_e2 uv2].
+    rewrite def_e1 def_e2.
+    case: (boolP (v1 == v2))=> [/eqP ->| v1Nv2]; first by [].
+    have [yNx zNx] : ((y == x) = false) /\ ((z == x) = false) by move: y_at_x z_at_x; do 2 rewrite in_opn sg_sym=> /sg_edgeNeq ->.
+    (* case if (u, v1) = (x, y) *)
+    case: ifP=> /eqP /doubleton_eq_iff.
+    - move=> [[uEx v1Ey] | [uEy v1Ex]].
+      + rewrite uEx in uv1 uv2 def_e1 def_e2 *.
+        rewrite v1Ey in v1Nv2 uv1 def_e1 *.
+        case: ifP=> [/eqP /doubleton_eq_left v2Ny | _]; first by rewrite v2Ny eq_refl in v1Nv2.
+        case: ifP=> /eqP /doubleton_eq_left v2Ez /esym.
+        * rewrite v2Ez in def_e2 uv2 *.
+          exact: (pc x [set x; y] [set x; z] (edge_neigh_self uv1) (edge_neigh_self uv2)).
+        * by rewrite in_opn in z_at_x=>   
+            /(pc x [set x; v2] [set x; z] (edge_neigh_self uv2) (edge_neigh_self z_at_x)) /doubleton_eq_left.
+      + rewrite uEy.
+        case: ifP=> [/eqP /doubleton_eq_iff [[yEx _] | [_ ->]] | _];
+          try rewrite v1Ex //; first by rewrite yEx eq_refl in yNx.
+        case: ifP=> [/eqP /doubleton_eq_iff | _].
+        * rewrite 4!(rwP eqP) 2!(rwP andP) yNx -v1Ex=> /orP. 
+          rewrite /= => /andP[_ /eqP v1Ev2]; by rewrite v1Ev2 eq_refl in v1Nv2.
+        * rewrite -in_opn uEy in uv2=> cEc.
+          have := absent_edge abs_y uv2; by rewrite cEc eq_refl.
+    - case: ifP=> /eqP /doubleton_eq_iff.
+      + move=> [[uEx v1Ez] | [uEz v1Ex]].
+        * rewrite uEx v1Ez in uv1 uv2 *.
+          case: ifP=> [/eqP /doubleton_eq_left v2Ey _ /esym|];
+          first by rewrite v2Ey in uv2 *; exact: (pc x [set x; z] [set x; y] (edge_neigh_self uv1) (edge_neigh_self uv2)).
+          case: ifP=> [/eqP /doubleton_eq_left -> //|_ /eqP /doubleton_eq_left v2Ny _].
+          by rewrite in_opn in y_at_x
+            => /(pc x _ _ (edge_neigh_self y_at_x) (edge_neigh_self uv2)) /doubleton_eq_left /esym.
+        * rewrite uEz in uv2 *.
+          case: ifP=>[/eqP /doubleton_eq_iff _ _ cEc|];
+          first by have := absent_edge_sym abs_z z_at_x; rewrite cEc eq_refl.
+          case: ifP=> [/eqP /doubleton_eq_iff|_ _ _ cEc];
+          last by rewrite -in_opn in uv2; have := absent_edge abs_z uv2; rewrite cEc eq_refl.
+          rewrite 4!(rwP eqP) 2!(rwP andP) zNx -v1Ex eq_refl=> /orP.
+          rewrite /= => /eqP v1Ev2. 
+          by rewrite v1Ev2 eq_refl in v1Nv2.
+      + case: ifP=> [/eqP /doubleton_eq_iff [[uEx v2Ey] | [uEy v2Ex]] + + cEc|].
+        -- rewrite uEx v2Ey in uv1 cEc *.
+           rewrite in_opn in z_at_x.
+           have /doubleton_eq_left -> := pc x _ _ (edge_neigh_self uv1) (edge_neigh_self z_at_x) cEc.
+           by rewrite 4!(rwP eqP) 2!(rwP andP) 2!eq_refl=> /orP.
+        -- rewrite uEy in uv1 cEc *.
+           rewrite -in_opn in uv1.
+           have := absent_edge abs_y uv1.
+           by rewrite cEc eq_refl.
+        * case: ifP=>[/eqP /doubleton_eq_iff [[uEx v2Ez] | [uEz v2Ex]] + + +|_ _ _ _] cEc.
+        -- rewrite uEx v2Ez in uv1 cEc * => _ _.
+           rewrite in_opn in y_at_x.
+           have /doubleton_eq_left -> := pc x _ _ (edge_neigh_self uv1) (edge_neigh_self y_at_x) cEc.
+           by rewrite 4!(rwP eqP) 2!(rwP andP) 2!eq_refl=> /orP.
+        -- rewrite uEz in uv1 cEc *.
+           rewrite -in_opn in uv1.
+           have := absent_edge abs_z uv1.
+           by rewrite cEc eq_refl.
+    exact: (pc u _ _ (edge_neigh_self uv1) (edge_neigh_self uv2) cEc). 
+  Qed.
 
 End Recolor.
  

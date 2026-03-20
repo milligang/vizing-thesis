@@ -133,7 +133,7 @@ Section EdgeNeighboorhood.
   Qed. 
 
   Lemma edgesSetP {G : sgraph} (x : G) (e : {set G}) :
-    reflect (exists y, e = [set x;y] /\ x -- y) (e \in E{G;x}).
+    reflect (exists y, e = [set x; y] /\ x -- y) (e \in E{G;x}).
   Proof.
     apply: (iffP imsetP) => [[y]|[y] [E xy]];
     first by rewrite in_opn; exists y.
