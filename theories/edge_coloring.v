@@ -219,6 +219,24 @@ Section AbsentSet.
     apply Hnin; exact: in_cneigh.
   Qed.
 
+  Lemma absent_del_edge {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y z :
+    [set x; y] \in E(G) -> x != z -> y != z ->
+    c [set x; y] \notin c[E(del_edges [set x; y])] ->
+    c [set x; y] \in absent_set c z.
+  Proof.
+    rewrite /absent_set=> xy_in xNz yNz w0p; apply/setDP; split;
+    first by apply/imsetP; exists [set x; y].
+    apply/negP=> /imsetP [e e_at_z cxy].
+    apply: (negP w0p); apply/imsetP; exists e; last by [].
+    rewrite mem_del_edges.
+    apply/andP; split; 
+    first by exact: (subsetP (sub_all_edges z) _ e_at_z).
+    apply/subsetPn.
+    move/edgesSetP: e_at_z => [w [-> _]].
+    exists z; first by rewrite !inE eqxx.
+    by rewrite !inE negb_or eq_sym xNz eq_sym.
+  Qed.
+
   Lemma absent_edge_sym {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y :
     c0 \in absent_set c x -> x \in N(y) -> c0 != c [set y; x].
   Proof. 

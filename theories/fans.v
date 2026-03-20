@@ -19,7 +19,6 @@ Section Fan.
 
   (* 2. if w0 is the first item in fan f centered at v under coloring c,
     (v, w0) is a distinct color from the rest of the edges in the graph *)
-  (* Todo: two equivalent definitions, choose one *)
   Definition w0_prop 
     {ColorType} (c : edgeColoringType G ColorType) e 
   := c e \notin c[E(del_edges e)].
@@ -51,6 +50,13 @@ Section Fan.
 
   Lemma fanpW c f v w0 wk : fanp c f v w0 wk -> path (fun x2 => absent_prop c [set v; x2]) wk f.
   Proof. by case/andP. Qed.
+
+  Lemma fanpW_rev c f v w0 wk : 
+    fanp c f v w0 wk -> 
+    path (fun x2 x1 => absent_prop c [set v; x1] x2) (last wk f) (rev (belast wk f)).
+  Proof.
+    move=> /fanpW. by rewrite rev_path.
+  Qed.
 
   Lemma fanp_last c f v w0 wk : fanp c f v w0 wk -> last wk f = w0.
   Proof. by case/andP=> /andP[/andP[/andP[/eqP-> _] _] _] _. Qed.
@@ -160,10 +166,16 @@ Section Rotation.
   Implicit Type (w : G).
 
   Lemma fanW : path (fun x2 => absent_prop c [set v; x2]) wk (fval f).
-  Proof.  move: (valP f); exact: fanpW. Qed.
+  Proof. move: (valP f); exact: fanpW. Qed.
 
   Lemma fan_last : last wk (val f) = w0.
   Proof. move: (valP f); exact: fanp_last. Qed.
+
+  Lemma fan_rev : rev (wk::val f) = w0::(rev (belast wk (fval f))).
+  Proof. rewrite lastI rev_rcons. congr (_ :: _). exact: fan_last. Qed.
+
+  Lemma fanW_rev : path (fun x2 x1 => absent_prop c [set v; x1] x2) w0 (rev (belast wk (fval f))).
+  Proof. move: (valP f)=> /fanpW_rev. by rewrite fan_last. Qed.
 
   Lemma fan_uniq : uniq (wk::val f).
   Proof. move: (valP f); exact: fanp_uniq. Qed.
@@ -221,8 +233,7 @@ Section Rotation.
     c[E(del_edges e0)] = rotateF[E(del_edges e1)].
   Proof.
     rewrite/rotateF; set fs := (rev (wk::val f)).
-    have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
-    elim: fs c Hws=> [/=|w1 [|w2 wss] IH] d Hws.
+    elim: fs c=> [/=|w1 [|w2 wss] IH] d.
     (* rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //.  *)
     (* move/andP: Hws => [Hw1 _].
     have He0: [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
@@ -268,16 +279,17 @@ Section Rotation.
   Proof. 
   Admitted.
 
-  (* TO DO: induction, b/c preserved at every step - how to reason ab fan properities after inductive step? set fseq := val f.
-    move: f=> [fval Hfan]? *)
   Lemma rot_proper : 
     is_proper_edge_coloring c ->
     is_proper_edge_coloring rotateF.
   Proof.
-    rewrite/rotateF; set fs := (rev (wk::val f)).
-    elim: fs c=> [//|w1 ws IH] d Hd.
-    case: ws IH=> [|w2 wss IH] //.
-    specialize (IH (swap_edge d [set v; w1] [set v; w2])).
+    rewrite/rotateF fan_rev.
+    set fs := rev (belast wk (val f)).
+    have nps: neigh_prop v (w0 :: fs) by rewrite /fs -fan_rev; apply rev_neigh; exact: fan_neigh.
+    have abs_fs: path (fun x2 x1 => absent_prop c [set v; x1] x2) w0 fs := fanW_rev; rewrite /absent_prop in abs_fs.
+    have w0p: w0_prop c [set v; w0] := fan_w0_prop; rewrite /w0_prop in w0p.
+    elim: fs c w0 abs_fs w0p nps => [//|w1 [|w2 wss] IH] d x0 /andP[abs_w01 abs_fs] x0p /andP[x0_at_v /andP[w1_at_v nps]] pc_d.
+    - rewrite/rotate. apply/(swap_proper_vertex pc_d _ abs_w01 x0_at_v w1_at_v).
   Admitted.
 
 End Rotation.
