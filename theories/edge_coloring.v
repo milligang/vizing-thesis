@@ -326,6 +326,8 @@ Section ExtendCol.
     {x : G}
   : c0 \in absent_set kc x -> Some c0 \in absent_set (k_extended_col kc) x.
   Proof.
+    rewrite/absent_set=> /setDP[c0_in_kc c0_nin_kc].
+    apply/setDP.
   Admitted.
   
 End ExtendCol.
@@ -356,7 +358,12 @@ Section Recolor.
     c0 \in c[E(G)] ->
     recolor_edge e c0 [E(G)] \subset c[E(G)].
   Proof.
-  Admitted.
+    rewrite/coloring_image/recolor_edge=> /imsetP [e1] e1_in_G def_c0.
+    apply/subsetP=> c1 /imsetP [e2] e2_in_G.
+    case: ifP=> _ def_c1; apply/imsetP;
+    last by exists e2. 
+    by exists e1; rewrite -def_c1 in def_c0.
+  Qed.
 
   Lemma recolor_proper (x y : G) c0 :
     is_proper_edge_coloring c ->
