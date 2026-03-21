@@ -283,20 +283,30 @@ Section ExtendCol.
     by rewrite (@del_edges_edge_neigh G del_e _ _).
   Qed.
 
-  (* TODO: Should be straightforward, need to figure out which tactic to use *)
   Lemma card_extended_col 
     {k : nat} 
     (kc : kEdgeColoringType (del_edges del_e) k) 
   : #|extendedColType kc[E(G)]| = k + 1.
   Proof. 
     rewrite /extendedColType /coloring_image.
-    rewrite (del_edges1 He).
-    rewrite imsetU1 eq_refl.
-    (* under eq_imset => e. rewrite (del_edges1_neq). *)
-    (* rewrite del_edgesN. *)
-    (* move: kc => [CT [pc Hcard]]. *)
-    (* exists (option CT), (proper_extended_col pc). *)
-  Admitted.
+    rewrite (del_edges1 He) imsetU1 eq_refl.
+    have -> : [set (if e == del_e then None else Some ((sval (sval (projT2 kc))) e)) | e in E(del_edges del_e)]
+            = Some @: (kc[E(del_edges del_e)]).
+    {
+      rewrite -imset_comp.
+      apply/setP=> c0.
+      apply/imsetP/imsetP=> [[e He' ->]| [e He' ->]];
+      exists e=> //; rewrite ifF //;
+      apply/negbTE/negP=> /eqP eEd;
+      have := del_edgesN del_e; rewrite -{1}eEd;
+      by rewrite He'.
+    }
+    rewrite cardsU1 card_imset; last by exact: Some_inj.
+    rewrite card_k_col. 
+    have -> : None \notin [set Some x | x in kc [E(del_edges del_e)]].
+    { by apply/imsetP => [[x _ /eqP //]]. }
+    by rewrite addnC.
+  Qed.
 
   (* extendedColType of a k-edge-coloring produces a (k+1)-edge-coloring *)
   Definition k_extended_col 
