@@ -241,16 +241,25 @@ Section Rotation.
     exact: imset_swap He0 He1. *)
   Admitted.
 
-  (* TO DO: Helper for next lemma, finish inductive step *)
+  Lemma rotate_last (fs : seq G) (d : edgeColoringType G ColorType) :
+      d [set v; head w0 fs] = rotate d fs v [set v; last w0 fs].
+  Proof.
+    elim: fs d=> [/=|w1 [|w2 wss] IH] d'; try by [].
+    change (d' [set v; w1] = rotate (swap_edge d' [set v; w1] [set v; w2]) (w2 :: wss) v [set v; last w2 wss]).
+    rewrite -(IH (swap_edge d' [set v; w1] [set v; w2])) /=.
+    rewrite /swap_edge; 
+    case: ifP=> [/eqP /doubleton_eq_left -> //|].
+    by rewrite eq_refl.
+  Qed.
+
   Lemma rot_first_last : c [set v; w0] = rotateF [set v; wk].
   Proof.
-    rewrite -fan_last /rotateF.
-    set fs := \val f.
-    elim Hf: fs c=> [|w1 [|w2 wss] IH] d //=.
-    - rewrite/swap_edge. case: ifP=> [/eqP -> //| H].
-      by rewrite eq_refl.
-    - admit.
-  Admitted.
+    rewrite /rotateF. 
+    set fs := (rev (wk::val f)).
+    have -> : w0 = (head w0 fs) by rewrite /fs fan_rev.
+    have -> : wk = (last w0 fs) by rewrite /fs rev_cons last_rcons.
+    exact: (rotate_last fs c). 
+  Qed.
 
   Lemma rot_w0_prop : w0_prop rotateF [set v; wk].
   Proof.
