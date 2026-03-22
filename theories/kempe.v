@@ -144,9 +144,9 @@ Section InvertChain.
   Proof.
   Admitted.
 
-  Lemma inverted_fan {v : G} (fan : Fan c x v u) : 
-    (ca \in absent_set c x) \/ (cb \in absent_set c x) -> 
-    exists ifan : Fan invertedChain x v u, fval fan = fval ifan.
+  Lemma w0_inverted (w0 : G) :
+    c [set u; w0] != ca -> c [set u; w0] != cb ->
+    w0_prop c [set u; w0] -> w0_prop invertedChain [set u; w0].
   Proof.
   Admitted.
 
@@ -282,5 +282,104 @@ Section KempeProper.
     have [y /ltn_geF] := @shared_interior3 (kempe_graph pc ca cb) _ _ _ _ _ degu degv degw uNv vNw uNw Ip Iq.
     by have -> := max_deg_kempe y.
   Qed.
+
+  (* Lemma inverted_fan {v : G} (fan : Fan c x v u) : 
+  (ca \in absent_set c x) \/ (cb \in absent_set c x) -> 
+  exists ifan : Fan invertedChain x v u, fval fan = fval ifan.
+  Proof.
+  Admitted. *)
+
+  (* 
+    Technically, the following is also true less hypotheses. 
+    But since we only use this in the proof of vizing's theorem,
+    we make this more specific (to not repeat our work from there)
+  *)
+
+  Lemma inverted_fan 
+    {w0 wi wj w : G} {f1 f2 : seq G} 
+    (imset_pc_ic : pc [E(G)] = (invertedChain chain) [E(G)])
+    (fan : Fan pc x w0 w) 
+    (fsplit : w :: \val fan = f1 ++ [:: wj,  wi  & f2])
+    (jN0 : wj != w0)
+    (pc_xa_cb : cb \in absent_set pc x)
+    (pc_wia_ca : ca \in absent_set pc wi)
+    (pc_wa_ca : ca \in absent_set pc w)
+    (pc_xwj_ca : (sval pc) [set x; wj] = ca)
+  : 
+    exists (w' : G) (ifan : Fan (invertedChain chain) x w0 w'),
+    (ca \in absent_set (invertedChain chain) w').
+  Proof.
+    rewrite -[wj :: wi :: f2]cat1s catA in fsplit.
+    have wj_at_x : wj \in N(x).
+    {
+      apply/(@in_neigh _ _ _ _ _ _ fan); rewrite fsplit.
+      by rewrite mem_cat cats1 mem_rcons in_cons eq_refl.
+    }
+    have w0_at_x : w0 \in N(x).
+    {
+      apply/(@in_neigh _ _ _ _ _ _ fan).
+      by have := mem_last w (\val fan); rewrite fan_last.
+    }
+    have w0_ifan : w0_prop (invertedChain chain) [set x; w0].
+    {
+      apply/(w0_inverted chain_x _ _ (fan_w0_prop fan)).
+      - rewrite -pc_xwj_ca. move: (wj_at_x). 
+        suff : (sval pc [set x; w0]) \in absent_set pc wj;
+        first by exact: absent_edge_sym.
+        rewrite eq_sym in jN0.
+        apply/(absent_del_edge _ _ (jN0)); first by rewrite in_edges -in_opn.
+        + move: wj_at_x; by rewrite in_opn=> /sg_edgeNeq /negbT.
+        exact: (fan_w0_prop fan).
+      - rewrite eq_sym. apply/(absent_edge pc_xa_cb w0_at_x). 
+    }
+    case: (boolP (wi \in chain))=> wi_in_x.
+    - have /andP[xNwi /andP[wiNw xNw]] : [&& x != wi, wi != w & x != w].
+      {
+        have w_in_f : w \in w::val fan by rewrite in_cons eq_refl.  
+        have eq_fmax : val fan = behead ((f1 ++ [:: wj]) ++ wi :: f2) by rewrite -fsplit.
+        have wi_in_fmax : wi \in val fan. 
+        {
+          rewrite eq_fmax; case: f1 fsplit eq_fmax=> [|hd tl] _; first by rewrite cat0s cat1s /behead in_cons eq_refl.
+          by rewrite -catA cat_cons /behead catA mem_cat in_cons eq_refl.
+        }
+        have wi_in_f : wi \in w::val fan by rewrite in_cons wi_in_fmax.
+        have := fan_uniq fan; rewrite cons_uniq=> /andP[w_nin_fmax _].
+        case: (boolP (x != wi))=> [xNwi|/negbNE /eqP xEwi];
+        [rewrite andTb; case: (boolP (wi != w))=> [wiNw|/negbNE /eqP wiEw];
+          [rewrite andTb; case: (boolP (x != w))=> [xNw|/negbNE /eqP xEw]=> //;
+            have := in_neigh w_in_f;
+            rewrite in_opn xEw=> /sg_edgeNeq /eqP; contradiction
+          | rewrite andFb; rewrite wiEw in wi_in_fmax; by rewrite (wi_in_fmax) in w_nin_fmax]
+        |
+          rewrite andFb; have := in_neigh wi_in_f;
+          rewrite in_opn xEwi=> /sg_edgeNeq /eqP; contradiction
+        ].
+      }
+      have x_in_x := (@in_component_of (kempe_graph pc ca cb) x).
+      have w_nin_x : w \notin chain by
+        case
+          (@chain_two_endpts x wi w xNwi wiNw xNw
+            (conj (chain_endptP (or_intror pc_xa_cb))
+            (conj (chain_endptP (or_introl pc_wia_ca))
+                  (chain_endptP (or_introl pc_wa_ca)))
+          ));
+        [rewrite chain_x /kempe_chain x_in_x | case; [rewrite wi_in_x|]].
+      
+      have ifan : fanp (invertedChain chain) (\val fan) x w0 w.
+      {
+        rewrite /fanp fan_last eq_refl fan_uniq fan_neigh w0_ifan //=.
+        admit.
+      }
+      exists w, (Build_Fan ifan).
+      by rewrite (notin_inverted_absent chain_x w_nin_x imset_pc_ic) in pc_wa_ca.
+    - rewrite (notin_inverted_absent chain_x wi_in_x imset_pc_ic) in pc_wia_ca.
+      have fsmaller := sub_fan fsplit.
+      have ifan : fanp (invertedChain chain) (\val fsmaller) x w0 wi.
+      {
+        rewrite /fanp fan_last eq_refl fan_uniq fan_neigh w0_ifan //=.
+        admit.
+      }
+      by exists wi, (Build_Fan ifan).
+    Admitted.
 
 End KempeProper.

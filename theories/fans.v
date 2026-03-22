@@ -227,7 +227,6 @@ Section Rotation.
     exact: imset_swap He1 He2.
   Qed.
   
-  (* TO DO: could be more general too, bc will need to prove base case anyways *)
   Lemma imset_rot_del_edge (e0 e1 : {set G}) : 
     c e0 = rotateF e1 ->
     c[E(del_edges e0)] = rotateF[E(del_edges e1)].

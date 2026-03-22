@@ -63,6 +63,34 @@ Section EdgeColoring.
     exact: (subset_trans Hsub (imsetS c (sub_all_edges x))).
   Qed.
 
+  Lemma c_del c (e1 e2 : {set G}) :
+    e1 \in E(G) -> e2 \in E(G) ->
+    c e1 = c e2 -> 
+    c [E(del_edges e1)] = c [E(del_edges e2)].
+  Proof.
+    rewrite/coloring_image=> e1_in_G e2_in_G eqc12.
+    case: (boolP (e1 == e2))=> [/eqP ->//| neq12].
+    apply/setP=> c0.
+    wlog suff H : e1 e2 e1_in_G e2_in_G eqc12 neq12 /
+    (c0 \in [set c e | e in E(del_edges e1)] ->
+     c0 \in [set c e | e in E(del_edges e2)]).
+    { 
+      have H12 := H e1 e2 e1_in_G e2_in_G eqc12 neq12.
+      rewrite eq_sym in neq12.
+      have H21 := H e2 e1 e2_in_G e1_in_G (esym eqc12) neq12.
+      apply/idP/idP; [exact: H12 | exact: H21].
+    }
+    move=> /imsetP [e3 e3_in_E eq03]; apply/imsetP.
+    case: (boolP (e3 == e2))=> [/eqP eq23| neq23].
+    - exists e1; last by rewrite eqc12 eq03 eq23.
+      rewrite mem_del_edges e1_in_G.
+      exact: edges_eqn_sub e1_in_G e2_in_G neq12.
+    - exists e3; last by [].
+      move: e3_in_E; rewrite 2!mem_del_edges=> /andP[e3_in_G _].
+      rewrite e3_in_G.
+      exact: edges_eqn_sub e3_in_G e2_in_G neq23.
+  Qed. 
+
   Lemma leq_col_deg c x : #|c[E{x}]| <= max_degree G.
   Proof. 
     apply: (leq_trans (leq_imset_card _ _)).

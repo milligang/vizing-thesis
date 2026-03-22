@@ -181,7 +181,7 @@ Proof.
   have is_fmax: is_fanmax fmax by move: (fanmax_is_max f0); rewrite {}Hfmax /=.
   (* there exists some color ck absent at w *)
   move: (exists_absent_color kc' leq_gg' w)=> [ck] Habw0' {leq_gg'}.
-  have{Habw0'} Habw0 := extended_absent Ein0 Habw0'.
+  have{Habw0'} Habw0 : Some ck \in absent_set kc w := extended_absent Ein0 Habw0'.
   case: (boolP (Some ck \in absent_set kc v))=> [Habv0 | Hnabv0].
   - (* if ck is absent at v, we can replace extra color with ck *)
     have Hcap: (Some ck \in absent_set kc v :&: absent_set kc w) by apply/setIP/(conj Habv0 Habw0).
@@ -193,14 +193,14 @@ Proof.
   have Evj : v -- wj by rewrite in_edges in Einj.
   (* split fan at wj as f1 and (wj::f2) *)
   case/splitPr fsplit: (w::fval fmax)/Hfanj=> [f1 f2 _].
+  have Hneqj0 : wj != w0.
+  { 
+    apply: (@contra_neq _ _ ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; wj]) ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; w0]) _ _)=> [-> //|];
+    have /eqP -> : (proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; w0] == None by move/eqP: (w0_col_extended kc').
+    by rewrite Hkcj.
+  }
   case: f2 fsplit=> [|wi f2'] fsplit.
   - (* contradiction if f2 is empty *)
-    have Hneqj0 : wj != w0.
-    { 
-      apply: (@contra_neq _ _ ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; wj]) ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; w0]) _ _)=> [-> //|];
-      have /eqP -> : (proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; w0] == None by move/eqP: (w0_col_extended kc').
-      by rewrite Hkcj.
-    }
     by rewrite -(fan_last fmax) -(last_cons w w) fsplit cats1 last_rcons eq_refl in Hneqj0.
   (* so f2 is non-empty, i.e. wi != w0 *)
   have kc_wia_ck : Some ck \in absent_set kc wi.
@@ -211,8 +211,6 @@ Proof.
     rewrite Hfval /absent_prop; [rewrite Hw | rewrite -cat_rcons cat_path last_rcons];
     rewrite /path Hkcj=> /andP[_ +] //; move=> /andP[-> _]. 
   }
-  rewrite -[wj :: wi :: f2']cat1s catA in fsplit.
-  have fsmallest := sub_fan fsplit.
 
   (* Construct ck cv Kempe Chain containing v *)
   pose chain := kempe_chain kc (Some ck) cv v.
@@ -230,50 +228,13 @@ Proof.
   have card_ic : #|ic[E(G)]| == (max_degree G  + 1 + 1) by rewrite -imset_kc_ic card_k_col.
   pose ikc : kEdgeColoringType G (max_degree G + 1 + 1) := existT _ (projT1 kc) (exist _ ipc card_ic).
   have v_in_v := (@in_component_of (kempe_graph kc (Some ck) cv) v).
-  have [ikc_fmax fvalmax] : (exists _ : Fan ikc v w0 w, _) := inverted_fan chain_refl fmax (or_intror Habv1).
   have ic_va_ck : Some ck \in absent_set ikc v.
   {
     have [_ H] := in_inverted_absent chain_refl v_in_v.
     by apply H.
   }
-  case: (boolP (wi \in chain))=> wi_in_v; exists (max_degree G + 1).
-  - have /andP[vNwi /andP[wiNw vNw]] : [&& v != wi, wi != w & v != w].
-    {
-      have w_in_f : w \in w::val fmax by rewrite in_cons eq_refl.  
-      have eq_fmax : val fmax = behead ((f1 ++ [:: wj]) ++ wi :: f2') by rewrite -fsplit.
-      have wi_in_fmax : wi \in val fmax. 
-      {
-        rewrite eq_fmax; case: f1 fsplit eq_fmax=> [|hd tl] _; first by rewrite cat0s cat1s /behead in_cons eq_refl.
-        by rewrite -catA cat_cons /behead catA mem_cat in_cons eq_refl.
-      }
-      have wi_in_f : wi \in w::val fmax by rewrite in_cons wi_in_fmax.
-      have := fan_uniq fmax; rewrite cons_uniq=> /andP[w_nin_fmax _].
-      case: (boolP (v != wi))=> [vNwi|/negbNE /eqP vEwi];
-      [rewrite andTb; case: (boolP (wi != w))=> [wiNw|/negbNE /eqP wiEw];
-        [rewrite andTb; case: (boolP (v != w))=> [vNw|/negbNE /eqP vEw]=> //;
-          have := in_neigh w_in_f;
-          rewrite in_opn vEw=> /sg_edgeNeq /eqP; contradiction
-        | rewrite andFb; rewrite wiEw in wi_in_fmax; by rewrite (wi_in_fmax) in w_nin_fmax]
-      |
-        rewrite andFb; have := in_neigh wi_in_f; 
-        rewrite in_opn vEwi=> /sg_edgeNeq /eqP; contradiction
-      ].
-    }
-    have w_nin_v : w \notin chain by 
-    case
-      (chain_two_endpts chain_refl vNwi wiNw vNw
-        (conj (chain_endptP (or_intror Habv1))
-        (conj (chain_endptP (or_introl kc_wia_ck))
-              (chain_endptP (or_introl Habw0)))
-      )); 
-    [rewrite v_in_v | case; [rewrite wi_in_v|]].
-    rewrite (notin_inverted_absent chain_refl w_nin_v imset_kc_ic) in Habw0.
-    have Hcap : (Some ck \in absent_set ikc v :&: absent_set ikc w) by apply/setIP/(conj ic_va_ck Habw0).
-    by have := (smaller_coloring ikc_fmax erefl Hcap).
-  - rewrite (notin_inverted_absent chain_refl wi_in_v imset_kc_ic) in kc_wia_ck.
-    rewrite -[\val fmax]/(fval fmax) fvalmax in fsplit.
-    have ikc_fsmallest : Fan ikc v w0 wi := sub_fan fsplit.
-    have Hcap : (Some ck \in absent_set ikc v :&: absent_set ikc wi) by apply/setIP/(conj ic_va_ck kc_wia_ck).
-    by have := (smaller_coloring ikc_fsmallest erefl Hcap).
+  have [u [ikc_fan ic_ua_ck]] : (exists _ : _, exists _ : Fan ikc v w0 _, _)
+    := inverted_fan chain_refl imset_kc_ic fsplit Hneqj0 Habv1 kc_wia_ck Habw0 Hkcj.
+  have Hcap : (Some ck \in absent_set ikc v :&: absent_set ikc u) by apply/setIP/(conj ic_va_ck ic_ua_ck).
+  by exists (max_degree G + 1); have := smaller_coloring ikc_fan erefl Hcap.
 Qed.
-
