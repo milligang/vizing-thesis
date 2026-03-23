@@ -201,6 +201,11 @@ Section Rotation.
   Definition rotateF : edgeColoringType G ColorType :=
     rotate c (rev (wk::val f)) v.
 
+  Lemma rot_notin (e : {set G}) :
+    e \notin E{v} -> c e = rotateF e.
+  Proof.
+  Admitted.
+
   Lemma imset_rot_vertex : c[E{v}] = rotateF[E{v}].
   Proof.
     rewrite /rotateF; set fs := (rev (wk::val f)).
@@ -279,13 +284,30 @@ Section Rotation.
     by rewrite/absent_set imset_rot imset_rot_vertex.
   Qed.
 
-  (* TO DO: may rephrase, can make it more/less general *)
   Lemma rot_absent_fan w c0 : 
     w \in (wk::val f) -> 
     c0 \in (absent_set c v :&: absent_set c w) ->
     c0 \in (absent_set rotateF v :&: absent_set rotateF w).
   Proof. 
-  Admitted.
+    rewrite /absent_set imset_rot imset_rot_vertex=> /in_neigh w_at_v /setIP[/setDP[c0_in_r c0_nin_v] /setDP[_ /negP c0_nin_w]].
+    apply/setIP; split; apply/setDP; split; try by assumption.
+    apply/negP=> /imsetP [e /edgesSetP [y] [def_e wy]] cNr.
+    have /andP[/andP[e_at_w e_at_y] wNy] : (e \in E{G;w}) && (e \in E{G;y}) && (w != y) by apply/edge_neigh_edge; rewrite def_e wy.
+    apply: c0_nin_w. 
+    have e_in_E : [set w; y] \in E(G)  by move: e_at_w; rewrite mem_edge_graph def_e=> /andP[-> _].
+    apply/in_c_edge_neighP; exists y=> //.
+    case: (boolP (y == v)) => [/eqP yEv | yNv].
+    - exfalso. move: c0_nin_v=> /negP c0_nin_v. 
+      apply: c0_nin_v. apply/in_c_edge_neighP; rewrite -yEv.
+      have set_refl : [set w; y] = [set y; w] by apply/doubleton_eq_iff; right.
+      rewrite set_refl in def_e e_in_E.
+      exists w=> //.
+      by rewrite cNr def_e. 
+    rewrite cNr def_e. 
+    apply/rot_notin/negP=> /imsetP [x] x_at_v /doubleton_eq_iff [[wEv yEx] | [_ yEv]].
+    - move: w_at_v. by rewrite in_opn=> /sg_edgeNeq; rewrite wEv eq_refl.
+    by rewrite yEv eq_refl in yNv.
+  Qed.
 
   Lemma rot_proper : 
     is_proper_edge_coloring c ->

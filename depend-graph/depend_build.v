@@ -1,9 +1,10 @@
 From dpdgraph Require dpdgraph.
 From VizingThesis Require aux edge_coloring fans spath alternate_path kempe vizing.
 
-(* Set DependGraph File "vizing-thesis/depend-graph/graph.dpd".
+Set DependGraph File "vizing-thesis/depend-graph/graph.dpd".
 
-Print FileDependGraph aux edge_coloring fans spath kempe alternate_path vizing. *)
+(* Print FileDependGraph edge_coloring. *)
+(* Print FileDependGraph aux edge_coloring fans spath kempe alternate_path vizing. *)
 
 (* 
     Step through to here, or make
