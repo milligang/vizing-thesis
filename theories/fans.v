@@ -238,18 +238,19 @@ Section Rotation.
     have He2: [set v; w2] \in E(G) by rewrite in_opn -in_edges in Hw2.
     exact: imset_swap He1 He2.
   Qed.
-  
+
   Lemma imset_rot_del_edge (e0 e1 : {set G}) : 
+    e0 \in E(G) -> e1 \in E(G) ->  
     c e0 = rotateF e1 ->
     c[E(del_edges e0)] = rotateF[E(del_edges e1)].
   Proof.
+    rewrite /coloring_image=> e0_in_G e1_in_G.
     rewrite/rotateF; set fs := (rev (wk::val f)).
-    elim: fs c=> [/=|w1 [|w2 wss] IH] d.
-    (* rewrite -(IH (swap_edge d [set v; w0] [set v; w1])) //.  *)
-    (* move/andP: Hws => [Hw1 _].
-    have He0: [set v; w0] \in E(G) by rewrite in_opn -in_edges in Hw0.
-    have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
-    exact: imset_swap He0 He1. *)
+    elim: fs c=> [/=|w1 [/=|w2 wss] IH] d.
+    - exact: c_del. 
+    - exact: (IH d). 
+    rewrite -[rotate d [:: w1,  w2  & wss] v]/(rotate (swap_edge d [set v; w1] [set v; w2]) (w2 :: wss) v)=> de0.
+    specialize (IH (swap_edge d [set v; w1] [set v; w2])).
   Admitted.
 
   Lemma rotate_last (fs : seq G) (d : edgeColoringType G ColorType) :

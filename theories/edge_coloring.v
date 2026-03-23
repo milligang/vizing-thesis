@@ -63,7 +63,7 @@ Section EdgeColoring.
     exact: (subset_trans Hsub (imsetS c (sub_all_edges x))).
   Qed.
 
-  Lemma c_del c (e1 e2 : {set G}) :
+  Lemma imset_c_del_edge c (e1 e2 : {set G}) :
     e1 \in E(G) -> e2 \in E(G) ->
     c e1 = c e2 -> 
     c [E(del_edges e1)] = c [E(del_edges e2)].
