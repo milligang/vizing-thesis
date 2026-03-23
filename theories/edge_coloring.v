@@ -182,10 +182,6 @@ Section ChromIdx.
 
   (* ----  One-to-one Coloring ---- *)
 
-  (* TO THINK: we could use Program Definition, is this better? Should we do this elsewhere too? *)
-  (* Program Definition in_edge_coloring2 : properEdgeColoringType G {set G} := 
-    fun e => e. *)
-
   (* injective coloring: each edge is a color *)
   Definition injEdgeColoringType : edgeColoringType G {set G} :=
     fun e => e.

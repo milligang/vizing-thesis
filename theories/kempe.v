@@ -303,7 +303,7 @@ Section KempeProper.
     we make this more specific (to not repeat our work from there)
   *)
 
-  Lemma inverted_fan 
+  Proposition inverted_fan 
     {w0 wi wj w : G} {f1 f2 : seq G} 
     (imset_pc_ic : pc [E(G)] = (invertedChain chain) [E(G)])
     (fan : Fan pc x w0 w) 
@@ -330,7 +330,7 @@ Section KempeProper.
     }
     have w0_ifan : w0_prop (invertedChain chain) [set x; w0].
     {
-      apply/(w0_inverted chain_x _ _ (fan_w0_prop fan)).
+      apply/(w0_inverted _ _ _ (fan_w0_prop fan)).
       - rewrite -pc_xwj_ca. move: (wj_at_x). 
         suff : (sval pc [set x; w0]) \in absent_set pc wj;
         first by exact: absent_edge_sym.

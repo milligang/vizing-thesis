@@ -1,7 +1,6 @@
 import re
 import subprocess
 import os
-import shutil
 
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 DPD_FILE     = os.path.join(SCRIPT_DIR, "graph.dpd")

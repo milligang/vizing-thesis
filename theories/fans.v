@@ -247,7 +247,7 @@ Section Rotation.
     rewrite /coloring_image=> e0_in_G e1_in_G.
     rewrite/rotateF; set fs := (rev (wk::val f)).
     elim: fs c=> [/=|w1 [/=|w2 wss] IH] d.
-    - exact: c_del. 
+    - exact: imset_c_del_edge. 
     - exact: (IH d). 
     rewrite -[rotate d [:: w1,  w2  & wss] v]/(rotate (swap_edge d [set v; w1] [set v; w2]) (w2 :: wss) v)=> de0.
     specialize (IH (swap_edge d [set v; w1] [set v; w2])).
@@ -277,8 +277,20 @@ Section Rotation.
   Proof.
     have +: w0_prop c [set v; w0] by exact: fan_w0_prop.
     rewrite/w0_prop.
+    have vw0_in_G : [set v; w0] \in E(G).
+    {
+      rewrite in_edges -in_opn.
+      apply/in_neigh.
+      by have := mem_last wk (\val f); rewrite fan_last.
+    }
+    have vwk_in_G : [set v; wk] \in E(G).
+    {
+      rewrite in_edges -in_opn.
+      apply/in_neigh.
+      by rewrite mem_head.
+    }
     have Heq: c [E(del_edges [set v; w0])] = rotateF [E(del_edges [set v; wk])] 
-      := imset_rot_del_edge rot_first_last. 
+      := imset_rot_del_edge vw0_in_G vwk_in_G rot_first_last. 
     by rewrite rot_first_last Heq.
   Qed.
 
