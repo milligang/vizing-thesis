@@ -202,9 +202,16 @@ Section Rotation.
     rotate c (rev (wk::val f)) v.
 
   Lemma rot_notin (e : {set G}) :
-    e \notin E{v} -> c e = rotateF e.
+    e \in E(G) -> e \notin E{v} -> c e = rotateF e.
   Proof.
-  Admitted.
+    rewrite /rotateF mem_edge_graph=> -> /= e_nin_v; set fs := (rev (wk::val f)).
+    elim: fs c=> [|w1 [|w2 wss] IH] d //.
+    change (d e = rotate (swap_edge d [set v; w1] [set v; w2]) (w2 :: wss) v e).
+    rewrite -(IH (swap_edge d [set v; w1] [set v; w2])).
+    rewrite /swap_edge. move: e_nin_v.
+    case: ifP=> [/eqP -> /negP|]; first by rewrite set21.
+    case: ifP=> [/eqP -> /negP|//]; by rewrite set21.
+  Qed.
 
   Lemma imset_rot_vertex : c[E{v}] = rotateF[E{v}].
   Proof.
@@ -304,7 +311,7 @@ Section Rotation.
       exists w=> //.
       by rewrite cNr def_e. 
     rewrite cNr def_e. 
-    apply/rot_notin/negP=> /imsetP [x] x_at_v /doubleton_eq_iff [[wEv yEx] | [_ yEv]].
+    apply/rot_notin/negP=>// /imsetP [x] x_at_v /doubleton_eq_iff [[wEv yEx] | [_ yEv]].
     - move: w_at_v. by rewrite in_opn=> /sg_edgeNeq; rewrite wEv eq_refl.
     by rewrite yEv eq_refl in yNv.
   Qed.
