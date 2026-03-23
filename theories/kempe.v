@@ -148,7 +148,21 @@ Section InvertChain.
     c [set u; w0] != ca -> c [set u; w0] != cb ->
     w0_prop c [set u; w0] -> w0_prop invertedChain [set u; w0].
   Proof.
-  Admitted.
+    rewrite /w0_prop /coloring_image=> /negbTE cNa /negbTE cNb /negP c_nin_E.
+    apply/negP=> /imsetP [e] e_in_E eq_i.
+    apply: c_nin_E; apply/imsetP.
+    exists e=> //.
+    have cEi : c [set u; w0] = invertedChain [set u; w0].
+    {
+      apply/not_kempe_edge; left. 
+      apply/negP=> +. 
+      by rewrite (@mem_kempe G _ c ca cb [set u; w0]) cNa cNb /= andbF.
+    }
+    move: (eq_i).
+    rewrite -cEi /invertedChain.
+    case: (boolP ((e \in E(kempe_graph c ca cb)) && (e \subset chain)))=> //.
+    case: ifP=> _ _ contra; by move: cNa cNb; rewrite contra eq_refl.
+  Qed.
 
 End InvertChain.
 
@@ -282,12 +296,6 @@ Section KempeProper.
     have [y /ltn_geF] := @shared_interior3 (kempe_graph pc ca cb) _ _ _ _ _ degu degv degw uNv vNw uNw Ip Iq.
     by have -> := max_deg_kempe y.
   Qed.
-
-  (* Lemma inverted_fan {v : G} (fan : Fan c x v u) : 
-  (ca \in absent_set c x) \/ (cb \in absent_set c x) -> 
-  exists ifan : Fan invertedChain x v u, fval fan = fval ifan.
-  Proof.
-  Admitted. *)
 
   (* 
     Technically, the following is also true less hypotheses. 
