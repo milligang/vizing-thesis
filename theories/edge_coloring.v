@@ -243,6 +243,14 @@ Section AbsentSet.
     apply Hnin; exact: in_cneigh.
   Qed.
 
+  Lemma absent_edge_sym {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y :
+    c0 \in absent_set c x -> x \in N(y) -> c0 != c [set y; x].
+  Proof. 
+    have -> : [set y; x] = [set x; y] by rewrite doubleton_eq_iff; right.
+    rewrite in_opn sg_sym -in_opn.
+    exact: absent_edge. 
+  Qed.
+
   Lemma absent_del_edge {ColorType : finType} (c : edgeColoringType G ColorType) x y z :
     [set x; y] \in E(G) -> x != z -> y != z ->
     c [set x; y] \notin c[E(del_edges [set x; y])] ->
@@ -259,14 +267,6 @@ Section AbsentSet.
     move/edgesSetP: e_at_z => [w [-> _]].
     exists z; first by rewrite !inE eqxx.
     by rewrite !inE negb_or eq_sym xNz eq_sym.
-  Qed.
-
-  Lemma absent_edge_sym {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y :
-    c0 \in absent_set c x -> x \in N(y) -> c0 != c [set y; x].
-  Proof. 
-    have -> : [set y; x] = [set x; y] by rewrite doubleton_eq_iff; right.
-    rewrite in_opn sg_sym -in_opn.
-    exact: absent_edge. 
   Qed.
 
   Proposition exists_absent_color {k : nat} (kc : kEdgeColoringType G k):

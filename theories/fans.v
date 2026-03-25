@@ -340,8 +340,8 @@ Section Rotation.
     have w0p: w0_prop c [set v; w0] := fan_w0_prop; rewrite /w0_prop in w0p.
     elim: fs c w0 abs_fs w0p nps => [//|w1 [|w2 wss] IH] d x0 /andP[abs_w01 abs_fs] x0p /andP[x0_at_v /andP[w1_at_v nps]] pc_d.
     - rewrite/rotate. apply/(swap_proper_vertex pc_d (absent_del_edge _ _ _ _) abs_w01 x0_at_v w1_at_v); rewrite //=; first by rewrite in_edges -in_opn.
-      + admit.
-      + admit.
+      + by move: w1_at_v; rewrite in_opn=> /sg_edgeNeq ->.
+      + (* contradiction if x0 = w1 from abs_w01 *) admit.
     apply: (IH (swap_edge d [set v; x0] [set v; w1]) w1).
   Admitted.
 
