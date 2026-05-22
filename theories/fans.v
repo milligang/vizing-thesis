@@ -34,7 +34,31 @@ Section Fan.
   : (extendedColType c_del) e = None.
   Proof. by rewrite /extendedColType eq_refl. Qed.
 
-    (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
+  Lemma swap_w0 {c e1 e2} (He1: e1 \in E(G)) (He2: e2 \in E(G))
+  : w0_prop c e1 -> w0_prop (swap_edge c e1 e2) e2.
+  Proof.
+    rewrite/w0_prop/coloring_image.
+    case: (boolP (e1 == e2))=> [/eqP ->| e1Ne2].
+    - have /(swap_edge_eq c) sEc: e2 == e2 by trivial.
+      by rewrite sEc (eq_imset _ sEc).
+    move=> /memPnC h.
+    apply/memPnC=> c0 /imsetP [e] He ->.
+    have ->: swap_edge c e1 e2 e2 = c e1 by rewrite/swap_edge eq_sym (negbTE e1Ne2) eqxx.
+    apply: h.
+    case: (boolP (e == e1))=> [/eqP ->| eNe1].
+    - have ->: swap_edge c e1 e2 e1 = c e2 by rewrite/swap_edge eqxx.
+      apply: imset_f.
+      rewrite mem_del_edges He2 (edges_eqn_sub He2 He1) //.
+      by rewrite eq_sym.
+    have eNe2: e != e2 := del_edges1_neq He.
+    have ->: swap_edge c e1 e2 e = c e by rewrite/swap_edge (negbTE eNe1) (negbTE eNe2).
+    apply: imset_f.
+    move: He.
+    rewrite 2! mem_del_edges=> /andP[e_in_G _].
+    rewrite e_in_G; apply (edges_eqn_sub e_in_G He1 eNe1).
+  Qed.
+
+  (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
     the color of (v, w_{i+1} is absent at w_i) *)
   Definition absent_prop c e w := 
     (c e) \in (absent_set c w).
@@ -98,6 +122,30 @@ Section Fan.
     - rewrite cat_cons; case=> _ ->.
       by rewrite -cat_rcons cat_path last_rcons=> /andP[_ ->].
   Qed.
+
+  Lemma swap_fanp c f v w0 wk : 
+    fanp c f v w0 wk -> 
+    fanp (swap_edge c [set v; w0] [set v; last wk (belast wk f)]) (behead (belast wk f)) v (last wk (belast wk f)) wk.
+  Proof.
+    rewrite/fanp=> /andP[/andP[/andP[/andP[Hlast Huniq] Hneigh] Hw0] Hpath].
+    have w0_in_G: [set v; w0] \in E(G).
+    {
+      rewrite in_edges -in_opn.
+      move/allP: Hneigh=> Hneigh.
+      apply Hneigh.
+      move/eqP: Hlast=> <-.
+      apply mem_last.
+    }
+    move: Hneigh=> /andP[Hwk Hneigh].
+    have wk_in_G: [set v; wk] \in E(G) by rewrite in_edges -in_opn.
+    have := lastI wk f.
+    (* elim: f1=> [|w1 ws IH] /=;
+    first by rewrite Hwk eq_refl (swap_w0 w0_in_G wk_in_G Hw0). 
+    have fcat : f = behead f1 ++ [::w0] by admit.
+    rewrite/fanp.
+    rewrite fcat.
+    move=> /andP[/andP[/andP[/andP[A B] C] L] H]. *)
+  Admitted.
 
 End Fan.
 
@@ -197,6 +245,10 @@ Section Rotation.
   Proof.
     move: (valP f)=> Hf. exact: (Build_Fan (sub_fanp Hcat Hf)). 
   Qed.
+
+  Lemma swap_fan : 
+    Fan (swap_edge c [set v; w0] [set v; last wk (belast wk (val f))]) v (last wk (belast wk (val f))) wk.
+  Proof. move: (valP f)=> Hf; exact: (Build_Fan (swap_fanp Hf)). Qed.
 
   Definition rotateF : edgeColoringType G ColorType :=
     rotate c (rev (wk::val f)) v.
@@ -341,8 +393,15 @@ Section Rotation.
     elim: fs c w0 abs_fs w0p nps => [//|w1 [|w2 wss] IH] d x0 /andP[abs_w01 abs_fs] x0p /andP[x0_at_v /andP[w1_at_v nps]] pc_d.
     - rewrite/rotate. apply/(swap_proper_vertex pc_d (absent_del_edge _ _ _ _) abs_w01 x0_at_v w1_at_v); rewrite //=; first by rewrite in_edges -in_opn.
       + by move: w1_at_v; rewrite in_opn=> /sg_edgeNeq ->.
-      + (* contradiction if x0 = w1 from abs_w01 *) admit.
+      + apply/negP=> /eqP eq. 
+        have : d [set v; w1] != d [set v; x0] := absent_edge_sym abs_w01 x0_at_v.
+        by rewrite eq eqxx.
     apply: (IH (swap_edge d [set v; x0] [set v; w1]) w1).
+    - admit.
+    - admit.
+    - admit.
+    have abs_x01: d [set v; x0]  \in absent_set d w1 by admit.
+    exact (swap_proper_vertex pc_d abs_x01 abs_w01 x0_at_v w1_at_v).
   Admitted.
 
 End Rotation.
