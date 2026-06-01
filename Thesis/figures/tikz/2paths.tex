@@ -1,0 +1,52 @@
+\begin{tikzpicture}[scale=0.8]
+
+\def\dx{4}
+
+% ================= 1. One extends the other =================
+\node[vertex] (x4) at (-2,0) {$x$};
+\node[vertex] (y4) at (0,0) {$y$};
+\node[vertex] (z4) at (2,0) {$z$};
+
+\draw[edge] (x4) -- (y4);
+\draw[edge] (y4) -- (z4);
+
+% ================= 2. Disjoint =================
+\node[vertex] (x1) at (\dx,0) {$x$};
+\node[vertex] (y1) at (\dx+2.5,1.2) {$y$};
+\node[vertex] (z1) at (\dx+2.5,-1.2) {$z$};
+
+\draw[edge] (x1) -- (y1);
+\draw[edge] (x1) -- (z1);
+
+% ================= 3. Shared prefix =================
+\node[vertex] (x2) at (2*\dx,0) {$x$};
+\node[vertex] (c2) at (2*\dx+1.5,0) {$w'$};
+\node[vertex] (y2) at (2*\dx+3,1.2) {$y$};
+\node[vertex] (z2) at (2*\dx+3,-1.2) {$z$};
+
+\draw[edge] (x2) -- (c2);
+\draw[edge] (c2) -- (y2);
+\draw[edge] (c2) -- (z2);
+
+% ================= 4. Multiple intersections =================
+\node[vertex] (x3) at (3*\dx,0) {$x$};
+
+% merge/split points
+\node[vertex] (m1) at (3*\dx+1.5,0) {};
+\node[vertex] (m2) at (3*\dx+3,0) {$w'$};
+
+\node[vertex] (y3) at (3*\dx+4,1.2) {$y$};
+\node[vertex] (z3) at (3*\dx+4,-1.2) {$z$};
+
+% first divergence and merge
+\draw[edge] (x3) to (m1);
+
+% split again
+\draw[edge, bend left=20] (m1) to (m2);
+\draw[edge, bend right=20] (m1) to (m2);
+
+% final split to endpoints
+\draw[edge] (m2) -- (y3);
+\draw[edge] (m2) -- (z3);
+
+\end{tikzpicture}

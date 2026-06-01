@@ -1,0 +1,402 @@
+%!TEX root = ../dissertation.tex
+\begin{savequote}[75mm]
+There are no lines in nature, only areas of color, one against another.
+\qauthor{\'Edouard Manet}
+\end{savequote}
+
+\chapter{A Proof of Vizing's Theorem}\label{chapter math}
+% \note{a small paragraph to start which sets up an example where Vizing’s theorem might arise so that people have something tangible to keep in mind}
+In this chapter, we present a thorough proof of Theorem~\ref{Vizing} (Vizing's theorem) for simple graphs. Recall that Vizing's theorem states the chromatic index of a graph is at least the maximum degree and at most the maximum degree plus one. We begin this chapter by defining edge colorings in Section~\ref{section background}. From this definition we can already lower bound the chromatic index by the maximum degree. For the upper bound, we will use induction to create an edge coloring of $G$ that uses $\Delta + 2$ colors. The aim will then be to construct a new edge coloring that uses one less color. For this, we will need two new structures, \textit{fans} and \textit{Kempe chains}. We also will define a \textit{rotation} and an \textit{inversion} operation for fans and Kempe chains, respectively, to modify the colors of the edges while preserving the properties of the original edge coloring. Fans and Kempe chains rely on \textit{absent sets}, that is, the set of colors which are not present on any edges adjacent to a given vertex. Absent sets, fans, and Kempe chains are addressed in turn in Section~\ref{section math aux}. For each lemma we will, where applicable, note the location of the corresponding lemma and proof in the code in Appendix~\ref{AppendixB}. Once these are established, we complete our proof of Vizing's theorem in Section~\ref{section proof}. To decrease the number of colors on the edges, we will create a maximal fan, build a Kempe chain at the last edge in the fan, invert the vertices along the chain, rotate the fan, and finally recolor the last edge of the rotated fan with a carefully selected color such that we still have a valid coloring and have removed the old color at this edge entirely from the graph.
+
+\section{Background}\label{section background}
+A graph $G$ is defined by its vertices $V(G)$ and edges $E(G).$ Every edge is \textit{incident} to two vertices and is said to \textit{join} these two vertices; we only concern ourselves with loop-less graphs, so we may assume these two vertices are distinct. Two vertices are considered \textit{adjacent vertices} if there exists some edge in $E(G)$ joining them. Two vertices $x$ and $y$ are said to be \textit{connected} if one can get from $x$ to $y$ by only stepping through adjacent vertices in $G.$ A non-repeating sequence of vertices connecting $x$ to $y$, including $x$ and $y$ themselves, is called a \textit{path}. The \textit{neighborhood} of a vertex $x$ is the set $N_G(x) = \{y \mid \e{x}{y} \in E(G)\}$ of vertices adjacent to $x$ in a graph $G,$ often written as $N(x)$ when $G$ can be inferred. Thus, adjacent vertices can also be called neighbors. We denote by $E_G(x) = \{\e{x}{y} \mid \e{x}{y} \in E(G)\} = \{\e{x}{y} \mid y \in N(x)\}$ the set of edges incident to a vertex $x.$ Two distinct edges in $E_G(x)$ are said to be \textit{adjacent edges.} The degree $d_G(x) = |N_G(x)| = |E_G(x)|$ of a vertex $x$ in $G$ is simply the number of vertices adjacent to it, or equivalently, the number of edges which are an incident to it. When it is clear from context, $d_G(x)$ will be written as $d(x).$ The maximum degree $\Delta(G) = \max_{x \in V(G)}d(x)$ of a graph $G$ is the maximum value of $d(x)$ over all vertices $x$ in $G.$
+
+An \textit{edge coloring} of a graph $G$ is a map $C : E(G) \to \{c_1, \dots, c_k\}$ from edges in $E(G)$ to colors $c_1, \dots, c_k.$ We will denote by $C[A]$ the image under $C$ of $A$, so $C[E(G)]$ is the range of $C$. The range of $C$ is typically referred to as the \textit{color set} of $C$ and an item in this color set is called a \textit{color}. The edge coloring $C[e \mapsto c_1]$ refers to the edge coloring $C$ with some edge $e$ recolored as some color $c_1$. We will also use $Swap(C, e, f)$ as shorthand for $C[e \mapsto C(f); f \mapsto C(e)]$ where $e$ and $f$ are any two edges. In other words, $Swap(C, e, f)$ is the edge coloring $C$ with the colors of edges $e$ and $f$ swapped. Swapping edge colors does not add or remove colors from the color set. Note that there may be colors in the color set of $C$ which are not assigned to any edges because $C$ is not necessarily surjective. If this is case, the color set of $C$ would be a proper subset of the co-domain. Thus, we can have unused colors, recolor edges with colors not already present in the graph, and be explicit about when a color must specifically be in the color set as opposed to generally in the co-domain (especially regarding Kempe swaps in Section~\ref{section Kempe definition} which potentially remove colors from the color set).
+
+An edge coloring is a \textit{proper edge coloring} if, for all vertices $x$ in $V(G),$ if there are two edges $e_1, e_2$ in $E_G(x)$ such that $C(e_1) = C(e_2),$ then $e_1 = e_2.$ Before continuing, we would like to point out three key distinctions among our definition and the variations across the literature. First, note that we distinguish between an edge coloring and a proper edge coloring while other papers have inconsistent terminology\footnote{It is refered to as an `edge coloring' by Diestel~\cite{Diestel}, Stiebitz et al.~\cite{GECBook}, and Green~\cite{Green}; as a `complete proper edge coloring' by Bhoja~\cite{Bhoja}; and as a `legal edge coloring' by Barenboim and Elkin~\cite{ElkinDistributed}.} and often only refer to what we call a proper edge coloring. This is likely in part because the chromatic index and Vizing's theorem itself are defined with respect to proper edge colorings. However, not all supporting definitions and lemmas rely on this property, so we chose to first define (and later implement) a more general edge coloring definition. After writing the code in Rocq, this also allowed us to better understand when the properness is explicitly required and when this implicit assumption is unnecessary. The second distinction we would like to point out is our actual definition of a proper edge coloring. This definition more commonly adheres to the following structure: for all edges $e_1, e_2$ in $E(G),$ if there exists a vertex $x$ such that $e_1$ and $e_2$ are in $E_G(x)$ (i.e. they are adjacent edges) and $e_1 \neq e_2$ then $C(e_1) \neq C(e_2).$ We instead utilize the contrapositive of this statement, that is, $C(e_1) = C(e_2)$ implies $e_1 = e_2,$ because this naturally implies $C$ is injective when constrained to the edges $E_G(x)$ incident to a vertex $x;$ we are then able to directly apply this in our proof of Vizing's lower bound. In natural language with typical mathematical assumptions, the proof of the lower bound is nearly immediate and this conclusion is not necessary, but in the Rocq formalization where each step must be justified, this proved rather useful. Finally, we do not include the notion of a partial coloring,\footnote{See Misra and Gries\cite{Misra}, Stiebitz et al~\cite{GECBook}, and even Bhoja's Lean implementation~\cite{Bhoja}.} so every edge in the domain of $C$ is mapped to a color in the co-domain. We found we could instead generate new colors to be replaced later as needed, so supporting a partial coloring was unnecessary. In fact, we mimic the properties of a partial edge coloring with our \fxn{extendedColType} in the code, elaborated upon in the next chapter.
+
+Now we shall continue with our preliminary definitions. A \textit{k-edge coloring} $C_k$ is a proper edge coloring that uses exactly $k$ colors, so the cardinality of $C_k[E(G)]$ is $k.$ Then the \textit{chromatic index} of a graph $G$, denoted $\ci(G),$ is the smallest such $k$ for which a $k$-edge coloring of $G$ exists. Observe that a $k$-edge coloring is exactly a proper edge coloring except that we explicitly state the cardinality of the proper edge coloring's image as the natural number $k.$ That is, we can, for any natural number $k$, write ``$k$-edge coloring'' instead of the wordier ``proper edge coloring $C$ with $C[E(G)] = k.$''  We can immediately upper bound $\ci(G)$ by the total number of edges in a graph $G$ because we can provide an edge coloring which maps each edge to a distinct color. At this point, we have sufficient information to lower bound $\ci(G)$ by the maximum degree, though we save this for Section~\ref{section proof}. However, to prove the upper bound of $\ci(G)$ as proposed by Vizing, we must define a few auxiliary concepts.
+
+\section{Auxiliary Data Structures and Lemmas}\label{section math aux}
+\subsection{The Absent Set}
+Given some vertex $x$ in the vertex set $V(G)$ of a graph $G$ and some edge coloring $C$ of this graph, the absent set at $x$, notated $A_C(x)$, is the set of colors in color set that are not present on the edges adjacent to vertex $x.$ In other words, we have 
+\begin{equation*}
+    A_C(x) := C[E(G)] - C[E_G(x)].
+\end{equation*}
+where subtraction here refers to set difference. We say a color in $A_C(x)$ is absent at $x$. Naturally, for any edge $e$ with a vertex $x$ as an endpoint, the color of edge $e$ cannot be absent at the vertex $x.$ If there are more colors present in the color set than edges at any given vertex, every vertex will have at least one color in its absent set. This follows directly from cardinality arguments, and to explicitly match our implementation in Rocq, we briefly present a lemma with this proof.
+\begin{lemma}[Appendix~\ref{apdx:ec}, lines~280-287]\label{exists_absent_color}
+    If $C_k$ is a k-edge coloring of a graph $G$ such that $\Delta + 1 \leq k,$ then for all vertices $x$ in $V(G)$ there exists some color $c \in C_k[E(G)]$ such that $c$ is absent at $x$.
+\end{lemma} 
+\begin{proof}
+    Let $G$ be any graph with a k-edge coloring $C_k$ such that $\Delta + 1 \leq k$ and let $x$ be any vertex in this graph. By definition of the maximum degree, we have $|C_k[E_G(x)]| \leq |C_k[E(G)]| \leq \Delta(G).$ Therefore, we arrive at the inequality
+    \begin{align*}
+        \Delta(G) + 1 - \Delta(G) \leq |C_k[E(G)]| - |C_k[E_G(x)]|.
+    \end{align*}
+    Substituting the definition of an absent set, this tell us $1 \leq |A_{C_k}(x)|,$ so there is at least one color absent at $x$ and we are done.
+\end{proof}
+
+Observe that no edge can be given some color that is also in the absent set of one of its endpoints. While this is generally straightforward, we present a proof below because it became useful for our implementation (it is used six times) and served as a check on our definition of the absent set.
+\begin{lemma}[\ref{apdx:ec}, lines~241-250]\label{absent_edge}
+    Let $x$ be any vertex in a graph $G$ and let $C$ be an edge coloring of this graph. For any edge $e \in E_G(x)$ and any color $c$ in $A_C(x)$ we have $c \neq C(e).$
+\end{lemma}
+\begin{proof}
+    Let $e$ be any edge in $E_G(x)$ and $c$ be any color in $A_C(x).$ Applying the definition of an absent set, we know $c \in C[E(G)] - C[E_G(x)]$ which implies $c$ must not be in $C[E_G(x)].$ However, we have $e \in E_G(x)$ so $C(e) \in C[E_G(x)].$ Therefore, $c$ cannot equal $C(e).$
+\end{proof}
+
+If we recolor an edge with some color absent at its endpoints, then recoloring preserves the properness of a proper edge coloring. Again, this is an intuitive statement. However, it is key to the final step of Vizing's proof when we remove an extraneous color in the graph while preserving the properness of the coloring, it serves as a stepping stone for more complicated proofs regarding the properness of edge colorings, and the proof grew quickly in the code due to casework involved. Thus, we believe there is value in sharing the reasoning here.
+\begin{lemma}[\ref{apdx:ec}, lines~402-435]\label{recolor_proper}
+    Given any two vertices $x, y$ of some graph $G,$ a proper edge coloring $C,$ and a color $c_1$ in the color set of $C,$ if $c_1$ is in the absent set of both $x$ and $y$ then the edge coloring $C[\e{x}{y}\mapsto c_1]$ is proper.
+\end{lemma}
+\begin{proof}
+    Let $e_1$ and $e_2$ be any two adjacent edges in $G.$ To show $D = C[\e{x}{y}\mapsto c_1]$ is proper, we must show that if $D(e_1) = D(e_2)$ then $e_1 = e_2.$ We assume $C$ is a proper edge coloring, so if $C(e_1) = C(e_2),$ then $e_1 = e_2$. We proceed by casework on if $e_1$ or $e_2$ is the edge $(x, y).$
+    
+    If neither $e_1$ nor $e_2$ are the edge $\e{x}{y},$ then $D(e_1) = C(e_1)$ and $D(e_2) = C(e_2),$ so we have $D(e_1) = D(e_2)$ only if $C(e_1) = C(e_2)$ and we are done. Therefore, we can assume, without loss of generality, that $e_1 = \e{x}{y}.$ Now $D(e_1) = c_1$ and $D(e_1) = D(e_2)$ only if $D(e_2) = c_1.$ Clearly, if $e_2 = \e{x}{y} = e_1$ we are done, so we can also assume $e_2 \neq \e{x}{y}$. However, this implies $D(e_2) = C(e_2)$ and we know $C(e_2) \neq c_1$ because $c_1$ was absent at $x$ and $y$ before the recoloring and $e_2$ is in $E_G(x)$ or $E_G(y).$ Thus, $D(e_1) \neq D(e_2)$ if $e_1 = \e{x}{y}$ and $e_2 \neq \e{x}{y}.$ In all cases, the properness of $C$ is preserved under the recoloring so $D = C[\e{x}{y} \mapsto c_1]$ is a proper edge coloring.
+\end{proof}
+
+Now that we have established absent sets and some basic properties, we can define a structure dependent on these sets and critical to reasoning about edge colorings: Fans.
+
+\subsection{Fans and Rotation}
+Given a vertex $x$ and an edge coloring $C$, a fan $F_{C}(x) = \la w_1, \dots, w_k\ra$ starting at $w_1$ is a sequence of vertices satisfying the following:
+\begin{enumerate}
+    \item \label{neigh_prop}$\la w_1, \dots, w_k\ra$ is a non-empty sequence of distinct neighbors of $x$.
+    \item \label{w0_prop} $C\e{x}{w_1}$ is not in the set $C[E(G) - \{\e{x}{w_1}\}].$ That is, edge $\e{x}{w_1}$ is the only edge with color $C\e{x}{w_1}$ in all of $G$. 
+    \item \label{abs_prop} For all $1 \leq i < k,$ we have $C\e{x}{w_{i+1}} \in A_{C}(w_i).$
+\end{enumerate}
+When partial edge colorings are allowed, property \ref{w0_prop} states that edge $\e{x}{w_1}$ is uncolored, though this naturally has the same implications as edge $\e{x}{w_1}$ being a distinct color. Note that property \ref{w0_prop} implies $C(x,w_1) \in A_C(y)$ for all vertices $y$ other than $x$ and $w_1.$ An example fan is shown in Figure~\ref{fig:fan}
+\begin{figure}
+    \centering
+    \input{figures/tikz/fan}
+    \caption{A fan $F_C(x)=\langle w_1, w_2, w_3, w_4\rangle$ centered at $x$ with edge colors labeled $c_1, c_2,$ etc. Edges connected to $x$ not in $F_C(x)$ are shown in gray (dotted).}
+    \label{fig:fan}
+\end{figure}
+
+If there exists some $w_{k+1}$ in the neighborhood of $x$ such that $w_{k+1}$ is not in $F_C(x)$ and $C\e{x}{w_{k+1}}$ is absent at $w_k,$ then we can extend $F_C(x)$ with $w_{k+1}$ because $\la w_1, \dots, w_{k+1}\ra$ is also a fan. A \textit{maximal fan} is a fan that cannot be extended in such a way. As a corollary of this definition, if $F_C(x) = \la w_1, \dots, w_k \ra$ is a maximal fan and there exists some vertex $w_i$ in the neighborhood of $x$ such that $C\e{x}{w_i}$ is absent at $w_k,$ then $w_i$ must already be in the fan. Otherwise, we could have extended $F_C(x)$ with $w_i,$ contradicting the assumption that $F_C(x)$ was maximal. We present this result below, and we will later use this in Section~\ref{section proof} to split our fan at this vertex $w_i.$
+
+\begin{lemma}[\ref{apdx:fan}, lines~398-413]\label{fanmax_present}
+    Let $F_C(x) = \la w_1, \dots, w_k\ra$ be a maximal fan centered at a vertex $x$ in some graph $G$ where $C$ is an edge coloring. If there exists some color $c$ such that $c$ is absent at $w_k$ but is not absent at $x,$ then there exists some vertex $w_i$ with $1 \leq i < k$ in the fan such that $C\e{x}{w_i} = c.$ 
+\end{lemma}
+\begin{proof}
+    By assumption, we know $c \in C[E(G)]$ because $c \in A_C(w_k).$ Since $c \notin A_C(x) = C[E(G)] - C[E_G(x)],$ it must be the case that $c \in C[E_G(x)]$ and there exists some edge $\e{x}{w_i}\in E_G(x)$ with $C\e{x}{w_i} = c.$ Now assume for the sake of contradiction vertex $w_i$ is not in the fan. Then vertex $w_i$ is in the neighborhood of $x,$ vertex $w_i$ is not in $F_C(x),$ and $C\e{x}{w_i} \in A_C(w_k),$ so we can extend $F_C(x)$ with $w_i.$ However, this contradicts the assumption $F_C(x)$ is a maximal fan. Therefore, the vertex $w_i$ must be in $F_C(x).$ Clearly $w_i$ is distinct from $w_k$ because $C(x, w_i) \in A_C(w_k),$ so $w_i$ is a vertex in $F_C(x)$ with $1 \leq i < k$ such that $C\e{x}{w_i} = c.$
+\end{proof}
+
+The unique properties of a fan allow us to define a rotation operation which will be fundamental to the proof of Vizing's theorem. When we rotate a fan $F_C(x),$ we create a new edge coloring $R$ such that
+\begin{equation*}
+    R(e) = \begin{cases}
+        C(e) & e \notin E_G({x}) \\
+        C\e{x}{w_{i+1}} & e = \e{x}{w_i} \text{ and } 1 \leq i < k \\
+        C\e{x}{w_1} & e = \e{x}{w_k}
+    \end{cases}
+\end{equation*}
+In other words, the colors of the edges $\e{x}{w_1}, \e{x}{w_1}, \dots \e{x}{w_k}$ are rotated counterclockwise as demonstrated in Figure~\ref{fig:rotation}.
+
+\begin{figure}
+    \centering
+    \input{figures/tikz/rotation}
+    \caption{A fan $F_C(x)=\langle w_1, w_2, w_3\rangle$ centered at $x$ with edge colors labeled $c_1, c_2, c_3$ before and after rotation.}
+    \label{fig:rotation}
+\end{figure}
+
+While the definition of rotation is generally clear enough for standard mathematical proofs, the implementation into computer code requires an explicit algorithm. Bhoja's verified Lean implementation of Vizing's theorem in 2025~\cite{Bhoja} also includes an algorithm \fxn{rotateFan} which recursively iterates through the fan's vertices, replacing the edge between this vertex and the central fan vertex with the original color of the previously recolored edge. The algorithm begins at the last vertex of the fan and takes in some new color $\alpha$ with which to color the edge in this first iteration. For our Rocq implementation, in order to perform the rotation of a $F_C(x)$ of vertices $\la w_1, \dots, w_k\ra$, we constructed a recursive algorithm \fxn{Rotate} which iterates over the vertices of this sequence, swapping the colors of $\e{x}{w_i}$ and $\e{x}{w_{i+1}}$ for $1 \leq i < k$. We found our definition easier to reason about inductively, avoiding the helper color $\alpha$ altogether. We could prove properties about the simpler operation of swapping edge colors in an edge coloring and then directly apply this reasoning to our rotation algorithm. This did require us to reverse the sequence of fan vertices in the code before rotating the colors to ensure the colors were rotated clockwise as shown in Figure~\ref{fig:rotation} and not counterclockwise. Algorithm~\ref{code rotate} displays the pseudo-code for the rotation operation.
+
+\begin{algorithm}
+  \caption{Rotation \label{code rotate}}
+  \begin{algorithmic}[1]
+    \Statex
+    \Function{Rotate}{$C, \la w_i, w_{i+1}, \dots, w_k\ra, x$}
+        \If{$i < k$}
+            \State $D \gets \Call{Swap}{C, \e{x}{w_i}, \e{x}{w_{i+1}}}$
+            \State \Return{\Call{Rotate}{$D, \la w_{i+1}, \dots, w_k \ra, x$}}
+        \Else
+            \State \Return{$C$}
+        \EndIf
+    \EndFunction
+  \end{algorithmic}
+\end{algorithm}
+
+We say the \textit{rotated edge coloring} of a fan $F_C(x) =  \la w_1, \dots, w_k\ra,$ written as $R(F_C(x)),$ is the edge coloring returned by \fxn{Rotate($C, \la w_1, \dots, w_k\ra, x$)}. Note that the rotation algorithm itself does not take in a fan as input; this is meant to reflect our Rocq implementation and is defined in this way to allow recursive calls without requiring the input to be a fan after the first call. In fact, the input will still be a fan, but we must prove this statement before we can use it.
+
+We now make a few helpful observations related to rotation. Most of these will be building up towards Proposition~\ref{smaller_lemma} at the end of this section. Since the rotation algorithm is repeated swapping edge colors, we find it helpful to first prove a statement about swapping edge colors before proving a similar statement about rotation with induction. In addition to maintaining the readability of our code and making for a cleaner written inductive proof, extracting these color swapping statements as their own lemmas also supports future applications of the swap operation should one wish to apply it outside of a rotation context. This is particularly applicable if our code becomes integrated with a larger graph theory library. 
+
+First, we show that if an edge satisfies property~\ref{w0_prop} of fans then swapping color with another edge will also swap which edge property~\ref{w0_prop} applies to.
+\begin{lemma}\label{swap_w0}
+    Let $C$ be an edge coloring of a graph $G,$ and let $e_1$ and $e_2$ be two distinct edges in this graph such that edge $e_1$ is the only edge with color $C(e_1)$ in all of $G.$ If $S = Swap(C, e_1, e_2),$ then $C(e_1) = S(e_2)$ and edge $e_2$ is the only edge with color $S(e_2)$ in all of $G.$
+\end{lemma}
+\begin{proof}
+    Our assumption about $C(e_1)$ can be expressed as:
+    $$C(e_1) \notin C[E(G) - \{e_1\}].$$
+    Note that, since $e_1$ and $e_2$ are distinct, this also implies $C(e_1) \neq C(e_2).$
+    To reach our conclusion, we must show 
+    $$S(e_2) \notin S[E(G) - \{e_2\}].$$
+    Only the two edges $e_1$ and $e_2$ are affected by the swap, so $$C[E(G) - \{e_1, e_2\}] = S[E(G) - \{e_1, e_2\}].$$
+    By definition, we have $C(e_1) = S(e_2)$ and $C(e_2) = S(e_1).$ Putting this together, we get the following set of equivalent statements.
+    \begin{align*}
+        S(e_2) &\notin S[E(G) - \{e_2\}]\\
+        S(e_2) &\notin S[E(G) - \{e_1, e_2\}] \cup S(e_1)\\
+        C(e_1) &\notin C[E(G) - \{e_1, e_2\}] \cup C(e_2)\\
+        C(e_1) &\notin C[E(G) - \{e_1, e_2\}] \text{ and } C(e_1) \neq C(e_2)
+    \end{align*}
+    We know both $(e_1) \notin C[E(G) - \{e_1, e_2\}]$ and $C(e_1)  \neq C(e_2)$ are true by our assumptions, for $C[E(G) - \{e_1, e_2\}]$ is a subset of $C[E(G) - \{e_1\}].$ Therefore, we have shown $C(e_1) = S(e_2)$ and edge $e_2$ is the only edge in $G$ with color $S(e_2).$
+\end{proof}
+
+With this result, we may now show that the sequence given as input at each recursive call in \fxn{Rotate} is indeed a fan. Again, we generalize away from the rotation algorithm itself, but the result directly applies.
+\begin{lemma}\label{rot_fan}
+    Let $C$ be an edge coloring and let $F_C(x) = \la w_1, w_2 \dots, w_k \ra$ be a fan centered at a vertex $x$ in some graph $G$ containing at least two vertices. If $S = Swap(C, (x, w_1), (x, w_2))$ then $F_S(x) = \la w_2, w_3, \dots, w_k \ra$ is a fan.
+\end{lemma}
+\begin{proof}
+    To prove $F_S(x)$ is a fan, we will show each of the three properties of fans holds for $F_S(x).$
+    
+    (\ref{neigh_prop}) No edges were added or removed from $G$ when we swapped the colors of two edges, all vertices in $\la w_2, w_3 \dots, w_k \ra$ are in the neighborhood of $x.$ Additionally, the fan $F_C(x)$ contained at least two vertices so the sequence $\la w_2, w_3, \dots, w_k \ra$ is non-empty.
+
+    (\ref{w0_prop}) Here, we had property~\ref{w0_prop} from the fan $F_C(x),$ so we can directly apply Lemma~\ref{swap_w0}.
+
+    (\ref{abs_prop}) The swap does not affect edges aside from $(x, w_1)$ and $(x, w_2)$, so property~\ref{abs_prop} is preserved from $F_C(x)$ for vertices $w_3, w_4 \dots, w_k.$ Additionally, from $A_C(w_2)$ to $A_S(w_2),$ the only color removed was $S(x, w_2) = S(x, w_1).$ Property~\ref{w0_prop} of fan $F_C(x)$ tells us color $C(x, w_1)$ cannot possibly be the same as $C(x, w_2),$ so we still have $C(x, w_3) = S(x, w_3) \in A_S(x_2).$ Therefore, property~\ref{abs_prop} holds for the sequence $\la w_2, w_3, \dots, w_k \ra.$
+    
+    All properties required for a fan apply, so $F_{S}(x) = \la w_2, w_3, \dots, w_k \ra$ is a fan.
+\end{proof}
+As mentioned, a corollary of the lemma above is that, assuming the initial sequence was a fan, the sequence given as input to \fxn{Rotate} will always be a valid fan. If we follow this reasoning to the last call of \fxn{Rotate} before the function returns a new edge coloring, this implies the singleton sequence containing the last vertex of the inputted fan is itself a fan in the returned edge coloring. In other words, property~\ref{w0_prop} applies to this vertex in the resulting edge coloring.
+\begin{cor}[\ref{apdx:fan}, lines~283-302]\label{rot_w0_prop}
+    Let $C$ be an edge coloring and let $F_C(x) = \la w_1, \dots, w_k \ra$ be a fan centered at a vertex $x$ in some graph $G.$ If $R = R(F_C(x))$ is the rotated edge color of $F_C(x),$ then $C(x, w_1) = R(x, w_k)$ and property \ref{w0_prop} of fans holds for edge $\e{x}{w_k}$ under $R.$
+\end{cor}
+
+We now would like to show that rotation preserves the properness of a proper edge coloring. The brunt of this work is handed over to supporting lemmas about edge coloring swapping. Most importantly, if the initial edge coloring was proper, then swapping the colors for the edges of two consecutive fan vertices still leaves a proper edge coloring.
+\begin{lemma}[\ref{apdx:ec}, lines~512-587]\label{swap_proper}
+    Let $C$ be a proper edge coloring, and let $F_C(x) = \la w_1, \dots, w_k\ra$ be a fan centered at some vertex $x$ in a graph $G.$ Additionally, let $i$ be some index with $1 \leq i < k$ such that vertices $w_i$ and $w_{i+1}$ are in the fan $F_C(x).$ If $C(x, w_i)$ is absent at $w_{i+1}$ and $C(x,w_{i+1})$ is absent at $w_i,$ then the edge coloring $Swap(C, (x, w_i), (x, w_{i+1}))$ is proper.
+\end{lemma}
+\begin{proof}
+    Let $S$ be the edge coloring $Swap(C,(x, w_i), (x, w_{i+1})).$ To show $S$ is proper, we must show $S(e_1) = S(e_2)$ implies $e_1 = e_2$ for any adjacent edges $e_1$ and $e_2$ in the graph $G.$ The only edges affected by the swap are those in the edge sets $E_G(w_i), E_G(x),$ and $E_G(w_{i+1}),$ so we may assume $S$ is proper if $e_1$ and $e_2$ are not together in one of these edge sets. Also, at least one of $e_1$ and $e_2$ must be edge $(x, w_i)$ or $(x, w_{i+1})$ because otherwise again neither edge has been affected. Edges $e_1$ and $e_2$ as well as vertices $w_i$ and $w_{i+1}$ are symmetrical in our assumptions, so without loss of generality we may assume $e_1 = (x, w_i).$ Now we will do case work on whether $e_2 \in E_G(x)$ or $e_2 \in E_G(w_i).$ For all cases except case~\ref{case: last}, we can simply apply the assumption $C$ is a proper edge coloring. Let $y$ represent an arbitrary vertex in $V(G).$ 
+    
+    \case{$e_2 \in E_G(x)$}
+    \subcase{$e_2 = (x, w_{i+1})$}
+       The edge coloring $S$ is proper in this case:
+        $$S(x, w_i) = S(x, w_{i+1}) \implies C(x, w_{i+1}) = C(x, w_i) \implies (x, w_{i+1}) = (x, w_i)$$
+        
+    \subcase{$e_2 = (x, y)$}
+        The edge coloring $S$ is proper in this case:
+        $$S(x, w_i) = S(x, y) \implies C(x, w_{i+1}) = C(x, y) \implies (x, w_{i+1}) = (x, y)$$
+        
+    \case{$e_2 \in E_G(w_i)$}
+    \subcase{$e_2 = (w_i, w_{i+1})$}
+        The edge coloring $S$ is proper in this case: 
+        $$S(x, w_i) = S(w_i, w_{i+1}) \implies C(x, w_{i+1}) = C(w_i, w_{i+1}) \implies (x, w_{i+1}) = (w_i, w_{i+1})$$
+        
+    \subcase{$e_2 = (w_i, y)$}\label{case: last}
+        Applying the definition of $S,$ we conclude if $S(x, w_i) = S(w_i, y)$ then it must be the case $C(x, w_{i+1}) = C(w_i, y).$ However, edge $(w_i, y)$ is in $E_G(w_i)$ and we know by assumption $C(x,w_{i+1})$ is absent at $w_i.$ According to Lemma~\ref{absent_edge}, the color $C(x, w_{i+1})$ of edge $(x, w_{i+1})$ cannot equal $C(w_i, y).$ As such, we have a contradiction and $S(x, w_i) \neq S(w_i, y).$ Then the requirements of a proper edge coloring do not apply to these two edges, so $S$ is proper in this case.
+
+    We have shown that $S$ is a proper edge coloring in all possible cases, so we may conclude that $S = Swap(C, (x, w_i), (x, w_{i+1}))$ is a proper edge coloring given the lemma's assumptions.
+\end{proof}
+
+With this helper lemma done, we may now show rotation preserves the properness of a proper edge coloring. Within this proof, we have a few additional asides related to the swap operation. These are short and naturally fit within the written proof here, but in Rocq we also pull them out as their own lemmas. 
+\begin{prop}[\ref{apdx:fan}, lines~342-362]\label{rot_proper}
+    Let $C$ be an edge coloring and let $F_C(x) = \la w_1, \dots, w_k\ra$ be a fan centered at a vertex $x$ in some graph $G.$ If $C$ is proper, then the rotated edge coloring of $F_C(x)$ is also proper.
+\end{prop}
+\begin{proof}
+    We will proceed via strong induction on $k$. If $k = 1$ then $F_C(x)$ contains only one vertex, so $R(F_C(x)) = C$ and this case is trivial. If $k = 1$, then $R(F_C(x)) = Swap(C, (x, w_1), (x, w_2)).$ We know $C(x,w_1) \in A_C(w_2)$ and $C(x,w_2) \in A_C(w_1)$ by property \ref{w0_prop} and property~\ref{abs_prop} of fans, respectively. Thus, Lemma~\ref{swap_proper} tells us the rotated edge coloring $R(F_C(x))$ of $F_C(x)$ is proper.
+    
+    Let $k$ be an arbitrary natural number. For the inductive hypothesis, assume that for all proper edge colorings $C,$ vertices $x$, and sequences $fs = \la w_1, \dots, w_k\ra$ such that $F_C(x) = fs$ is a fan, the rotated edge coloring $R(F_C(x))$ is proper. Then we need to show that for all proper edge colorings $D,$ vertices $y,$ and sequences $gs = \la u_1, \dots, u_k, u_{k+1} \ra$ such that $F_{D}(y) = gs$ is a fan, the edge coloring $R(F_D(y))$ is proper.
+
+    Since $1 < 2 < k + 1,$ we know we are within the if-statement during the rotation function's first iteration, so we can rewrite $R(F_D(y))$ = \fxn{Rotate($D\,', gs\,', y$)} where $D\,' = Swap(D,(y, u_1), (y,u_2))$ and $gs\,' = \la u_2, \dots, u_{k+1} \ra.$ By Lemma~\ref{rot_fan}, we know $F_{D\,'}(y) = gs\,'$ is a fan. If we can show $D\,'$ is a proper edge coloring, then we can apply our inductive hypothesis. 
+
+    According to property~\ref{w0_prop} and property~\ref{abs_prop} of fan $F_D(y) = gs,$ respectively, we know $D(y, u_1)$ is absent at $u_2$ and $D(y, u_2)$ is absent at $u_1.$ Thus, by Lemma~\ref{swap_proper}, the edge coloring $D\,' = Swap(D,(y, u_1), (y,u_2))$ must be proper. Now we may use the inductive hypothesis to assert that $R(F_{D\,'}(y)) = R(F_D(y))$ is a proper edge coloring.
+    
+    By induction, we can conclude for all proper edge colorings $C,$ vertices $x,$ and fans $F_C(x),$ the rotated edge coloring of $F_C(x)$ is proper.
+\end{proof}
+
+Naturally, we are not adding or removing colors throughout the rotation process, so the color set is invariant under rotation. Because we chose not to include the auxiliary color as in Bhoja's algorithm, this result is almost immediate. Originally, we did not even have this as a lemma. Yet once we began writing our code, we realized we would need a more substantial argument to support the claim (as opposed to a singular sentence). The proof required induction, even if it was short. As such, we present the reasoning here.
+\begin{lemma}[\ref{apdx:fan}, lines~234-244]\label{imset_rot}
+   Let $C$ be an edge coloring and let $F_C(x)$ be a fan centered at a vertex $x$ in some graph $G.$ Then the color set of $C$ equals the color set of the rotated edge coloring of $F_C(x).$
+\end{lemma}
+\begin{proof}
+    At each step in the \fxn{Rotate} algorithm, we modify the given edge coloring by swapping the colors of two edges. Since swapping edge colors does not add or remove colors from the range of an edge coloring, the range of the edge coloring is invariant at each iteration of the rotation algorithm. By induction on the size of our fan, the color set of $C$ is invariant under rotation and thus is equivalent to the color set of $R(F_C(x)).$
+\end{proof}
+
+We proved Lemma~\ref{imset_rot_vertex} in Rocq with similar logic. It was required because it did not immediately follow Lemma \ref{imset_rot}; in fact, it would be a false statement for any vertex $w$ which is contained in the rotated fan when this fan includes at least two vertices. For instance, in Figure~\ref{fig:rotation}, we have $c_1 \in C[E_G(w_1)]$ before the rotation, and this is not the case after rotation.
+\begin{lemma}[\ref{apdx:fan}, lines~220-231]\label{imset_rot_vertex}
+     Let $C$ be an edge coloring and let $F_C(x)$ be a fan centered at a vertex $x$ in some graph $G.$ Let $R = R(F_C(x))$ be the rotated edge coloring at $F_C(x)$. Then we have $R[E_G(x)] = C[E_G(x)]$.
+\end{lemma}
+\begin{proof}
+    The set of colors at edges adjacent to $x$ is invariant at each iteration of the \fxn{Rotate} algorithm. For an arbitrary step in the recursive calls, the edge coloring is only modifying by swapping the colors of two edges adjacent to $x$. These two colors are present on edges adjacent to $x$ both before and after the swap, so the set of colors at edges adjacent to $x$ is unaltered. By induction on the size of our fan, the set of colors at edges adjacent to $x$ is invariant under rotation and $R[E_G(x)] = C[E_G(x)]$.
+\end{proof}
+
+From these two lemmas on the color set of $R$, we can conclude $A_C(x) = A_R(x).$ This next lemma extends this to derive information about the absent set of vertices in the fan. The Mathematical Components library in Rocq~\cite{mathcomp} includes a well-developed section on finite sets, so this proof was reasonably straightforward to formalize once we familiarized ourselves with it. 
+\begin{lemma}[\ref{apdx:fan}, lines~314-340]\label{rot_absent_fan}
+    Let $C$ be an edge coloring and let $F_C(x)$ be a fan centered at a vertex $x$ in some graph $G.$ Let $R = R(F_C(x))$ be the rotated edge coloring at $F_C(x)$. Suppose $w$ is any vertex in $F_C(x)$. If there exists some color $c_1$ such that $c_1 \in A_C(x) \cap A_C(w)$ then $c_1 \in A_R(x) \cap A_R(w).$
+\end{lemma}
+\begin{proof}
+    Expanding the definition of an absent set and applying Lemmas~\ref{imset_rot} and Lemma~\ref{imset_rot_vertex}, we have 
+    \begin{align*}
+        A_C(x) &= (C[E(G)] - C[E_G(x)]) \\
+        &= R[E(G)] - R[E_G(x)]\\
+        &= A_R(x)
+    \end{align*}   
+    This in turn tells us $c_1 \in A_R(x) \cap A_R(w)$ only if $c_1 \in A_R(w).$ Since again we know $C[E(G)] = R[E(G)],$ it is sufficient to show $c_1 \notin R[E_G(w)].$ The only edge in $E_G(w)$ which changes colors between edge colorings $C$ and $R$ is the edge $\e{x}{w}.$ In other words, we can say the set $R[E_G(w) - \{\e{x}{w}\}]$ with edge $(x, w)$ removed is equivalent to $C[E_G(w) - \{\e{x}{w}\}].$ Our assumption $c_1 \in A_C(w)$ implies $c_1$ is not in $C[E_G(w)].$ Merging these two statements, we know $c_1 \notin R[E_G(w) - \{\e{x}{w}\}]$ and as such $c_1 \in R[E_G(w)]$ only if $c_1 = R(x, w).$ However, we have already shown $c_1$ is in $A_R(x).$ Clearly, edge $\e{x}{w}$ is in $E_G(x),$ so by Lemma~\ref{absent_edge} we know $c_1$ cannot be $R(x, w).$ As such, the color $c_1$ cannot be contained in $R[E_G(w)]$ and we are done.
+\end{proof}
+
+Finally, we merge the concept of fans, recoloring, and absent sets to produce a $(\Delta(G)+1)$-edge coloring of a graph $G.$ When we do case work in our proof of Vizing's theorem, this lemma will allow us to conclude the two main branches. In essence, if we have a fan $F_C(x) = \la w_1, \dots, w_k\ra$ and there is some color $c_j$ absent at both $x$ and $w_k,$ then we can rotate the fan and recolor the last edge (which is a unique color according to Lemma~\ref{rot_w0_prop}) with $c_j$ to decrease the total number of colors in the color set. We use the subscript $j$ for the last vertex of our fan rather than $k$ to emphasize that this fan may be a sub-fan of some other fan; it may itself not be a maximal fan.
+\begin{prop}[\ref{apdx:viz}, lines~13-47]\label{smaller_lemma}
+    Let $G$ be any graph such that there exists a $(\Delta(G)+2)$-edge coloring $C$ of $G$ and a fan $F_{C}(x) = \la w_1, \dots, w_j \ra$. If there exists some $c_j \in C[E(G)]$ such that $c_j \in (A_{C}(x) \cap A_{C}(w_j))$ then we can produce a $(\Delta(G)+1)$-edge coloring of $G$.
+\end{prop}
+\begin{proof}
+Observe that $\e{x}{w_j}$ is an edge in $E(G)$ because, by property \ref{neigh_prop} of fans, vertex $w_j$ is in the neighborhood of $x.$ We will create an edge coloring $R'$ by rotating the fan and then recoloring the last edge $\e{x}{w_j}.$ To show $R'$ is a $(\Delta(G)+1)$-edge coloring of $G,$ we must prove it is proper and it uses exactly $(\Delta(G)+1)$ colors.
+
+Let $R = R(F_C(x))$ be the rotated edge coloring of $F_C(x).$ By Lemma~\ref{rot_proper}, we know $R$ is a proper edge coloring. From Lemma~\ref{imset_rot} we have $|R[E(G)]| = |C[E(G)]| = \Delta(G)+2.$ Therefore, $R$ is a $(\Delta(G)+2)$-edge coloring of $G.$ Now, let $R' = R[\e{x}{w_j} \mapsto c_j]$ be the coloring $R$ with edge $\e{x}{w_j}$ recolored as $c_j$. From our assumptions, we have $c_j \in (A_{C}(x) \cap A_{C}(w_j)).$ By Lemma~\ref{rot_absent_fan} and Lemma~\ref{recolor_proper}, this implies $c_j \in (A_{R}(x) \cap A_{R}(w_j))$ and $R'$ is a proper edge coloring. Recall that by property~\ref{w0_prop}, color $C\e{x}{w_1}$ was distinct in $G$ under $C$. After the fan is rotated, we have $R\e{x}{w_j} = C\e{x}{w_1}$ and $\e{x}{w_j}$ is the only edge with color $R\e{x}{w_j}$ in all of $G$ by Lemma~\ref{rot_w0_prop}. With the edge coloring $R',$ we replaced the only appearance of color $C(x, w_1) = R(x, w_j)$ with $c_j,$ thus removing it from the color set. Clearly, we already have $c_j \in R'[E(G) - \e{x}{w_j}],$ for $c_j,$ which we assumed existed in $C[E(G)],$ was not present on the edges adjacent to $x$ in the fan, and as such was not affected by the rotation or recoloring operation. Hence, by recoloring edge $\e{x}{w_j},$ we have removed one color without using any new colors, so $|R'[E(G)]| = |R[E(G)]| - 1 = \Delta(G) + 1$ and we can conclude $R'$ is a $(\Delta(G) + 1)$-edge coloring of $G.$
+\end{proof}
+
+\subsection{Kempe Chains}\label{section Kempe definition}
+We considered two main viable definitions of a Kempe chain. The first was a maximal path that alternates in color, and Bhoja’s implementation in Lean followed this approach. After considering the strengths of Rocq’s graph theory library, we decided to pursue alternative definitions and came across a subgraph definition in Scheide et al.~\cite{GECBook}. Inspired, this served as our main point of reference as we implemented this new representation. Since we had already explored the former definition, our final proof in Section~\ref{section proof} still shares many ideas with Misra and Grieg's algorithm.
+
+Suppose $C$ is an edge coloring of a graph $G$ and $c_1$ and $c_2$ are any two colors. Then let us consider the subgraph $H$ of $G$ including exactly the edges colored $c_1$ or $c_2$ that is $V(H) = V(G)$ and $E(H) = \{e\in E(G) | C(e) = c_1 \text{ or } C(e) = c_2\}.$ A \emph{Kempe chain} is a connected component of this subgraph $H$ containing some specified vertex $v$ and is denoted $K_C(v, c_1, c_2).$ When it is clear from context, we will shorten $K_C(v, c_1, c_2)$ to $K_C.$ An example Kempe chain is shown in Figure~\ref{fig:Kempe}.
+\begin{figure}[h]
+    \centering
+    \input{figures/tikz/Kempe}
+    \caption{
+    The subgraph $H$ induced by edges colored red (solid) and blue (dashed). Each vertex is in a component; two vertices connected by red and blue edges are in the same component. The component containing $v$ is the Kempe chain $K_C(v,$ red, blue$)$. Edges shown in gray (dotted) are in $E(G)$ but not in $E(H).$
+    }
+    \label{fig:Kempe}
+\end{figure}
+When $C$ is a proper edge coloring, every vertex in $G$ is adjacent to at most one edge colored $c_1$ and one edge colored $c_2,$ so every vertex in $H$ is at most degree two and every Kempe chain is either a cycle or a path. Scheide et al.~\cite{GECBook} state this as fact. However, this core idea is non-trivial, especially the jump to the implicit assumption that a chain can only have two endpoints. There were many potential approaches to support this proposition in Rocq. Due to the minimal number of lemmas relating cycles, paths, and vertex degree in the existing library, we decided to tailor the final Proposition~\ref{chain_two_endpts} to our specific needs rather than be more general in hopes of limiting the proof length and amount of auxiliary lemmas. We do prove Lemma~\ref{deg1_internal}, Proposition~\ref{shared_interior3}, and a few other results in \fxn{spath.v} that could be used outside of a Kempe graph context, and these could be also be written in terms of paths and cycles, trees, or $K_{1,3}$ subdivisions and extending this portion of the library could be a direction for future work.
+
+If we have some path $P = \la x_1, x_2, \dots, x_n \ra $ from some vertex $x_1$ to some vertex $x_n,$ then we refer to $\la x_2, \dots, x_{n-1} \ra$ as the \textit{interior} of the path. Note that if $x_1$ and $x_n$ are adjacent then it is possible the interior of $P$ is empty. Lemma~\ref{deg1_internal} says that interior vertices must have degree at least two, and Proposition~\ref{shared_interior3} then concludes there must exist some interior vertex with degree at least three if we have two connected paths with shared interior vertices.
+
+\begin{lemma}[\ref{apdx:spath}, lines~36-46]\label{deg1_internal}
+Let $P$ be a path from some vertex $x_1$ to some vertex $x_n$ in a graph $G.$ If $y$ is some vertex in $G$ such that $d(y) \leq 1,$ then $y$ is not in the interior of $P.$
+\end{lemma}
+\begin{proof}
+    Consider any vertex $x_i$ in the interior of $P.$ Then there exists some vertices $x_{i-1}$ and $x_{i+1}$ in $\la x_1, x_2, \dots, x_{n-1}, x_n \ra.$ By definition of a path, there also exists an edge joining $x_{i-1}$ and $x_i$ in $G$ and a different edge joining $x_i$ and $x_{i+1}$ in $G.$ Then $2 \leq |E_G(x_i)| = d(x_i).$ Since we assumed $d(y) \leq 1,$ we must have $y \neq x_i$ for any vertex $x_i$ in the interior of $P.$ Therefore, if $y$ is a vertex with $d(y) \leq 1$ then $y$ cannot be in the interior of a path.
+\end{proof}
+
+To assist in understanding the proof of Proposition~\ref{shared_interior3}, Figure~\ref{fig:2paths} displays four possible ways two paths with the same starting vertex and different ending vertices could interact. Of course, there are other possibilities not shown here. For instance, the last example shows the paths diverging and reuniting once, but this could happen any number of times. However, considering just these four cases is enough to prove the proposition, for the logic generalizes to all other cases. For instance, the same logic applies for paths diverging once or twice or thrice, etc., because we only rely on the last vertex $w'$ of divergence. Thus, Proposition~\ref{shared_interior3} will proceed with these four possibilities in mind. We will first show that neither path is contained within the other, as shown in the first example, by applying Lemma~\ref{deg1_internal}. We then argue there must exist at least one shared internal vertex, eliminating the second possibility. Finally, we recognize that all other possibilities include a vertex of degree three to finish the proof.
+\begin{figure}
+    \centering
+    \input{figures/tikz/2paths}
+    \caption{Four possible ways two paths with the same starting vertex could appear in a graph.}
+    \label{fig:2paths}
+\end{figure}
+
+\begin{prop}[\ref{apdx:spath}, lines~50-134]\label{shared_interior3}
+    Let $P$ be a path from $x$ to $y,$ and let $Q$ be a path from $x$ to $z$ where $x \neq y \neq z.$ If $d(x) = d(y) = d(z) = 1,$ then there exists some vertex with degree greater than $3.$
+\end{prop}
+\begin{proof}
+Lemma~\ref{deg1_internal} implies vertex $y$ cannot be in the interior of path $Q$ and vertex $z$ cannot be in the interior of path $P.$ That is, $P$ is not entirely contained within $Q$ and vice versa. Since $d(x) = 1,$ there is exactly one edge $(x, w)$ at $x$ where $w$ is some vertex in $V(G).$ This vertex $w$ must be distinct from $y$ and $z,$ else we would have $y = z$ or one of $P$ and $Q$ would be contained within the other. In order for $x$ to be connected to $y$ and $z$ through paths $P$ and $Q,$ both paths must include edge $(x, w).$ Thus, we can split these paths at $w$ such that $P\,'$ is the path from $w$ to $y$ and $Q\,'$ is the path from $w$ to $z.$ Again, the paths $P\,'$ and $Q\,'$ are not equal nor contained within each other, so there must exist some vertex $w'$ in both $P\,'$ and $Q\,'$ where they diverge. That is, there is a path from $R$ from $x$ to $w'$ (containing $w$) and there are two disjoint paths $P\,''$ from $w'$ to $y$ and $Q\,''$ from $w'$ to $z.$ Note it is possible $P\,'$ and $Q\,'$ diverge and reconnect multiple times. However, there must exist some last divergent vertex at which the paths do not reconnect (since $y \neq z$); we let $w'$ be this last vertex. It is also possible $w = w',$ but our argument still applies if this is the case.
+
+We wish to show $w'$ has degree at least $3.$ To do so, we prove there is at least one edge in each of $R, P\,'',$ and $Q\,''.$ By construction, these three paths are non-overlapping, so their edges are distinct. By construction, vertex $w'$ is in shared by $P\,''$ and $Q\,'',$ so it must be distinct from vertices $y$ and $z.$ Then in order for $P\,''$ and $Q\,''$ to be connected, there must exist at least one edge in each path. Vertex $w'$ is connected to each of these edges since it is in both paths; thus, we have two distinct edges with an endpoint at $w'.$ Additionally, we know that at least one edge $(x, w)$ is in our path $R,$ and $w'$ must be connected to this edge. $R$ is disjoint from $P\,''$ and $Q\,'',$ so this gives us a third unique edge with an endpoint at $w'.$ Hence, there are at least three edges in $E_G(w')$ and we conclude $w'$ had degree at least $3.$
+\end{proof}
+
+Before we apply Proposition~\ref{shared_interior3} to our Kempe chains, we must state some natural conclusions about the degree of vertices in the Kempe chains. First, we show that if there are two vertices in $V(K_C)$ then these must have positive degree because they are connected.
+\begin{lemma}[\ref{apdx:kempe}, lines~201-217]\label{min_deg_Kempe}
+    Let $K_C(v,c_1,c_2)$ be to a Kempe chain in a graph $G$ where $C$ is an edge coloring, vertex $v$ is in $G,$ and $c_1$ and $c_2$ are colors. If $x$ and $y$ are two distinct vertices in $V(K_C),$ then both $d(x)$ and $d(y)$ are greater than zero.
+\end{lemma}
+\begin{proof}
+    Components are connected subgraphs, so we know $K_C$ is connected and as such there exists some path $P$ from $x$ to $y$ in $K_C.$ Since $x \neq y,$ we can split $P$ as $P_1$ and $P_2$ where $P_1$ is the singleton path containing $x.$ Paths $P_1$ and $P_2$ must be connected via some edge in $E(K_C)$ in order for $P$ itself to be a connected path. This edge has an endpoint in $P_1,$ so it must have an endpoint at $x,$ the only vertex in $P_1.$ Therefore, there is at least one edge at $x$ and $0 < d_{K_C}(x).$ We could have instead split the path on the right with $P_2$ as the singleton path containing $y,$ so by symmetry $0 < d_{K_C}(y).$ 
+\end{proof}
+
+Vertices adjacent to only one edge colored $c_1$ or $c_2$ must be endpoints in their respective Kempe chains; this will later allow us to apply Proposition~\ref{shared_interior3} if there are three `endpoint' vertices in a single chain.
+\begin{lemma}[\ref{apdx:kempe}, lines~271-288]\label{deg_chain_endpt}
+     Let $K_C(v,c_1,c_2)$ be to a Kempe chain in a graph $G$ where $C$ is a proper edge coloring, vertex $v$ is in $G,$ and $c_1$ and $c_2$ are colors. Let $x$ be a vertex in $K_C.$ If either $c_1$ or $c_2$ is in $A_C(x),$ then $d_{K_C}(x) \leq 1.$
+\end{lemma}
+\begin{proof}
+    Since $C$ is by definition injective when constrained to the domain of $E_G(x)$, it is also injective when constrained to the domain of $E_{K_C}(x)$ because $E_{K_C}(x)$ is a subset of $E_G(x).$ Now, by definition $d_{K_C}(x) = |E_{K_C}(x)|$ and by injectivity $|E_{K_C}(x)| = |C[E_{K_C}(x)]|.$ The edges of $K_C$ are exactly those colored $c_1$ and $c_2$ in $G$ under $C,$ so we have $C[E_{K_C}(x)] \subseteq \{c_1, c_2\}.$ 
+    
+    We know by assumption either $c_1$ or $c_2$ are in $A_C(x).$ Without loss of generality, suppose $c_1$ is in $A_C(x).$ Lemma~\ref{absent_edge} tells us $c_1 \neq C(e)$ for all $e \in E_{K_C}(x) \subseteq E_G(x).$ Thus, the color $c_1$ is not in $C[E_{K_C}(x)]$ and we conclude 
+    $$d_{K_C}(x) = |E_{K_C}(x)| = |C[E_{K_C}(x)]| \leq |\{c_2\}| = 1.$$
+\end{proof}
+
+With these assisting lemmas, the proof of Proposition~\ref{chain_two_endpts} can be relatively short. 
+\begin{prop}[\ref{apdx:kempe}, lines~290-317]\label{chain_two_endpts}
+   Let $K_C(v,c_1,c_2)$ be to a Kempe chain in a graph $G$ where $C$ is a proper edge coloring, vertex $v$ is in $G,$ and $c_1$ and $c_2$ are colors. Suppose $x, y,$ and $z$ are three distinct vertices such that at each vertex $x, y$ and $z,$ either $c_1$ or $c_2$ is absent at the vertex. Then at most two of $x, y,$ and $z$ are in $V(K_C).$
+\end{prop}
+\begin{proof}
+Suppose for the sake of contradiction that $x,y,$ and $z$ are in $K_C(v, c_1, c_2).$ Our goal will be to show Proposition~\ref{shared_interior3} forces us to arrive at a contradiction. Sandwiched by Lemma~\ref{min_deg_Kempe} and Lemma~\ref{deg_chain_endpt}, we have $d_{K_C}(x) = d_{K_C}(y) = d_{K_C}(z) = 1.$ Because Kempe chains are connected components, there exists some path $P$ connecting $x$ to $y$ in $K_C$ and some path $Q$ connecting $x$ to $z$ in $K_C.$ Therefore, there exists some vertex $w \in V(K_C)$ with $3 \leq d_{K_C}(w)$ by Proposition~\ref{shared_interior3}. However, we know $$d_{K_C}(w) = |E_{K_C}(w)| = |C[E_{K_C}(w)]| \leq |\{c_1, c_2\}| = 2$$ by the same reasoning as in the previous lemma. Now we have $3 \leq d_{K_C}(w) \leq 2,$ a contradiction; hence, it is impossible for all three of $x, y,$ and $z$ to be in $V(K_C).$
+\end{proof}
+
+Like rotation with the fans, we define a recoloring operation on the Kempe chain structure that will preserve the properness of a proper edge coloring. In this case, that operation is a Kempe swap. A \textit{Kempe swap} consists in swapping the two colors along a given Kempe chain. That is, given a Kempe chain $K_C(v, c_1, c_2),$ we will invert the edge coloring for edges within this component, recoloring the edges $c_1$ with $c_2$ and vice versa. To not be conflated with the $Swap$ edge coloring, we will refer to this new coloring $I$ as the \textit{inverted edge coloring} of $K_C(v, c_1, c_2).$ It is defined as follows:
+\begin{equation*}
+    I(e) = \begin{cases}
+        C(e) & e \notin E(K_C) \\
+        c_2 & e \in E(K_C) \text{ and } C(e) = c_1 \\
+        c_1 & e \in E(K_C) \text{ and } C(e) = c_2
+    \end{cases}
+\end{equation*}
+
+In our proof of Vizing's theorem, we will construct a Kempe chain starting at the central vertex of a fan. Thus, we show that, given some assumptions, there is still a fan present at this central vertex after we perform a Kempe swap.
+\begin{prop}[\ref{apdx:kempe}, lines~325-411]\label{inverted_fan}
+    Let $C$ be a proper edge coloring, and let $I$ be the inverted edge coloring of a Kempe chain $K_C(v, c_1, c_2)$ where $v$ is some vertex and $c_1$ and $c_2$ are colors. Let $F_C(x) = \la w_1, \dots, w_k\ra$ be a fan centered at a vertex $x.$ Note that $x$ and $v$ may or may not be the same vertex. If $c_2$ is in $A_C(x)$ and there exists some $i \in [2, k]$ such that $C(x, w_i) = c_1,$  then $F_I(x) = \la w_1, \dots, w_{i-1} \ra$ is a fan.
+\end{prop}
+\begin{proof}
+    We will show the three properties of a fan hold for $F_I(x) = \la w_1, \dots, w_{i-1} \ra.$
+
+    (\ref{neigh_prop}) Clearly, property~\ref{neigh_prop} holds for $F_I(x)$ because all vertices in $F_I(x)$ are also in $F_C(x)$ and we did not add or remove edges of our graph $G.$
+    
+    (\ref{w0_prop}) Since $F_C(x)$ is a fan, property~\ref{w0_prop} tells us edge $(x, w_1)$ is the only edge in the graph $G$ with color $C(x, w_1).$ We will now show property~\ref{w0_prop} of fans holds after a Kempe swap of chain $K_C$. Under coloring $C,$ we know the color $c_2$ is absent at $x,$ so edge $(x, w_1)$ is not colored $c_2.$ Additionally, $C$ is a proper edge coloring and edge $(x, w_i)$ is already colored $c_1$ under $C$ where $1 < i,$ so we know $(x, w_1)$ cannot be colored $c_1.$ The Kempe chain only includes edges colored $c_1$ and $c_2,$ and the inversion only swaps these two colors. Therefore, edge $(x, w_1)$ is still the only edge in $G$ with color $I(x, w_1) = C(x, w_1)$ after the Kempe swap and property~\ref{w0_prop} of our fan is preserved.
+
+    (\ref{abs_prop}) Finally, we need to show $I(x, w_{j+1}) \in A_I(w_j)$ for all $1 \leq j < i - 1.$ Aside from colors $c_1$ and $c_2,$ the colors absent at any given vertex are invariant under a Kempe swap. We know that edge $(x, w_i)$ is the only edge at $x$ with the color $c_2$ because $C$ is a proper edge coloring, and we know no edge at $x$ is colored $c_2$ under $C$ because $c_2 \in A_C(x).$ Hence, we have $C(x, w_{j+1}) = I(x, w_{j+1})$ and $I(x, w_{j+1}) \in A_I(w_j)$ for all $1 \leq j < i - 1.$ This is what we wanted to show, so property~\ref{abs_prop} is preserved on this sub-fan $F_I(x).$
+    
+    We have now proven all properties of a fan hold for $F_I(x).$ Therefore, we conclude $F_I(x) = \la w_1, \dots, w_{i-1} \ra$ is a fan.
+\end{proof}
+
+Finally, we will later perform a Kempe swap on a graph with a $k$-edge coloring, so we will need to show that after the inversion there still exists proper edge coloring of the graph that uses at most $k$ colors. Thus, we first show properness is preserved by Kempe swaps.
+\begin{lemma}[\ref{apdx:kempe}, lines~219-262]\label{inverted_proper}
+    Let $C$ be an edge coloring, and let $I$ be the inverted edge coloring of a Kempe chain $K_C(v, c_1, c_2)$ where $v$ is some vertex and $c_1$ and $c_2$ are colors. If $C$ is proper, then the inverted edge coloring $I$ is also proper.
+\end{lemma}
+\begin{proof}
+     Let $e_1$ and $e_2$ be any two adjacent edges in $E(G)$. To show $I$ is proper in $G$, we must show that if $I(e_1) = I(e_2)$ then $e_1 = e_2.$ We assumed $C$ is a proper edge coloring so if $C(e_1) = C(e_2)$ then $e_1 = e_2$. Now we may proceed by casework, inspired by the definition of $I,$ on whether $e_1$ and $e_2$ are in the subgraph $K_C.$
+     
+     \case{$e_1 \notin E(K_C)$ and $e_2 \notin E(K_C)$}
+     This is a rather simple case because $I(e_1) = C(e_1)$ and $I(e_2) = C(e_2).$ If $I(e_1) = I(e_2)$ then $C(e_1) = C(e_2),$ so $e_1 = e_2$ and we are done.
+
+     \case{$e_1 \notin E(K_C)$ and $e_2 \in E(K_C)$}\label{case:1nk}
+     We know that all edges $e$ in $E(G)$ colored $c_1$ or $c_2$ under $C$ are in $K_C.$ Therefore, we know that $I(e_1) = C(e_1)$ is not $c_1$ or $c_2.$ Meanwhile, $I(e_2)$ by definition can only be colored $c_1$ or $c_2$ since $e_2$ is in $E(K_C).$ This implies $I(e_1)$ cannot possibly equal $I(e_2),$ and we are done.
+     
+     \case{$e_1 \in E(K_C)$ and $e_2 \notin E(K_C)$}
+     This is symmetric to Case~\ref{case:1nk}.
+
+     \case{$e_1 \in E(K_C)$ and $e_2 \in E(K_C)$}
+     All edges in $E(K_C)$ must be colored either $c_1$ or $c_2$ under $C$ by construction. If edges $e_1$ and $e_2$ are the same color under $C,$ then $I(e_1) = I(e_2)$ and the properness of $C$ implies $e_1 = e_2$ so we are done. Thus, we may assume that $C(e_1) \neq C(e_2)$ and $c_1 \neq c_2.$ By symmetry, we can assume $C(e_1) = c_1$ and $C(e_2) = c_2.$ Then $I(e_1) = c_2$ and $I(e_2) = e_2.$ Since $I(e_1) \neq I(e_2),$ we do not need to continue.
+     
+    In all cases, we have shown that $I(e_1) = I(e_2)$ implies $e_1 = e_2$ when $C$ is a proper edge coloring, so $I$ is a proper edge coloring of $G$ when $C$ is a proper edge coloring of $G$.
+\end{proof}
+
+We conclude this section with a short proof that the color set after the Kempe swap is a subset of the color set before the inversion. The algorithm presented by Misra and Gries~\cite{Misra} does not address the possibility that either $c_1$ or $c_2$ may have been removed from the color set altogether. The aim of both our proof of Vizing's theorem and theirs is to demonstrate we can decrease the total number of colors used given any proper edge coloring with more than $\Delta + 1$ colors in its color set. We both recognize that inversion will not add any colors since $c_1$ and $c_2$ were already present in the color set, so their result is certainly still valid. We separate the proof into cases based on whether or not the size of the color set has decreased or remained the same to assist our implementation. The constructive nature of Rocq encourages the explicit construction of a $k$-edge coloring to show a graph is at worst $(\Delta + 1)$-edge colorable, and this means we must specify $k.$ Thus, we prefer split the inequality and work with an equality instead (this also lets us directly use the \fxn{rewrite} tactic). Luckily, when the inversion decreases the number of colors in the color set, we can already conclude our proof and this case is quickly resolved.
+\begin{lemma}[\ref{apdx:kempe}, lines~105-118]\label{imset_invert_sub}
+   Let $C$ be an edge coloring, and let $I$ be the inverted edge coloring of a Kempe chain $K_C(v, c_1, c_2)$ where $v$ is some vertex and $c_1$ and $c_2$ are colors. If $c_1$ and $c_2$ were present in the color set of $C,$ then the color set of $I$ is a (not necessarily strict) subset of the color set of $C.$
+\end{lemma}
+\begin{proof}
+    It is possible the color set $I[E(G)]$ of $I$ is smaller than the color set $C[E(G)]$ of $C$ if we inverted the only edge colored $c_1$ or $c_2$ under $C.$ However, the only colors we are reassigning to edges during the inversion are $c_1$ and $c_2.$ Since these were already present in the color set of $C,$ there are no colors in $I[E(G)]$ that are not already in $C[E(G)].$ Thus, we conclude $I[E(G)] \subseteq C[E(G)].$
+\end{proof}
+
+\section{Main Proof}\label{section proof}
+Many proofs\footnote{See, for instance, the proofs by Diestel~\cite{Diestel} and Misra and Gries~\cite{Misra}} tend to focus on the upper bound in Vizing's theorem, omitting discussion of the lower bound as it is rather straightforward. However, this is not trivially solved in Rocq, i.e. it has non-trivial steps and assumptions, so we include an explicit proof of both the lower and upper bounds here. For ease, we replicate the statement of Theorem~\ref{Vizing} here.
+\begin{theorem}[\ref{apdx:viz}, lines~49-55 and 175-267]
+    For any finite, simple graph $G$, we have $\Delta(G) \leq \ci(G) \leq \Delta(G)+1$
+\end{theorem}
+We first prove the lower bound $\Delta(G) \leq \ci(G).$ If the chromatic index is some natural number $\ci(G),$ there must exist at least one $\ci(G)$-edge coloring of $G$. We will refer to this coloring as $C.$ Observe that, for all $x$ in $V(G),$ we know that $\ci(G) = |C[E(G)]|$ must be greater than or equal to $|C[E_G(x)]|$ because $E_G(x)$ is a subset of $E(G).$ Additionally, $C$ is by definition injective when constrained to the domain $E_G(x),$ so we must use $E_G(x)$ distinct colors on the edges at $x$ in order for $C$ to be a proper edge coloring. Then, letting $y$ be a vertex of $G$ such that $d(y) = \Delta(G),$ we can conclude
+$$\Delta(G) = d(y) = |E_G(y)| = |C[E_G(y)]| \leq |C[E_G(G)]| = \ci(G).$$ 
+
+We will proceed to prove the upper bound via induction on the number of edges $m$ of $G.$ For the base case when $m = 0,$ the maximum degree of $G$ is trivially $0$ and any proper edge coloring of $G$ requires $0$ colors so $$\ci(G) = 0 < \Delta(G) + 1.$$
+For the inductive step, assume the hypothesis holds for $m = k$ where $k$ is some natural number. Then we need to show it holds for $k + 1.$
+
+Let $G$ be any graph with $k + 1$ edges. Define $G'$ to be the graph $G$ with some arbitrary edge $\e{x}{w_1}$ removed. Then the graph $G'$ has $k$ edges, so by our inductive hypothesis there exists some $\ci(G')$-edge coloring of $G'$ such that $\ci(G') \leq \Delta(G') + 1.$ Now let us add back edge $\e{x}{w_1}.$
+
+If we select some new color with which to color $\e{x}{w_1},$ then this naturally extends to a $(\ci(G') + 1)$-edge coloring of $G;$ we will refer to this coloring as $C.$ Note that we have only removed edges and as such the maximum degree of $G'$ is less than or equal to the maximum degree of $G$. Therefore, by transitivity we have $\ci(G') \leq \Delta(G') + 1 \leq \Delta(G) + 1$. Furthermore, if $\ci(G')$ is strictly less than $\Delta(G) + 1$ then our coloring $C$ shows that $\ci(G) \leq \Delta(G)+1$ and we are done. Hence, going forward we assume $\ci(G')$ is exactly equal to $\Delta(G) + 1$ and $C$ is a $(\Delta(G)+2)$-edge coloring. Note that Lemma~\ref{exists_absent_color} now tells us there is at least one color absent at each vertex in $G'.$ These colors remain absent at their respective vertices even when we add back edge $(x, w_1)$ because we do not color the new edge with any colors already present in the color set. Additionally, only the edge $(x, w_1)$ has the color $C\e{x}{w_1}$ by construction, so let $F_C(x) = \la w_1, \dots, w_k \ra$ be a maximal fan starting at $w_1.$ As mentioned, some color $c_k,$ which is not the new color $C\e{x}{w_1},$ is absent at $w_k.$ We may do casework on whether or not $c_k$ is also absent at $x,$ the central vertex of our fan.
+
+\case{$c_k \in A_C(x)$} In this case, we can directly apply Proposition~\ref{smaller_lemma} because $c_k \in A_C(x) \cap A_C(w_k),$ so there exists a $(\Delta(G)+1)$-edge coloring of $G.$ This implies $\ci(G) \leq \Delta(G)+1$ and we are done.
+
+\case{$c_k \notin A_C(x)$} For this case, we will need to create a Kempe chain $K_C(x, c_x, c_k)$ where $c_x$ is a color absent at $x.$ Let $I$ be the inverted edge coloring of $K_C$. We know $I$ is a proper edge coloring by Lemma~\ref{inverted_proper}, and we know $c_x$ and $c_k$ were in the color set $C[E(G)]$ so the color set $I[E(G)]$ is a subset of $C[E(G)]$ by Lemma~\ref{imset_invert_sub}. If $I[E(G)]$ is a proper subset of $C[E(G)],$ then $|I[E(G)]|$ is strictly less than $|C[E(G)]|,$ so we have $$\ci(G) \leq |I[E(G)]| \leq \Delta(G) + 1 < \Delta(G) + 2 = |C[E(G)]|$$ and we are done. Thus, we may assume $I[E(G)] = C[E(G)].$
+
+Lemma~\ref{fanmax_present} tells us there exists some vertex $w_i$ in $F_C(x)$ such that $C\e{x}{w_i} = c_k.$ Edge $(x, w_i)$ is contained within our chain $K_C$ because this edge is connected to $x$ and colored $c_k.$ Recall that the color $C\e{x}{w_1}$ is not $c_k,$ implying $w_i \neq w_1$ and $w_{i-1}$ is a valid vertex in the fan $F_C(x)$ with $c_k \in A_C(w_{i-1})$ from property~\ref{abs_prop} of fans. According to Proposition~\ref{inverted_fan}, we know $F_I(x) = \la w_1, \dots, w_{i-1} \ra$ is a fan. Do casework on whether or not $w_{i-1}$ is in $K_C.$ 
+
+\subcase{$w_{i-1} \in K_C(x, c_x, c_k)$} Recall $c_x$ is in $A_C(x)$ and $c_k$ is in both $A_C(w_{i-1})$ and $A_C(w_k).$ Proposition~\ref{chain_two_endpts} tells us at most two of these vertices can be in the Kempe chain, and we know both $x$ and $w_{i-1}$ are. Hence, we know $w_{k}$ cannot be in $K_C.$ The colors $c_x$ and $c_k$ are only inverted at edges with endpoints in the chain. As such, we know $c_k \in A_I(x)$ and $c_k \in A_I(w_k) = A_C(w_k).$ 
+
+We would now like to apply Proposition~\ref{smaller_lemma}. Since we know $c_k \in A_I(w_k),$ it suffices to show $F_I(x)' = \la w_1, \dots, w_{i-1}, w_i, \dots, w_k \ra$ is a fan.
+
+(\ref{neigh_prop}) The vertices of $F_I(x)'$ are equivalent to those in the fan $F_C(x),$ so property~\ref{neigh_prop} applies.
+
+(\ref{w0_prop}) Fan $F_I(x)$ is contained in the head of $F_I(x)',$ so the first vertex is the same and property~\ref{w0_prop} extends to fan $F_I(x)'.$
+
+(\ref{abs_prop}) Again, the existence of fan $F_C(x)$ tells us property~\ref{abs_prop} applies to the first few vertices in $F_I(x)'.$ In order to show this property holds for the entire sequence, we must show $I(x, w_{j+1}) \in A(w_j)$ for all ${i-1} \leq j < k.$ We can apply the same reasoning as in Proposition~\ref{inverted_fan} to conclude $I(x, w_{j+1}) \in A(w_j)$ for all $i \leq j < k.$ Hence, we are left with the case $j = i - 1.$  The color $c_k$ was in $A_C(w_{i-1})$ and vertex $w_{i-1}$ was contained in $K_C,$ so after the inversion $c_x \in A_I(w_{i-1})$. Additionally, edge $\e{x}{w_i}$ is in $K_C$ and $C\e{x}{w_i} = c_k,$ so $I\e{x}{w_i} = c_x.$ Together, these imply $I\e{x}{w_i} \in A_I(w_{i-1})$ and property~\ref{abs_prop} holds for $F_I(x)'.$
+
+We have successfully shown $F_I(x)'$ is a fan, so we are done with this case.
+
+\subcase{$w_{i-1} \notin K_C(x, c_x, c_k)$}
+Similar to the previous case, we know $c_k \in A_I(x).$ We also have $c_k \in A_I(w_{i-1})$ because the edges adjacent to $w_{i-1}$ were not affected by the inversion. Then we can apply Proposition~\ref{smaller_lemma} with $F_I(x)$ to produce a $(\Delta(G) + 1)$-edge coloring of $G$ and conclude $\ci(G) \leq \Delta(G) + 1.$
+
+In every case, we were able to demonstrate the existence of a $(\Delta(G) + 1)$-edge coloring of $G,$ so $\ci(G)$ is at most $\Delta(G) + 1.$ Putting this together with our lower bound, we can conclude $$\Delta(G) \leq \ci(G) \leq \Delta(G) + 1.$$

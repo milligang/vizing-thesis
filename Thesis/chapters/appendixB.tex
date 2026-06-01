@@ -1,0 +1,2503 @@
+%!TEX root = ../dissertation.tex
+\chapter{The Code}
+\label{AppendixB}
+We display our Rocq code in this Appendix to be viewed alongside the thesis, though it may also be accessed from our GitHub repository~\cite{my_code}. 
+\setminted{
+  fontsize=\small,
+  baselinestretch=1,
+}
+\section{Basic Examples}\label{apdx:basic}
+\begin{minted}[linenos]{coq}
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
+(* to ignore warnings due to the import of ssreflect *)
+From mathcomp Require Import all_boot.
+From Stdlib Require Import RelationClasses.
+From GraphTheory Require Import digraph sgraph dom.
+Require Import Stdlib.Logic.Classical_Prop.
+
+Set Bullet Behavior "Strict Subproofs".
+
+Lemma bipSubCom (n : nat) : subgraph ('K_n,1) ('K_n.+1).
+Proof. 
+    apply: sub_Kn.
+    rewrite card_sum !card_ord. 
+    by rewrite addn1.
+Qed.
+
+(* any singleton dominates K_n *)
+Lemma domK n (v : 'K_n) :
+    dominating [set v].
+Proof.
+    apply/forallP => u.
+    rewrite /closed_neigh_set big_set1 /closed_neigh in_setU1 /orb.
+    case: (u == v) /eqP => //.
+    - move/eqP. rewrite in_opn. rewrite /edge_rel/=. by rewrite eq_sym.
+Qed.
+\end{minted}
+
+\section{Auxiliary Material}\label{apdx:aux}
+\begin{minted}[linenos]{coq}
+    From mathcomp Require Import all_boot.
+From GraphTheory Require Import edone preliminaries digraph sgraph.
+
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Lemma notin_setD {T : finType} (A B : {set T}) (x : T) :
+  x \in A -> x \notin A :\: B -> x \in B.
+Proof.
+  rewrite in_setD => ->.
+  by rewrite andbT negbK.
+Qed.
+
+Section preliminaries.
+  Variables (T : finType).
+  Implicit Types (A B : pred {set T}) (e : rel T).
+
+  Lemma bigmax_eq_pointwise (P : pred T) (F G : T -> nat) :
+    {in P, forall x, F x = G x} -> \max_(i | P i) F i = \max_(i | P i) G i.
+  Proof.
+    move => ?. by elim/big_ind2 : _ => // y1 y2 x1 x2 -> ->.
+  Qed.
+
+  Definition restrict2_mem (P : mem_pred {set T}) e := 
+    [rel u v | in_mem [set u; v] P && e u v].
+  Local Notation restrict2 P := (restrict2_mem (mem P)).
+
+  Lemma sub_restrict2 A e :
+    subrel (restrict2 A e) e.
+  Proof. move => x y /=. by case: (e x y); case: (_ \in A). Qed.
+
+  Lemma restrict2_mono A B e :
+    {subset A <= B} -> subrel (restrict2 A e) (restrict2 B e).
+  Proof. move => H x y /= => /andP [HA ->]. by rewrite !H. Qed.
+
+  Lemma restrict2_irrefl A e : 
+    irreflexive e -> irreflexive (restrict2 A e).
+  Proof. move => irr_e x /=; by rewrite irr_e. Qed.
+
+  Lemma restrict2_sym A e : 
+    symmetric e -> symmetric (restrict2 A e).
+  Proof. move => sym_e x y /=. by rewrite sym_e setUC. Qed.
+
+  Lemma erpath_sub A e x p : 
+    path (restrict2 A e) x p -> path e x p.
+  Proof.
+    elim: p x => //= b p IH x. rewrite -!andbA => /and3P[H1 H2 H3].
+    by rewrite H2 (IH b H3).
+  Qed.
+
+  (* restrict in preliminaries is actually a special case of restrict2 *)
+  Lemma restrict_eq_restrict2 (P : pred T) e :
+    restrict P e =2 restrict2 [pred f : {set T} | f \subset P] e.
+  Proof.
+    move => x y /=; rewrite /restrict_mem /restrict2_mem inE.
+    apply/andb_id2r => _. 
+    apply/andP/subsetP=> [[+ +] z /set2P [-> //|-> //]| H].
+    by split; [apply/H/set21 | apply/H/set22].
+  Qed.
+
+  Lemma restrict2E A e: 
+    A =i predT -> connect (restrict2 A e) =2 connect e.
+  Proof. 
+    move => H x y. rewrite (eq_connect (e' := e)) //. 
+    move => {x y} x y /=. by rewrite !H.
+  Qed.
+
+End preliminaries.
+Notation restrict2 A := (restrict2_mem (mem A)).
+
+Section erestrictGraph.
+  Variables (G : sgraph) (A : pred {set G}).
+
+  Lemma symmetric_restrict2_sedge :
+    symmetric (restrict2 A (--)).
+  Proof. apply: restrict2_sym. exact: sg_sym. Qed.
+
+  Lemma erestrict_sym :
+    connect_sym (restrict2 A (--)).
+  Proof. exact/connect_symI/symmetric_restrict2_sedge. Qed.
+
+  Lemma sedge_in_equiv2 :
+    equivalence_rel (connect (restrict2 A (--))).
+  Proof. exact/equivalence_rel_of_sym/symmetric_restrict2_sedge. Qed.
+
+  Definition erestrict : sgraph :=
+    Eval hnf in SGraph (restrict2_sym A (@sg_sym G))
+                      (restrict2_irrefl A (@sg_irrefl G)).
+
+  Lemma upathPR (x y : G) :
+    reflect (exists p : seq G, @upath erestrict x y p)
+            (connect (restrict2 A (--)) x y).
+  Proof. exact: (@upathP erestrict). Qed.
+
+  Lemma erestrict_sub : subgraph erestrict G.
+  Proof. by exists id=> // u v /andP[_ ->]. Qed.
+End erestrictGraph.
+
+Section EdgeNeighboorhood.
+  Definition edge_neigh (G : sgraph) x := [set [set x; y] | y in N(G;x)].
+
+  Local Notation "E{ x }" := (@edge_neigh _ x) (at level 0, format "E{ x }").
+  Local Notation "E{ G ; x }" := (@edge_neigh G x) (at level 0, format "E{ G ; x }"). 
+
+  Lemma sub_all_edges {G : sgraph} (v : G) : E{v} \subset E(G).
+  Proof.
+      apply/subsetP => e.
+      rewrite/edge_neigh.
+      move/imsetP => [w Hw ->].
+      apply/edgesP; exists v, w.
+      split => //.
+      by rewrite in_opn in Hw.
+  Qed.
+
+  Lemma edge_neigh_self {G : sgraph} {x y : G} (xy : x -- y) : [set x; y] \in E{x}.
+  Proof.
+    rewrite /edge_neigh; apply/imsetP; exists y;
+    by rewrite -in_opn in xy.
+  Qed.
+
+  Lemma mem_edge_graph {G : sgraph} (x : G) (e : {set G}) :
+    (e \in E{G;x}) = (e \in E(G)) && (x \in e).
+  Proof.
+    rewrite /edge_neigh.
+    apply/imsetP/andP => [[y Hy ->] | [/edgesP [u [v [-> uv]]] Hx]];
+    first by rewrite !inE eqxx in_edges -in_opn.
+    case/set2P : Hx => ?; subst; [exists v | exists u]; try rewrite in_opn; rewrite //;
+    first by rewrite sg_sym.
+    by apply/doubleton_eq_iff; right.
+  Qed. 
+
+  Lemma edgesSetP {G : sgraph} (x : G) (e : {set G}) :
+    reflect (exists y, e = [set x; y] /\ x -- y) (e \in E{G;x}).
+  Proof.
+    apply: (iffP imsetP) => [[y]|[y] [E xy]];
+    first by rewrite in_opn; exists y.
+    exists y; by rewrite // in_opn.
+  Qed.
+
+  Lemma edge_neigh_edge {G : sgraph} (x y : G) (e : {set G}) : 
+    ((e \in E{x}) && (e \in E{y}) && (x != y)) <-> (e == [set x; y]) && x -- y.
+  Proof.
+    split=> [/andP[/andP[/imsetP[z1] Hn1 He1 /imsetP[z2] Hn2 He2]]| /andP[/eqP Heq xy]].
+    - rewrite He2 in He1.
+      case: (iffLR (doubleton_eq_iff y z2 x z1) He1);
+      move=> [Hxy Hz]; first by rewrite Hxy eqxx.
+      rewrite in_opn -Hxy in Hn1; rewrite Hz setUC in He2.
+      by move/eqP: He2.
+    - move: (xy)=> /sg_edgeNeq ->.
+      rewrite Heq (edge_neigh_self xy).
+      have -> : [set x; y] = [set y; x] by apply/doubleton_eq_iff; right.
+      by rewrite sg_sym in xy; rewrite (edge_neigh_self xy).
+  Qed.
+
+  Lemma del_edges_edge_neigh (G : sgraph) (A e : {set G}) (x : G) : 
+    e \in E{del_edges A;x} = (e \in E{G;x}) && ~~ (e \subset A).
+  Proof.
+    rewrite/edge_neigh.
+    apply/imsetP/andP => [[z + ->] | [/imsetP [z] Hin -> Hns]].
+    - rewrite (del_edges_opn _ x) => /andP[Hin ->].
+      by split; first apply/imsetP; try exists z.
+    - move/andP: (conj Hin Hns). rewrite -del_edges_opn.
+      by exists z.
+  Qed.
+
+  Lemma card_edge_neigh (G : sgraph) (v : G) :
+    #|E{v}| = #|N(v)|.
+  Proof.
+      rewrite /edge_neigh.
+      apply: card_imset => w1 w2.
+      by rewrite doubleton_eq_left. 
+  Qed.
+
+End EdgeNeighboorhood.
+Notation "E{ x }" := (@edge_neigh _ x) (at level 0, format "E{ x }").
+Notation "E{ G ; x }" := (@edge_neigh G x) (at level 0, format "E{ G ; x }"). 
+
+Lemma del_edges1_neq {G : sgraph} (e del_e : {set G}) :
+  e \in E(del_edges del_e) -> e != del_e.
+Proof.
+  move=> He.
+  apply/eqP => Heq.
+  rewrite Heq in He.
+  by move: (del_edgesN del_e); rewrite He.
+Qed.
+
+Definition max_degree (G : sgraph) : nat := \max_(x in G) #|N(x)|.
+
+(* When we delete edges, it's easier to reason about E{x} *)
+Lemma max_deg_edge (G : sgraph) : \max_(x in G) #|N(x)| = \max_(x in G) #|E{x}|.
+Proof.
+  apply: bigmax_eq_pointwise => v _; by rewrite card_edge_neigh.
+Qed.
+
+Lemma del_edges_max_deg (G : sgraph) (A : {set G} ):
+  max_degree (del_edges A) <= max_degree G.
+Proof.
+  rewrite/max_degree 2!max_deg_edge.
+  apply: bigmax_leq_pointwise => x _.
+  apply: subset_leq_card.
+  apply/subsetP => e.
+  by rewrite (@del_edges_edge_neigh G A e) => /andP[-> _].
+Qed.
+\end{minted}
+
+\section{Simple Paths}\label{apdx:spath}
+\begin{minted}[linenos]{coq}
+From mathcomp Require Import all_boot.
+From GraphTheory Require Import edone preliminaries digraph sgraph.
+
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Section PathHelpers.
+    Variables (G : sgraph) (x y z : G) (p : Path x y).
+
+    Lemma inInteriorP :
+        reflect (z \in interior p) ((z != x) && (z != y) && (z \in p)).
+    Proof. rewrite !inE negb_or; exact: idP. Qed.
+
+    Lemma isplitInternal : 
+        irred p -> z \in interior p ->
+        exists (u v : G) (uz : u -- z) (zv : z -- v) (p1 : Path x u) (p2 : Path v y),
+        p = pcat (pcat p1 (edgep uz)) (pcat (edgep zv) p2) /\ u != v.
+    Proof.
+        move=> Ip /inInteriorP /andP[/andP[xNz zNy] z_in_p]; rewrite eq_sym in xNz.
+        case/(isplitP Ip) def_p1 : _ / z_in_p => [pl pr Ipl Ipr Iz].
+        case: (splitR pl xNz) Ipl => u [pl'] [uz] El Ipl. 
+        case: (splitL pr zNy) Ipr => v [zv] [pr'] [Er _] Ipr.
+        exists u, v, uz, zv, pl', pr'.
+        split; first by rewrite El Er.
+        (* by contradiction if u = v *)
+        apply/eqP=> eq_uv.
+        have u_in_pl : u \in pl by rewrite El mem_pcat_edgeR path_end.
+        have u_in_pr : u \in pr by rewrite eq_uv Er mem_pcat_edgeL path_begin.
+        have := Iz u u_in_pl u_in_pr.
+        by have /eqP := sg_edgeNeq uz.
+    Qed.
+
+    Lemma deg1_internal : #|N(z)| <= 1 -> irred p -> z \notin interior p. 
+    Proof.
+        move=> /leq_gtF deg1 Ip; apply/negP=> z_in_p.
+        have [u [v] [uz] [zv] [p1] [p2] [pc uNv]] := isplitInternal Ip z_in_p.
+        suff : 2 <= #|N(z)|; first by rewrite deg1.
+        rewrite -(ltn_add2r 1) addn1.
+        have -> : 2 = #|[set u; v]| by rewrite cards2 uNv.
+        rewrite addn1 ltnS. 
+        apply/subset_leqif_cards.
+        by rewrite subUset 2!sub1set 2!in_opn sg_sym.
+    Qed.
+
+End PathHelpers.
+
+Proposition shared_interior3 
+    (G : sgraph) 
+    (x y z : G) 
+    (p : Path x y) 
+    (q : Path x z) 
+    :
+    #|N(x)| = 1 -> #|N(y)| = 1 -> #|N(z)| = 1 ->
+    x != y -> y != z -> x != z ->
+    irred p -> irred q ->
+    exists w : G, 3 <= #|N(w)|.
+Proof.
+    move=> /eq_leq degx /eq_leq degy /eq_leq degz xNy yNz xNz Ip Iq.
+    have z_nin_p : z \notin p by have := deg1_internal degz Ip; 
+    rewrite !inE negb_and negb_or eq_sym xNz eq_sym yNz.
+    have y_nin_q : y \notin q by have := deg1_internal degy Iq;
+    rewrite !inE negb_and negb_or eq_sym xNy yNz.
+    case: (splitL p xNy) => u [xu] [p'] [Epc _].
+    case: (splitL q xNz) => u' [xu'] [q'] [Eqc _].
+    have uEu' : u = u'.
+    {
+        move/card_le1_eqP: degx=> in_nx.
+        have := in_nx u u'.
+        rewrite 2!in_opn=> eq_uu'.
+        by have := eq_uu' xu xu'.
+    }
+    have x_nin_p' : x \notin p' by rewrite Epc irred_edgeL in Ip; case/andP: Ip.
+    have y_nin_q' : y \notin q' 
+      by move: y_nin_q; rewrite Eqc mem_pcat_edgeL negb_or=> /andP[_ ->].
+    have /andP[x_nin_q' Iq'] : (x \notin q') && irred q' 
+      by rewrite Eqc irred_edgeL in Iq.
+    have u_in_p' : u \in p' by rewrite path_begin.
+    have u_in_q : u \in q by rewrite uEu' Eqc mem_pcat_edgeL path_begin.
+    case: (split_at_last (p := p') u_in_q u_in_p') => v [p1] [p2] [def_p' v_in_q v_last].
+    case/(isplitP Iq) def_q' : _ / v_in_q => [q1 q2 Iq1 Iq2 Iv].
+    exists v.
+    have [v_in_p' v_in_q'] : v \in p' /\ v \in q 
+      by rewrite def_p' def_q' 2!mem_pcat 2!path_end.
+    have xNv : x != v by 
+        apply/eqP=> xEv; rewrite -xEv in v_in_p'; rewrite v_in_p' in x_nin_p'.
+    have vNy : v != y by 
+        apply/eqP=> vEy; rewrite vEy in v_in_q'; rewrite v_in_q' in y_nin_q.
+    have vNz : v != z by 
+        apply/eqP=> vEz; rewrite vEz in v_in_p'; 
+        rewrite Epc mem_pcat_edgeL v_in_p' negb_or andbF in z_nin_p.
+    case: (splitR q1 xNv) => vx [q1'] [vxv] def_q1.
+    case: (splitL p2 vNy) => vy [vvy] [p2'] [def_p2 _].
+    case: (splitL q2 vNz) => vz [vvz] [q2'] [def_q2 _].
+    have [hwy [hwz hwx]] : vy \in N(v) /\ vz \in N(v) /\ vx \in N(v) by 
+        rewrite 3!in_opn vvy vvz sg_sym.
+    have [vx_in_q1 [vy_in_p2 vz_in_q2]] : vx \in q1 /\ vy \in p2 /\ vz \in q2 by
+        rewrite def_q1 def_p2 def_q2 3!mem_pcat 3!path_begin.
+    have vzNvx : vz != vx. 
+    {
+        apply/eqP=> /esym vxEvz; rewrite vxEvz in vx_in_q1. 
+        have vzEv := Iv vz vx_in_q1 vz_in_q2.
+        by have := (sg_edgeNeq vvz); rewrite vzEv eq_refl.
+    }
+    have vzNvy : vz != vy.
+    {
+        apply/eqP=> /esym vyEvz; rewrite vyEvz in vy_in_p2.
+        have vz_in_q : vz \in q by rewrite def_q' mem_pcat vz_in_q2.
+        have vyEv := v_last vz vz_in_q vy_in_p2.
+        by have := (sg_edgeNeq vvz); rewrite vyEv eq_refl. 
+    } 
+    have vxNvy : vx != vy.
+    {
+        apply/eqP=> vxEvy; rewrite vxEvy in vx_in_q1.
+        have vy_in_q : vy \in q by rewrite def_q' mem_pcat vx_in_q1.
+        have vyEv := v_last vy vy_in_q vy_in_p2.
+        by have := (sg_edgeNeq vvy); rewrite vyEv eq_refl. 
+    }
+    rewrite -(ltn_add2r 1).
+    have -> : 2 + 1 = #|[set vz; vx; vy]|.
+    {
+        have [djzy djxy] : 
+            [disjoint [set vz] & [set vy]] /\ [disjoint [set vx] & [set vy]] 
+          by do 2 rewrite disjoints1 -in_setC in_setC1. 
+        by rewrite (@cardsU _ [set vz; vx] _) 
+                   setIUl (disjoint_setI0 djzy) (disjoint_setI0 djxy) 
+                   set0U cards0 cards1 cards2 vzNvx.
+    }
+    rewrite addn1 ltnS.
+    apply/subset_leqif_cards.
+    by rewrite 2!subUset 3!sub1set 3!in_opn vvz sg_sym.
+Qed.
+
+Definition pathp_edge {G : sgraph} (x u v : G) (s : seq G) : Prop :=
+    exists i, (i < size s) && (nth x (x::s) i == u) && (nth x s i == v).
+
+Definition Path_edge {G : sgraph} {x y : G} (p : Path x y) (u v : G) :=
+    pathp_edge x u v (tail p).
+
+Section PathEdge.
+    Variables (G : sgraph) (x y z u v : G) (p : Path x y).
+
+    Lemma is_path_edge : Path_edge p u v -> u -- v.
+    Proof.
+        rewrite/Path_edge/pathp_edge=> [[i] /andP[/andP[Hs /eqP <-] /eqP <-]].
+        move: (pathpW (valP p))=> /pathP Hp.
+        exact: Hp x i Hs.
+    Qed.
+
+    Lemma not_path_edge :
+        ~ u -- v -> ~ Path_edge p u v.
+    Proof.
+        apply/contra_not; exact: is_path_edge.
+    Qed.
+
+    Lemma vert_not_in_path :
+        (u \notin p) \/ (v \notin p) -> ~ Path_edge p u v.
+    Proof.
+        case=> Hn [i /andP[/andP[Hs /eqP Hnl] /eqP Hnr]];
+        [have Hin : u \in p | have /(mem_tail x) Hin : v \in tail p].
+        - have /(mem_nth x) : i < size (x :: tail p) by
+            move/(ltn_addr 1): Hs; 
+            rewrite [size (tail p) + 1]addnC 
+                    -[1 + size (tail p)]/(size([::x]) + size (tail p)) -size_cat.
+        by rewrite Hnl -nodesE.
+        - by rewrite Hin in Hn.
+        - rewrite -Hnr; exact: (mem_nth x Hs).
+        - by rewrite -nodesE in Hin; rewrite Hin in Hn.
+    Qed.
+
+    Lemma edgep_path_edge (xy : x -- y) :
+        (Path_edge (edgep xy) u v) <-> ((x == u) && (y == v)).
+    Proof.
+        rewrite/Path_edge/pathp_edge /=;
+        split=> [[i]| Heq]; by [case i | exists 0].
+    Qed.
+
+    Lemma cat_path_edge (q : Path y z) :
+        Path_edge (pcat p q) u v <-> Path_edge p u v \/ Path_edge q u v.
+    Proof.
+        rewrite/Path_edge -[tail (pcat p q)]/((tail p) ++ (tail q)) /pathp_edge size_cat;
+        split=> [[i] /andP[/andP[Hs +] +] |].
+        - rewrite nth_cat (nth_cat x (x :: tail p) (tail q) i).
+        case Hi: (i < size (tail p)).
+        + have Hlt : size (tail p) < size (x :: tail p) by [].
+            have -> := leq_ltn_trans (ltnW Hi) Hlt=> Hnl Hnr.
+            left; exists i; by rewrite Hi Hnl Hnr.
+        + move/negbT: Hi; rewrite -leqNgt -cat1s size_cat /= ltnS => Hi Hnl Hnr.
+            right; exists (i - size (tail p)).
+            rewrite -(ltn_subLR (size (tail q)) Hi) in Hs.
+            rewrite Hs (set_nth_default x y Hs) {}Hnr /= andbT.
+            rewrite leq_eqVlt in Hi; move/orP: Hi Hnl=> [/eqP Hi | Hi];
+            [move/esym/eq_leq: (Hi) | move/ltn_geF: (Hi)]=> ->.
+            - have/eqP H0 : (size (tail p) - size (tail p)) == 0 by rewrite subn_eq0.
+            by rewrite -Hi -last_nth path_last /= H0 nth0 => /eqP <-.
+            - rewrite -cat1s nth_cat -[_ < 1]/(_ == 0) subn1 subn_eq0 leqNgt Hi /=.
+            have Hlt : (i - size (tail p) - 1) < size (tail q) 
+              by rewrite subn1; exact: (leq_ltn_trans (leq_pred (i - size (tail p))) Hs).
+            by rewrite (set_nth_default x y Hlt) addnC subnDA.
+        - case; move=> [i] /andP[/andP[Hi Hnl] Hnr];
+            [exists i | exists (size (tail p) + i)]; 
+            rewrite -cat1s catA 2!(@nth_cat _ _ _ (tail q) _) size_cat /=;
+            first by rewrite Hi (ltn_addl _ Hi) (ltn_addr _ Hi).
+            rewrite ltn_add2l addnC ltn_add2r (@ltnNge _ (size (tail p))) 
+                    leq_addl -[i + size (tail p) - size (tail p)]addnBA //= 
+                    subnn addn0 (set_nth_default y x Hi) Hi Hnr andTb andbT.
+            case Hs: (i == 0). 
+            move/eqP: Hs Hnl=> -> /=.
+            rewrite add0n -(@cat1s _ x _) nth_cat /=.
+            case Hp: (size (tail p) < 1)=> /eqP <-; 
+            last by rewrite subn1 nth_last path_last.
+            rewrite -[_ < 1]/(_ <= 0) in Hp.
+            have Hxy: x = y.
+            {
+                have := leq_trans (idx_mem (path_end p)) Hp;
+                rewrite -[_ <= 0]/(_ == 0) subn0  -(idx_start p);
+                move/eqP/esym=> +. apply (idx_inj (path_begin p)).
+            }
+            by move/eqP: Hp Hxy; rewrite subn0 => -> ->.
+            - move/neq0_lt0n: Hs Hnl=> Hs.
+                have Hilts : i - 1 < size (tail q) 
+                  by rewrite -ltn_predL -subn1 in Hs; exact: (ltn_trans Hs Hi).
+                rewrite -cat1s nth_cat ltnS leqNgt Hs /=.
+                by rewrite subnDr (set_nth_default y x Hilts).
+    Qed.
+
+End PathEdge.
+
+Lemma idp_path_edge {G : sgraph} (x u v : G) : Path_edge (idp x) u v -> False.
+Proof. by rewrite/Path_edge/pathp_edge /= => [[_]]. Qed.
+\end{minted}
+
+\section{Edge Colorings}\label{apdx:ec}
+\begin{minted}[linenos]{coq}
+From HB Require Import structures.
+From mathcomp Require Import all_boot.
+From GraphTheory Require Import edone preliminaries digraph sgraph.
+Require Import aux.
+
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Section EdgeColoring.
+  (* ---- Edge Coloring Functional Definition ---- *)
+  Variables (G : sgraph) (ColorType : finType).
+  Implicit Type (x : G).
+
+  (* An edge coloring function assigns edges in E(G) to colors *)
+  Definition edgeColoringType : Type := {set G} -> ColorType.
+  Implicit Type (c : edgeColoringType).
+  
+  Definition is_proper_edge_coloring c : Prop := 
+    forall (x : G),
+    {in E{x}&, forall (e1 e2 : {set G}), c e1 = c e2 -> e1 = e2}.
+
+  Definition properEdgeColoringType : Type := { c | is_proper_edge_coloring c }.
+  Implicit Type (pc : properEdgeColoringType).
+
+  Coercion proper_to_edge_coloring
+    pc : edgeColoringType := proj1_sig pc.
+
+  Lemma single_colored_proper pc 
+    {x y z : G} (xy : x -- y) (xz : x -- z) (c0 : ColorType) 
+  : 
+    (sval pc) [set x; y] = c0 -> 
+    ((sval pc) [set x; z] = c0) <-> (y = z).
+  Proof.
+    have := (proj2_sig pc); rewrite/is_proper_edge_coloring=> is_pc xy_c0.
+    specialize (is_pc x [set x; y] [set x; z]).
+    split=> [z_eq| <- //].
+    rewrite z_eq in is_pc.
+    by apply/(doubleton_eq_left x)/is_pc; try apply/edge_neigh_self.
+  Qed.
+
+  Definition coloring_image c (E : {set {set G}}) : {set ColorType} := c @: E.
+  Local Notation "c [ E ]" := (coloring_image c E) (at level 50).
+
+  Lemma in_c_edge_neighP c x (c0 : ColorType) : 
+    reflect (exists2 y, [set x; y] \in E(G) & c [set x; y] = c0) (c0 \in c[E{x}]).
+  Proof.
+    rewrite/edge_neigh; apply/(iffP idP)=>[/imsetP[e] /imsetP[y]|[y] He Hc].
+    - rewrite in_opn -in_edges=> Hin He Hc; rewrite He in Hc.
+      by exists y.
+    - apply/imsetP; exists [set x; y]=> //=.
+      apply/imsetP; exists y; by rewrite // in_opn -in_edges He.
+  Qed.
+  
+  Lemma in_c_all_edgeP c (c0 : ColorType) :
+    reflect (exists2 e, e \in E(G) & c e = c0) (c0 \in c[E(G)]).
+  Proof.
+    apply/(iffP idP)=> [/imsetP[e] He /esym|[e] /edgesP [x] [y] [He Hxy]] Hc; 
+    first by exists e.
+    rewrite -in_edges in Hxy; rewrite He in Hc.
+    have: (c0 \in c[E{x}]) by apply/in_c_edge_neighP; exists y.
+    rewrite -2!sub1set=> Hsub. 
+    exact: (subset_trans Hsub (imsetS c (sub_all_edges x))).
+  Qed.
+
+  Lemma imset_c_del_edge c (e1 e2 : {set G}) :
+    e1 \in E(G) -> e2 \in E(G) ->
+    c e1 = c e2 -> 
+    c [E(del_edges e1)] = c [E(del_edges e2)].
+  Proof.
+    rewrite/coloring_image=> e1_in_G e2_in_G eqc12.
+    case: (boolP (e1 == e2))=> [/eqP ->//| neq12].
+    apply/setP=> c0.
+    wlog suff H : e1 e2 e1_in_G e2_in_G eqc12 neq12 /
+    (c0 \in [set c e | e in E(del_edges e1)] ->
+     c0 \in [set c e | e in E(del_edges e2)]).
+    { 
+      have H12 := H e1 e2 e1_in_G e2_in_G eqc12 neq12.
+      rewrite eq_sym in neq12.
+      have H21 := H e2 e1 e2_in_G e1_in_G (esym eqc12) neq12.
+      apply/idP/idP; [exact: H12 | exact: H21].
+    }
+    move=> /imsetP [e3 e3_in_E eq03]; apply/imsetP.
+    case: (boolP (e3 == e2))=> [/eqP eq23| neq23].
+    - exists e1; last by rewrite eqc12 eq03 eq23.
+      rewrite mem_del_edges e1_in_G.
+      exact: edges_eqn_sub e1_in_G e2_in_G neq12.
+    - exists e3; last by [].
+      move: e3_in_E; rewrite 2!mem_del_edges=> /andP[e3_in_G _].
+      rewrite e3_in_G.
+      exact: edges_eqn_sub e3_in_G e2_in_G neq23.
+  Qed. 
+
+  Lemma leq_col_deg c x : #|c[E{x}]| <= max_degree G.
+  Proof. 
+    apply: (leq_trans (leq_imset_card _ _)).
+    rewrite card_edge_neigh /max_degree.
+    exact: leq_bigmax_cond.
+  Qed.
+
+  Lemma eq_deg_pcol pc x : #|pc[E{x}]| = #|E{x}|.
+  Proof.
+    apply: card_in_imset.
+    exact: (proj2_sig pc). 
+  Qed.
+
+  Lemma leq_vertex_graph c x : #|c[E{x}]| <= #|c[E(G)]|.
+  Proof.
+    exact: subset_leq_card (imsetS c (sub_all_edges x)).
+  Qed.
+
+  Lemma leq_maxdeg_pcol pc : max_degree G <= #|pc[E(G)]|.
+  Proof.
+    rewrite /max_degree max_deg_edge.
+    apply/bigmax_leqP=> x _. 
+    apply: (leq_trans _ (leq_vertex_graph pc x)).
+    by rewrite (eq_deg_pcol pc x).
+  Qed.
+
+End EdgeColoring.
+Notation "c [ E ]" := (coloring_image c E) (at level 50).
+
+Section ChromIdx.
+  Variables (G : sgraph).
+  Implicit Types (k chi : nat).
+  
+  (* A k-edge-coloring is a proper coloring which uses exactly k colors *)
+  Definition kEdgeColoringType k : Type := 
+    { ColorType : finType &
+      { c : properEdgeColoringType G ColorType | #|c[E(G)]| == k } }.
+
+  Coercion k_to_proper_coloring {k} (kc : kEdgeColoringType k) : 
+    properEdgeColoringType G (projT1 kc) :=
+    proj1_sig (projT2 kc).
+
+  Definition proper_to_k_coloring 
+    {ColorType : finType} (pc : properEdgeColoringType G ColorType) 
+  : kEdgeColoringType #|pc[E(G)]| := (existT _ ColorType (exist _ pc (eqxx _))).
+
+  Definition card_k_col {k} (kc : kEdgeColoringType k) :
+    #|kc[E(G)]| = k := eqP (proj2_sig (projT2 kc)).
+
+  (* G is k-colorable if a k-edge-coloring exists. *)
+  Definition k_edge_colorable k : Prop := inhabited (kEdgeColoringType k).
+
+  (* The chromatic index chi is the smallest k such that G is k-colorable *)
+  Definition is_chromatic_index chi : Prop :=
+    k_edge_colorable chi /\ forall k, k < chi -> ~ k_edge_colorable k.
+
+  (* We can already lower bound the chromatic index *)
+  Theorem chi_lower_bound chi : 
+    is_chromatic_index chi -> 
+    max_degree G <= chi.
+  Proof. 
+    do 3![elim]=> ColorType is_chiEC _. 
+    elim: is_chiEC=> ? /eqP <-.
+    by rewrite leq_maxdeg_pcol.
+  Qed.
+
+  (* Any valid k-edge-coloring upper bounds chi *)
+  Lemma chi_upper_bound k chi :
+    is_chromatic_index chi ->
+    k_edge_colorable k ->
+    chi <= k.
+  Proof.
+    move=> [Hchi_color Hchi_min] kc.
+    rewrite leqNgt.
+    apply/negP=> Hlt.
+    have nkc : ~ k_edge_colorable k := Hchi_min _ Hlt.
+    exact: nkc kc.
+  Qed.
+
+  Lemma chi_upper_bound_trans k chi :   
+    is_chromatic_index chi ->
+    (exists n, k_edge_colorable n /\ n <= k) ->
+    chi <= k.
+  Proof.
+    move=> ? [n] [? n_lt_k].
+    have chi_lt_n : chi <= n by exact/chi_upper_bound.
+    exact (leq_trans chi_lt_n n_lt_k).
+  Qed.
+
+  (* ----  One-to-one Coloring ---- *)
+
+  (* injective coloring: each edge is a color *)
+  Definition injEdgeColoringType : edgeColoringType G {set G} :=
+    fun e => e.
+
+  Definition proper_inj_coloring : properEdgeColoringType G {set G}.
+  Proof.
+    exists injEdgeColoringType.
+    by move=> _ e1 e2 _ _ eq.
+  Defined.
+
+  Lemma imset_inj : proper_inj_coloring[E(G)] = E(G). 
+  Proof.
+    apply/setP=> e.
+    apply/imsetP/idP=> [[e'] He' -> |He]; last by exists e.
+    by rewrite /proper_inj_coloring /injEdgeColoringType.
+  Qed.
+
+  Definition inj_k_coloring : kEdgeColoringType #|E(G)|.
+  Proof.
+    exists {set G}, proper_inj_coloring; by rewrite imset_inj.
+  Defined.
+
+  (* Thus, all graphs have a k-edge-coloring with k = #|E(G)|*)
+  Lemma inj_chrom : k_edge_colorable #|E(G)|.
+  Proof.
+    constructor; exact inj_k_coloring.
+  Qed.
+
+  (* If chi is a chromatic index of G, then chi <= |E(G)| *)
+  Corollary chromatic_index_le_edges chi (is_chi : is_chromatic_index chi) :
+    chi <= #|E(G)|.
+  Proof.
+    exact: (chi_upper_bound is_chi inj_chrom).
+  Qed.
+
+  (* TO THINK: could also prove chromatic index exists and is unique *)
+End ChromIdx.
+
+Section AbsentSet.
+  Variables (G : sgraph).
+  Implicit Types (x y : G).
+
+  Definition absent_set {ColorType : finType} 
+    (c : edgeColoringType G ColorType) x :=
+    setD (c[E(G)]) (c[E{x}]).
+
+  Lemma absent_in_imset 
+    {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x 
+  :
+    c0 \in absent_set c x -> c0 \in c[E(G)].
+  Proof.
+    by move=>/setDP [? _].
+  Qed.
+
+  Lemma absent_edge 
+    {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y 
+  :
+    c0 \in absent_set c x -> y \in N(x) -> c0 != c [set x; y].
+  Proof.
+    move=> /setDP[_ /memPnC Hnin] ?.
+    have in_cneigh : c [set x; y] \in c[E{x}].
+    { by apply/imsetP; exists [set x; y]; first by apply/imsetP; exists y. }
+    apply Hnin; exact: in_cneigh.
+  Qed.
+
+  Lemma absent_edge_sym 
+    {ColorType : finType} (c : edgeColoringType G ColorType) (c0 : ColorType) x y 
+  :
+    c0 \in absent_set c x -> x \in N(y) -> c0 != c [set y; x].
+  Proof. 
+    have -> : [set y; x] = [set x; y] by rewrite doubleton_eq_iff; right.
+    rewrite in_opn sg_sym -in_opn.
+    exact: absent_edge. 
+  Qed.
+
+  Lemma absent_del_edge {ColorType : finType} (c : edgeColoringType G ColorType) x y z :
+    [set x; y] \in E(G) -> x != z -> y != z ->
+    c [set x; y] \notin c[E(del_edges [set x; y])] ->
+    c [set x; y] \in absent_set c z.
+  Proof.
+    rewrite /absent_set=> xy_in xNz yNz w0p; apply/setDP; split;
+    first by apply/imsetP; exists [set x; y].
+    apply/negP=> /imsetP [e e_at_z cxy].
+    apply: (negP w0p); apply/imsetP; exists e; last by [].
+    rewrite mem_del_edges.
+    apply/andP; split; 
+    first by exact: (subsetP (sub_all_edges z) _ e_at_z).
+    apply/subsetPn.
+    move/edgesSetP: e_at_z => [w [-> _]].
+    exists z; first by rewrite !inE eqxx.
+    by rewrite !inE negb_or eq_sym xNz eq_sym.
+  Qed.
+
+  Proposition exists_absent_color {k : nat} (kc : kEdgeColoringType G k):
+    max_degree G + 1 <= k ->
+    forall x : G, exists c, c \in (absent_set kc x).
+  Proof.
+    rewrite addn1=> ? x; apply/set0Pn.
+    rewrite -card_gt0 cardsDS; last by apply imsetS; apply sub_all_edges.
+    by rewrite subn_gt0 (card_k_col kc) (leq_ltn_trans (leq_col_deg kc x)).
+  Qed.
+  
+End AbsentSet.
+
+Section ExtendCol. 
+  Variables (G : sgraph) (del_e : {set G}) (He : del_e \in E(G)).
+
+  Definition extendedColType 
+    {ColorType : finType}
+    (c : edgeColoringType (del_edges del_e) ColorType)
+  : edgeColoringType G (option ColorType) :=
+    fun e => if e == del_e then None else Some (c e).
+
+  Lemma proper_extended_col
+    {ColorType : finType}
+    (pc : properEdgeColoringType (del_edges del_e) ColorType)
+  : is_proper_edge_coloring (extendedColType pc).
+  Proof.
+    move:pc => [c Hp] x f0 f1 Hf0 Hf1.
+    rewrite /extendedColType.
+    case H00: (f0 == del_e); case H10 : (f1 == del_e) => //.
+    - move/eqP: H00=> ->; move/eqP: H10 => -> //.
+    move=> [Heq]; apply (Hp x); last by [];
+    move/negbT: H00=> H00; move/negbT: H10=> H10;
+    move/(subsetP (sub_all_edges x)): (Hf0)=> Hf0G;
+    move/(subsetP (sub_all_edges x)): (Hf1)=> Hf1G;
+    move: (edges_eqn_sub Hf0G He H00)=> Hsub0;
+    move: (edges_eqn_sub Hf1G He H10)=> Hsub1;
+    by rewrite (@del_edges_edge_neigh G del_e _ _).
+  Qed.
+
+  Lemma card_extended_col 
+    {k : nat} 
+    (kc : kEdgeColoringType (del_edges del_e) k) 
+  : #|extendedColType kc[E(G)]| = k + 1.
+  Proof. 
+    rewrite /extendedColType /coloring_image.
+    rewrite (del_edges1 He) imsetU1 eq_refl.
+    have -> : 
+        [set (if e == del_e then None else Some ((sval (sval (projT2 kc))) e)) 
+            | e in E(del_edges del_e)]
+        = Some @: (kc[E(del_edges del_e)]).
+    {
+      rewrite -imset_comp.
+      apply/setP=> c0.
+      apply/imsetP/imsetP=> [[e He' ->]| [e He' ->]];
+      exists e=> //; rewrite ifF //;
+      apply/negbTE/negP=> /eqP eEd;
+      have := del_edgesN del_e; rewrite -{1}eEd;
+      by rewrite He'.
+    }
+    rewrite cardsU1 card_imset; last by exact: Some_inj.
+    rewrite card_k_col. 
+    have -> : None \notin [set Some x | x in kc [E(del_edges del_e)]].
+    { by apply/imsetP => [[x _ /eqP //]]. }
+    by rewrite addnC.
+  Qed.
+
+  (* extendedColType of a k-edge-coloring produces a (k+1)-edge-coloring *)
+  Definition k_extended_col 
+    {k : nat}
+    (kc : kEdgeColoringType (del_edges del_e) k)
+  : kEdgeColoringType G (k + 1).
+  Proof.
+    exists (option (projT1 kc)), 
+    (exist _ (extendedColType kc) (@proper_extended_col _ kc));
+    by rewrite (card_extended_col kc). 
+  Defined.
+
+  Lemma extended_absent 
+    {k : nat}
+    {kc : kEdgeColoringType (del_edges del_e) k}
+    {c0 : projT1 kc}
+    {x : G}
+  : c0 \in absent_set kc x -> Some c0 \in absent_set (k_extended_col kc) x.
+  Proof.
+    rewrite/absent_set=> /setDP[c0_in_kc c0_nin_kc].
+    apply/setDP.
+  Admitted.
+  
+End ExtendCol.
+
+Section Recolor.
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType).
+  Implicit Types (e f : {set G}).
+
+  Definition recolor_edge e c0 : edgeColoringType G ColorType :=
+    fun edge => if edge == e then c0 else c edge.
+
+  Lemma recolor_eq e c0 : (recolor_edge e c0) e = c0.
+  Proof. by rewrite /recolor_edge eqxx. Qed.
+
+  Lemma recolor_neq e f c0 : f != e -> (recolor_edge e c0) f = c f.
+  Proof. by rewrite /recolor_edge=> /negPf ->. Qed.
+
+  Lemma del_edges_imset_recolor e c0 : 
+    c[E(del_edges e)] = recolor_edge e c0 [E(del_edges e)].
+  Proof.
+    apply/setP => c1.
+    by apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /recolor_edge;
+    exists e2 => //; case: ifP => /eqP Heq //;
+    rewrite Heq in He2; move: (del_edgesN e); rewrite -in_setC => /setCP.
+  Qed.
+
+  Lemma imset_recolor e c0 :
+    c0 \in c[E(G)] ->
+    recolor_edge e c0 [E(G)] \subset c[E(G)].
+  Proof.
+    rewrite/coloring_image/recolor_edge=> /imsetP [e1] e1_in_G def_c0.
+    apply/subsetP=> c1 /imsetP [e2] e2_in_G.
+    case: ifP=> _ def_c1; apply/imsetP;
+    last by exists e2. 
+    by exists e1; rewrite -def_c1 in def_c0.
+  Qed.
+
+  Lemma recolor_proper (x y : G) c0 :
+    is_proper_edge_coloring c ->
+    c0 \in (absent_set c x :&: absent_set c y) ->
+    is_proper_edge_coloring (recolor_edge [set x; y] c0).
+  Proof.
+    rewrite/recolor_edge in_setI=> Hp /andP[Hax Hay].
+    move: Hp=> Hp z e1 e2 Hz1 Hz2.
+    move: (Hz1) (Hz2); rewrite/edge_neigh=> /imsetP [w1] Hw1 Ezw1 /imsetP [w2] Hw2 Ezw2.
+    rewrite Ezw1 Ezw2.
+    case: ifP=> /eqP /doubleton_eq_iff; 
+    [case; move=> [H1 H2]|rewrite 4!(rwP eqP) !(rwP andP) (rwP orP) (rwP negP) negb_or];
+    (case: ifP=> /eqP /doubleton_eq_iff; 
+    [case; move=> [H3 H4]| rewrite 4!(rwP eqP) 2!(rwP andP) (rwP orP) (rwP negP) negb_or]);
+    rewrite doubleton_eq_iff 5!(rwP eqP) 2!(rwP andP) (rwP orP).
+    - by rewrite H2 H4 3!eq_refl. 
+    - by rewrite H2 H4 -H3 H1 2!eq_refl.
+    - rewrite -H1 in Hax=> _ /eqP Hc0.
+      have Hcontra := absent_edge Hax Hw2. 
+      by rewrite Hc0 eqxx in Hcontra.
+    - by rewrite 2!eq_refl H2 -H3 H1 -H4 eq_refl.
+    - by rewrite H2 H4 3!eq_refl.
+    - rewrite -H1 in Hay=> _ /eqP Hc0.
+      have Hcontra := absent_edge Hay Hw2. 
+      by rewrite Hc0 eqxx in Hcontra.
+    - rewrite -H3 in Hax=> _ /eqP Hc0.
+      have Hcontra := absent_edge Hax Hw1. 
+      by rewrite Hc0 eqxx in Hcontra.
+    - rewrite -H3 in Hay=> _ /eqP Hc0.
+      have Hcontra := absent_edge Hay Hw1. 
+      by rewrite Hc0 eqxx in Hcontra.
+    - rewrite Ezw1 in Hz1; rewrite Ezw2 in Hz2.
+      rewrite eq_refl=> _ _ /eqP /(Hp z _ _ Hz1 Hz2) /doubleton_eq_left ->.
+      by rewrite eq_refl.
+  Qed.
+
+  Lemma replace_col e c0 : 
+    e \in E(G) ->  
+    c0 \in c[E(del_edges e)] ->
+    c e \notin c[E(del_edges e)] -> 
+    #|recolor_edge e c0 [E(G)]| = #|c[E(G)]| - 1.
+  Proof.
+    move=> e_in_e.
+    rewrite (del_edges1 e_in_e).
+    move: (del_edges_imset_recolor e c0).
+    rewrite /coloring_image 2!imsetU1 2!cardsU1 recolor_eq => -> -> -> /=.
+    by rewrite add0n add1n subn1.
+  Qed.
+
+  Definition swap_edge e f : edgeColoringType G ColorType :=
+    fun edge => 
+      if edge == e then c f
+      else if edge == f then c e
+      else c edge. 
+  
+  Lemma swap_edge_eq {e f} : e == f -> swap_edge e f =1 c.
+  Proof.
+    move=> /eqP -> e'.
+    rewrite/swap_edge.
+    case Heq: (e' == f)=> //.
+    by move/eqP: Heq ->.
+  Qed.
+
+  Lemma imset_swap e f : 
+    e \in E(G) -> 
+    f \in E(G) ->
+    c[E(G)] = (swap_edge e f)[E(G)].
+  Proof.
+    move=> He Hf; apply/setP=> c0.
+    apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
+    exists (if e2 == e then f else if e2 == f then e else e2) => //;
+    repeat case: ifP => //; repeat move=> /eqP -> //; try rewrite eq_refl //.
+    - do 2 move=> _ -> //.
+    - move=> _ /eqP -> //.
+  Qed.
+
+  (* Same proof as above*)
+  Lemma imset_swap_vertex e f (x : G) :
+    e \in E{x} -> 
+    f \in E{x} -> 
+    c[E{x}] = (swap_edge e f)[E{x}].
+  Proof.
+    move=> He0 He1; apply/setP=> c0.
+    apply/imsetP/imsetP; move=> [e2 He2 ->]; rewrite /swap_edge;
+    exists (if e2 == e then f else if e2 == f then e else e2) => //;
+    repeat case: ifP=> //; repeat move=> /eqP -> //; try rewrite eq_refl //.
+    - do 2 move=> _ -> //.
+    - move=> _ /eqP -> //.
+  Qed.
+
+  Lemma imset_swap_nin e f (x : G) :
+    x \notin e -> x \notin f ->
+    c[E{x}] = (swap_edge e f)[E{x}].
+  Proof.
+    move=> x_nin_e x_nin_f; apply/setP=> c0.
+    apply/imsetP/imsetP; move=> [e2 e2_in_G ->]; rewrite /swap_edge;
+    exists e2=> //; move: e2_in_G; rewrite mem_edge_graph=> /andP[_ x_in_e2];
+    by (case: ifP=> [/eqP contra|]; 
+        [by rewrite contra in x_in_e2; rewrite x_in_e2 in x_nin_e|]);
+       (case: ifP=> [/eqP contra|]; 
+        [by rewrite contra in x_in_e2; rewrite x_in_e2 in x_nin_f|]).
+  Qed.
+
+  Lemma swap_absent_nin (e f : {set G}) (x : G) :
+    x \notin e -> x \notin f -> e \in E(G) -> f \in E(G) ->
+    absent_set (swap_edge e f) x = absent_set c x.
+  Proof.
+    rewrite/absent_set=> x_nin_e x_nin_f e_in_G f_in_G.
+    by rewrite (imset_swap e_in_G f_in_G) (imset_swap_nin x_nin_e x_nin_f).
+  Qed.
+
+  Lemma swap_proper_vertex (x y z : G) :
+    is_proper_edge_coloring c ->
+    (c [set x; y]) \in absent_set c z ->
+    (c [set x; z]) \in absent_set c y ->
+    y \in N(x) -> z \in N(x) ->
+    is_proper_edge_coloring (swap_edge [set x; y] [set x; z]).
+  Proof.
+    rewrite /is_proper_edge_coloring /swap_edge
+      => pc abs_z abs_y y_at_x z_at_x u e1 e2  
+        /edgesSetP [v1] [def_e1 uv1] /edgesSetP [v2] [def_e2 uv2].
+    rewrite def_e1 def_e2.
+    case: (boolP (v1 == v2))=> [/eqP ->| v1Nv2]; first by [].
+    have [yNx zNx] : ((y == x) = false) /\ ((z == x) = false) 
+    by move: y_at_x z_at_x; do 2 rewrite in_opn sg_sym=> /sg_edgeNeq ->.
+    (* case if (u, v1) = (x, y) *)
+    case: ifP=> /eqP /doubleton_eq_iff.
+    - move=> [[uEx v1Ey] | [uEy v1Ex]].
+      + rewrite uEx in uv1 uv2 def_e1 def_e2 *.
+        rewrite v1Ey in v1Nv2 uv1 def_e1 *.
+        case: ifP=> [/eqP /doubleton_eq_left v2Ny | _]; 
+        first by rewrite v2Ny eq_refl in v1Nv2.
+        case: ifP=> /eqP /doubleton_eq_left v2Ez /esym.
+        * rewrite v2Ez in def_e2 uv2 *.
+          exact: (pc x [set x; y] [set x; z] (edge_neigh_self uv1) (edge_neigh_self uv2)).
+        * by rewrite in_opn in z_at_x=>   
+            /(pc x [set x; v2] [set x; z] (edge_neigh_self uv2) 
+            (edge_neigh_self z_at_x)) /doubleton_eq_left.
+      + rewrite uEy.
+        case: ifP=> [/eqP /doubleton_eq_iff [[yEx _] | [_ ->]] | _];
+          try rewrite v1Ex //; first by rewrite yEx eq_refl in yNx.
+        case: ifP=> [/eqP /doubleton_eq_iff | _].
+        * rewrite 4!(rwP eqP) 2!(rwP andP) yNx -v1Ex=> /orP. 
+          rewrite /= => /andP[_ /eqP v1Ev2]; by rewrite v1Ev2 eq_refl in v1Nv2.
+        * rewrite -in_opn uEy in uv2=> cEc.
+          have := absent_edge abs_y uv2; by rewrite cEc eq_refl.
+    - case: ifP=> /eqP /doubleton_eq_iff.
+      + move=> [[uEx v1Ez] | [uEz v1Ex]].
+        * rewrite uEx v1Ez in uv1 uv2 *.
+          case: ifP=> [/eqP /doubleton_eq_left v2Ey _ /esym|];
+          first by rewrite v2Ey in uv2 *; 
+            exact: (pc x [set x; z] [set x; y] (edge_neigh_self uv1) (edge_neigh_self uv2)).
+          case: ifP=> [/eqP /doubleton_eq_left -> //|_ /eqP /doubleton_eq_left v2Ny _].
+          by rewrite in_opn in y_at_x
+            => /(pc x _ _ (edge_neigh_self y_at_x) (edge_neigh_self uv2)) 
+               /doubleton_eq_left /esym.
+        * rewrite uEz in uv2 *.
+          case: ifP=>[/eqP /doubleton_eq_iff _ _ cEc|];
+          first by have := absent_edge_sym abs_z z_at_x; rewrite cEc eq_refl.
+          case: ifP=> [/eqP /doubleton_eq_iff|_ _ _ cEc];
+          last by rewrite -in_opn in uv2; have := absent_edge abs_z uv2; 
+            rewrite cEc eq_refl.
+          rewrite 4!(rwP eqP) 2!(rwP andP) zNx -v1Ex eq_refl=> /orP.
+          rewrite /= => /eqP v1Ev2. 
+          by rewrite v1Ev2 eq_refl in v1Nv2.
+      + case: ifP=> [/eqP /doubleton_eq_iff [[uEx v2Ey] | [uEy v2Ex]] + + cEc|].
+        -- rewrite uEx v2Ey in uv1 cEc *.
+           rewrite in_opn in z_at_x.
+           have /doubleton_eq_left -> :=
+             pc x _ _ (edge_neigh_self uv1) (edge_neigh_self z_at_x) cEc.
+           by rewrite 4!(rwP eqP) 2!(rwP andP) 2!eq_refl=> /orP.
+        -- rewrite uEy in uv1 cEc *.
+           rewrite -in_opn in uv1.
+           have := absent_edge abs_y uv1.
+           by rewrite cEc eq_refl.
+        * case: ifP=>[/eqP /doubleton_eq_iff [[uEx v2Ez] | [uEz v2Ex]] + + +|_ _ _ _] cEc.
+        -- rewrite uEx v2Ez in uv1 cEc * => _ _.
+           rewrite in_opn in y_at_x.
+           have /doubleton_eq_left -> :=
+             pc x _ _ (edge_neigh_self uv1) (edge_neigh_self y_at_x) cEc.
+           by rewrite 4!(rwP eqP) 2!(rwP andP) 2!eq_refl=> /orP.
+        -- rewrite uEz in uv1 cEc *.
+           rewrite -in_opn in uv1.
+           have := absent_edge abs_z uv1.
+           by rewrite cEc eq_refl.
+    exact: (pc u _ _ (edge_neigh_self uv1) (edge_neigh_self uv2) cEc). 
+  Qed.
+
+End Recolor.
+\end{minted}
+
+\section{Fans and Rotation}\label{apdx:fan}
+\begin{minted}[linenos]{coq}
+From HB Require Import structures.
+From mathcomp Require Import all_boot.
+From GraphTheory Require Import edone preliminaries digraph sgraph.
+Require Import aux edge_coloring.
+From Equations Require Import Equations.
+
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Section Fan.
+  Variable (G : sgraph) (ColorType : finType).
+  Implicit Types (c : edgeColoringType G ColorType) (v wk w : G) (e : {set G}) (f : seq G).
+
+  (* 1. For all w in the fan centered at v, w is in the neighborhood of v *)
+  Definition neigh_prop v f := all (fun w => w \in N(v)) f.
+
+  (* 2. if w0 is the first item in fan f centered at v under coloring c,
+    (v, w0) is a distinct color from the rest of the edges in the graph *)
+  Definition w0_prop 
+    {ColorType} (c : edgeColoringType G ColorType) e 
+  := c e \notin c[E(del_edges e)].
+
+  Lemma w0_prop_extended {e} (c_del : edgeColoringType (del_edges e) ColorType)
+  : w0_prop (extendedColType c_del) e.
+  Proof. 
+    rewrite /w0_prop /extendedColType eq_refl.
+    by apply/negP => /imsetP [e' /del_edges1_neq /negbTE ->].
+  Qed.
+
+  Lemma w0_col_extended {e} (c_del : edgeColoringType (del_edges e) ColorType)
+  : (extendedColType c_del) e = None.
+  Proof. by rewrite /extendedColType eq_refl. Qed.
+
+    (* 3. for all w_i, w_{i+1} in the fan f centered at v under coloring c,
+    the color of (v, w_{i+1} is absent at w_i) *)
+  Definition absent_prop c e w := 
+    (c e) \in (absent_set c w).
+
+  Definition fanp c f v w0 wk := 
+    (last wk f == w0) && 
+    uniq (wk::f) &&
+    neigh_prop v (wk::f) &&
+    w0_prop c [set v; w0] &&
+    path (
+      fun x2 => absent_prop c [set v; x2]
+    ) wk f.
+
+  Lemma fanpW c f v w0 wk : 
+    fanp c f v w0 wk -> path (fun x2 => absent_prop c [set v; x2]) wk f.
+  Proof. by case/andP. Qed.
+
+  Lemma fanpW_rev c f v w0 wk : 
+    fanp c f v w0 wk -> 
+    path (fun x2 x1 => absent_prop c [set v; x1] x2) (last wk f) (rev (belast wk f)).
+  Proof.
+    move=> /fanpW. by rewrite rev_path.
+  Qed.
+
+  Lemma fanp_last c f v w0 wk : fanp c f v w0 wk -> last wk f = w0.
+  Proof. by case/andP=> /andP[/andP[/andP[/eqP-> _] _] _] _. Qed.
+
+  Lemma fanp_uniq c f v w0 wk : fanp c f v w0 wk -> uniq (wk::f).
+  Proof. by case/andP=> /andP[/andP[/andP[_ ->] _] _]. Qed.
+
+  Lemma fanp_w0_prop c f v w0 wk : fanp c f v w0 wk -> w0_prop c [set v; w0].
+  Proof. by case/andP=> /andP [_ ->] _. Qed.
+
+  Lemma fanp_neigh c f v w0 wk : fanp c f v w0 wk -> neigh_prop v (wk::f).
+  Proof. by case/andP => /andP [/andP [_ ->] _] _. Qed.
+
+  Lemma rev_neigh f v wk : neigh_prop v (wk::f) -> neigh_prop v (rev (wk::f)).
+  Proof. by rewrite /neigh_prop all_rev. Qed.
+
+  Definition valid_fan_vertex {c f v w0 wk} (fan : fanp c f v w0 wk) (w : G) :=
+    (w \in N(v)) && (w \notin wk::f) && absent_prop c [set v; w] wk.
+  
+  Lemma fanp_cons {c f v w0 wk} (fan : fanp c f v w0 wk) (w : G) : 
+    valid_fan_vertex fan w ->
+    fanp c (wk::f) v w0 w.
+  Proof. 
+    by move: fan;
+    rewrite /fanp last_cons /neigh_prop /valid_fan_vertex
+    => /andP[/andP[/andP[/andP[Hl Hu] Hn]] -> Hp] /andP[/andP[Hin Hnin] Ha].
+  Qed.
+
+  Lemma sub_fanp 
+    {c f v w0 wk}
+    {f1 f2 : seq G} {w}
+    (Hcat : (wk::f) = f1 ++ (w :: f2))
+  : fanp c f v w0 wk -> fanp c f2 v w0 w.
+  Proof.
+    rewrite/fanp -(last_cons wk wk) Hcat cat_uniq 
+           /neigh_prop all_cat -cat_rcons last_cat last_rcons
+    => /andP[/andP[/andP[/andP[-> /andP[_ /andP[_ ->]]] /andP[_ ->]] ->] +].
+    case: f1 Hcat=> [|wk' f1].
+    - by rewrite cat0s; case=> <- <-.
+    - rewrite cat_cons; case=> _ ->.
+      by rewrite -cat_rcons cat_path last_rcons=> /andP[_ ->].
+  Qed.
+
+End Fan.
+
+Section Pack.
+  Variables (G : sgraph) (ColorType : finType).
+  Implicit Types (c : edgeColoringType G ColorType) (v w : G).
+
+  Section FanDef.
+    Variables (c : edgeColoringType G ColorType) (v w0 w : G).
+
+    Record Fan : predArgType := { fval : seq G; _ : fanp c fval v w0 w }.
+
+    HB.instance Definition _ := [isSub for fval].
+    HB.instance Definition _ := [Countable of Fan by <:].
+
+  End FanDef.
+End Pack.
+
+Section FanOps.
+  Variables (G : sgraph) (ColorType : finType).
+  Implicit Types (k : nat) (c : edgeColoringType G ColorType) (fs : seq G).
+
+  Fixpoint rotate c fs (v : G) : edgeColoringType G ColorType :=
+    match fs with
+    | w0 :: ((w1::tl) as ws) =>
+        rotate
+            (swap_edge c [set v; w0] [set v; w1])
+            ws v
+    | _ => c
+    end. 
+
+  Lemma Fan_of_proof 
+    {v w0 : G} 
+    (c_del : edgeColoringType (del_edges [set v; w0]) ColorType) 
+  : v -- w0 -> fanp (extendedColType c_del) [::] v w0 w0.
+  Proof.
+    by rewrite /fanp (w0_prop_extended c_del) -in_opn.
+  Qed.
+
+  Definition Fan_of_del_edges 
+    {v w0 : G}
+    (He : v -- w0)
+    (c_del : edgeColoringType (del_edges [set v; w0]) ColorType)
+  := Build_Fan (Fan_of_proof c_del He).
+
+  Lemma k_Fan_of_proof
+    {k} {v w0 : G} 
+    (He : [set v; w0] \in E(G))
+    (kc_del : kEdgeColoringType (del_edges [set v; w0]) k) 
+  : fanp (k_extended_col He kc_del) [::] v w0 w0.
+  Proof.
+    rewrite /fanp (w0_prop_extended kc_del) //=.
+    by have -> : w0 \in N(v) by move: (He); rewrite in_edges in_opn.
+  Qed.
+
+  (* TO THINK: Is there a way to avoid this (just use fan_of...) *)
+  Definition k_Fan_of_del_edges 
+    {k} {v w0 : G}
+    (He : [set v; w0] \in E(G))
+    (kc_del : kEdgeColoringType (del_edges [set v; w0]) k) 
+  := Build_Fan (k_Fan_of_proof He kc_del).
+End FanOps.
+
+Section Rotation. 
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType)
+            (v w0 wk : G) (f : Fan c v w0 wk).
+  Implicit Type (w : G).
+
+  Lemma fanW : path (fun x2 => absent_prop c [set v; x2]) wk (fval f).
+  Proof. move: (valP f); exact: fanpW. Qed.
+
+  Lemma fan_last : last wk (val f) = w0.
+  Proof. move: (valP f); exact: fanp_last. Qed.
+
+  Lemma fan_rev : rev (wk::val f) = w0::(rev (belast wk (fval f))).
+  Proof. rewrite lastI rev_rcons. congr (_ :: _). exact: fan_last. Qed.
+
+  Lemma fanW_rev : 
+    path (fun x2 x1 => absent_prop c [set v; x1] x2) w0 (rev (belast wk (fval f))).
+  Proof. move: (valP f)=> /fanpW_rev. by rewrite fan_last. Qed.
+
+  Lemma fan_uniq : uniq (wk::val f).
+  Proof. move: (valP f); exact: fanp_uniq. Qed.
+
+  Lemma fan_neigh : neigh_prop v (wk::val f).
+  Proof. move: (valP f); exact: fanp_neigh. Qed.
+
+  Lemma fan_w0_prop : w0_prop c [set v; w0].
+  Proof. move: (valP f); exact: fanp_w0_prop. Qed.
+
+  Lemma in_neigh w : w \in (wk::val f) -> w \in N(v).
+  Proof. 
+    move: fan_neigh; rewrite/neigh_prop=> /allP H. exact: H.
+  Qed.
+
+  Definition fancons {w} (H : valid_fan_vertex (valP f) w) := Build_Fan (fanp_cons H).
+
+  Lemma sub_fan {f1 f2 : seq G} w (Hcat : (wk::val f) = f1 ++ (w :: f2)) : Fan c v w0 w.
+  Proof.
+    move: (valP f)=> Hf. exact: (Build_Fan (sub_fanp Hcat Hf)). 
+  Qed.
+
+  Definition rotateF : edgeColoringType G ColorType :=
+    rotate c (rev (wk::val f)) v.
+
+  Lemma rot_notin (e : {set G}) :
+    e \in E(G) -> e \notin E{v} -> c e = rotateF e.
+  Proof.
+    rewrite /rotateF mem_edge_graph=> -> /= e_nin_v; set fs := (rev (wk::val f)).
+    elim: fs c=> [|w1 [|w2 wss] IH] d //.
+    change (d e = rotate (swap_edge d [set v; w1] [set v; w2]) (w2 :: wss) v e).
+    rewrite -(IH (swap_edge d [set v; w1] [set v; w2])).
+    rewrite /swap_edge. move: e_nin_v.
+    case: ifP=> [/eqP -> /negP|]; first by rewrite set21.
+    case: ifP=> [/eqP -> /negP|//]; by rewrite set21.
+  Qed.
+
+  Lemma imset_rot_vertex : c[E{v}] = rotateF[E{v}].
+  Proof.
+    rewrite /rotateF; set fs := (rev (wk::val f)).
+    have Hws : neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
+    elim: fs c Hws=> [|w1 ws IH] d //= /andP [Hw1 Hws].
+    case: ws IH Hws=> [|w2 wss IH] Hws //.
+    rewrite -(IH (swap_edge d [set v; w1] [set v; w2])) //. 
+    move/andP: Hws => [Hw2 _].
+    have He1 : [set v; w1] \in E{v} by rewrite/edge_neigh; apply/imsetP; exists w1.
+    have He2 : [set v; w2] \in E{v} by rewrite/edge_neigh; apply/imsetP; exists w2.
+    exact: imset_swap_vertex He1 He2.
+  Qed.
+
+  (* Basically the same as above *)
+  Lemma imset_rot : c[E(G)] = rotateF[E(G)].
+  Proof.
+    rewrite/rotateF; set fs := (rev (wk::val f)).
+    have Hws: neigh_prop v fs by apply rev_neigh; exact: fan_neigh.
+    elim: fs c Hws=> [|w1 [|w2 wss] IH] d //= /andP [Hw1 Hws].
+    rewrite -(IH (swap_edge d [set v; w1] [set v; w2])) //. 
+    move/andP: Hws => [Hw2 _].
+    have He1: [set v; w1] \in E(G) by rewrite in_opn -in_edges in Hw1.
+    have He2: [set v; w2] \in E(G) by rewrite in_opn -in_edges in Hw2.
+    exact: imset_swap He1 He2.
+  Qed.
+
+  Lemma imset_rot_del_edge (e0 e1 : {set G}) : 
+    e0 \in E(G) -> e1 \in E(G) ->  
+    c e0 = rotateF e1 ->
+    c[E(del_edges e0)] = rotateF[E(del_edges e1)].
+  Proof.
+    rewrite /coloring_image=> e0_in_G e1_in_G.
+    rewrite/rotateF; set fs := (rev (wk::val f)).
+    elim: fs c=> [/=|w1 [/=|w2 wss] IH] d.
+    - exact: imset_c_del_edge. 
+    - exact: (IH d). 
+    rewrite -[rotate d [:: w1,  w2  & wss] v]/(rotate (swap_edge d [set v; w1] [set v; w2])
+            (w2 :: wss) v)=> de0.
+    specialize (IH (swap_edge d [set v; w1] [set v; w2])).
+  Admitted.
+
+  Lemma rotate_last (fs : seq G) (d : edgeColoringType G ColorType) :
+      d [set v; head w0 fs] = rotate d fs v [set v; last w0 fs].
+  Proof.
+    elim: fs d=> [/=|w1 [|w2 wss] IH] d'; try by [].
+    change (d' [set v; w1] = 
+        rotate (swap_edge d' [set v; w1] [set v; w2]) (w2 :: wss) v [set v; last w2 wss]
+    ).
+    rewrite -(IH (swap_edge d' [set v; w1] [set v; w2])) /=.
+    rewrite /swap_edge; 
+    case: ifP=> [/eqP /doubleton_eq_left -> //|].
+    by rewrite eq_refl.
+  Qed.
+
+  Lemma rot_first_last : c [set v; w0] = rotateF [set v; wk].
+  Proof.
+    rewrite /rotateF. 
+    set fs := (rev (wk::val f)).
+    have -> : w0 = (head w0 fs) by rewrite /fs fan_rev.
+    have -> : wk = (last w0 fs) by rewrite /fs rev_cons last_rcons.
+    exact: (rotate_last fs c). 
+  Qed.
+
+  Lemma rot_w0_prop : w0_prop rotateF [set v; wk].
+  Proof.
+    have +: w0_prop c [set v; w0] by exact: fan_w0_prop.
+    rewrite/w0_prop.
+    have vw0_in_G : [set v; w0] \in E(G).
+    {
+      rewrite in_edges -in_opn.
+      apply/in_neigh.
+      by have := mem_last wk (\val f); rewrite fan_last.
+    }
+    have vwk_in_G : [set v; wk] \in E(G).
+    {
+      rewrite in_edges -in_opn.
+      apply/in_neigh.
+      by rewrite mem_head.
+    }
+    have Heq: c [E(del_edges [set v; w0])] = rotateF [E(del_edges [set v; wk])] 
+      := imset_rot_del_edge vw0_in_G vwk_in_G rot_first_last. 
+    by rewrite rot_first_last Heq.
+  Qed.
+
+  (* TO THINK: Arguably doesn't need to be it's own lemma *)
+  Lemma card_rot :
+    #|c[E(G)]| = #|rotateF[E(G)]|.
+  Proof. by rewrite imset_rot. Qed.
+
+  Lemma rot_absent_center : absent_set c v = absent_set rotateF v.
+  Proof.
+    by rewrite/absent_set imset_rot imset_rot_vertex.
+  Qed.
+
+  Lemma rot_absent_fan w c0 : 
+    w \in (wk::val f) -> 
+    c0 \in (absent_set c v :&: absent_set c w) ->
+    c0 \in (absent_set rotateF v :&: absent_set rotateF w).
+  Proof. 
+    rewrite /absent_set imset_rot imset_rot_vertex=> 
+            /in_neigh w_at_v /setIP[/setDP[c0_in_r c0_nin_v] /setDP[_ /negP c0_nin_w]].
+    apply/setIP; split; apply/setDP; split; try by assumption.
+    apply/negP=> /imsetP [e /edgesSetP [y] [def_e wy]] cNr.
+    have /andP[/andP[e_at_w e_at_y] wNy] : (e \in E{G;w}) && (e \in E{G;y}) && (w != y) 
+      by apply/edge_neigh_edge; rewrite def_e wy.
+    apply: c0_nin_w. 
+    have e_in_E : [set w; y] \in E(G)  
+      by move: e_at_w; rewrite mem_edge_graph def_e=> /andP[-> _].
+    apply/in_c_edge_neighP; exists y=> //.
+    case: (boolP (y == v)) => [/eqP yEv | yNv].
+    - exfalso. move: c0_nin_v=> /negP c0_nin_v. 
+      apply: c0_nin_v. apply/in_c_edge_neighP; rewrite -yEv.
+      have set_refl : [set w; y] = [set y; w] by apply/doubleton_eq_iff; right.
+      rewrite set_refl in def_e e_in_E.
+      exists w=> //.
+      by rewrite cNr def_e. 
+    rewrite cNr def_e. 
+    apply/rot_notin/negP=>// /imsetP [x] x_at_v /doubleton_eq_iff [[wEv yEx] | [_ yEv]].
+    - move: w_at_v. by rewrite in_opn=> /sg_edgeNeq; rewrite wEv eq_refl.
+    by rewrite yEv eq_refl in yNv.
+  Qed.
+
+  Lemma rot_proper : 
+    is_proper_edge_coloring c ->
+    is_proper_edge_coloring rotateF.
+  Proof.
+    rewrite/rotateF fan_rev.
+    set fs := rev (belast wk (val f)).
+    have nps: neigh_prop v (w0 :: fs) 
+      by rewrite /fs -fan_rev; apply rev_neigh; exact: fan_neigh.
+    have abs_fs: path (fun x2 x1 => absent_prop c [set v; x1] x2) w0 fs := 
+        fanW_rev; rewrite /absent_prop in abs_fs.
+    have w0p: w0_prop c [set v; w0] := fan_w0_prop; rewrite /w0_prop in w0p.
+    elim: fs c w0 abs_fs w0p nps 
+      => [//|w1 [|w2 wss] IH] d x0 /andP[abs_w01 abs_fs] x0p   
+      /andP[x0_at_v /andP[w1_at_v nps]] pc_d.
+    - rewrite/rotate. 
+      apply/(swap_proper_vertex pc_d (absent_del_edge _ _ _ _) abs_w01 x0_at_v w1_at_v); 
+      rewrite //=; first by rewrite in_edges -in_opn.
+      + by move: w1_at_v; rewrite in_opn=> /sg_edgeNeq ->.
+      + (* contradiction if x0 = w1 from abs_w01 *) admit.
+    apply: (IH (swap_edge d [set v; x0] [set v; w1]) w1).
+  Admitted.
+
+End Rotation.
+
+Section MaximalFan.
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType) (v w0 : G).
+  Implicit Types (wk : G) (ck : ColorType).
+
+  Definition is_fanmax {wk} (f : Fan c v w0 wk) : Prop :=
+    forall w, ~~ valid_fan_vertex (valP f) w.
+
+  Equations fanmax {wk} (f : Fan c v w0 wk) 
+  : {w & Fan c v w0 w} by wf #|N(v) :\: [set x in wk :: val f]| lt :=
+    fanmax f := 
+    match pickP (valid_fan_vertex (valP f)) with
+      | Pick w Pw => fanmax (fancons Pw)
+      | Nopick _ => existT _ wk f
+    end.
+  Next Obligation.
+    apply/ltP/proper_card/properP. rewrite (set_cons w _).
+    split.
+    - exact/setDS/subsetU1. 
+    - have /andP[/andP[Hin Hnin] _] := Pw.
+      by exists w; rewrite 2!inE // in_set1 inE eq_refl Hin.
+  Qed.
+
+  Lemma fanmax_is_max {wk} (f : Fan c v w0 wk)
+  : is_fanmax (projT2 (fanmax f)).
+  Proof.
+    rewrite/is_fanmax=> w.
+    funelim (fanmax f).
+    case: pickP=> [wp Pw | Np].
+    - exact (H wp Pw w).
+    - by rewrite (Np w).
+  Qed.
+
+  Lemma fanmax_present
+    {ck} {wk} (f : Fan c v w0 wk)
+    (Hf : is_fanmax f)
+    (Hnab : ck \notin absent_set c v)
+    (Hab : ck \in absent_set c wk)
+  :
+    exists wj, 
+    [&& [set v; wj] \in E(G), c [set v; wj] == ck & wj \in (wk :: val f)].
+  Proof.
+    have Hinc: ck \in c[E(G)] by rewrite/absent_set in_setD in Hab; exact: proj2 (andP Hab).
+    have Hatv: ck \in c[E{v}] by exact: notin_setD Hinc Hnab.
+    move/in_c_edge_neighP: Hatv=> [wj] Hine Hc.
+    exists wj; rewrite/is_fanmax in Hf; move: (Hf wj); rewrite/valid_fan_vertex.
+    have -> : wj \in N(v) by rewrite in_opn -in_edges.
+    by rewrite /absent_prop Hine Hc Hab eq_refl /= andbT negbK.
+  Qed.
+
+End MaximalFan.
+\end{minted}
+
+\section{Kempe chains and Kempe swaps}\label{apdx:kempe}
+\begin{minted}[linenos]{coq}
+From HB Require Import structures.
+From mathcomp Require Import all_boot.
+From GraphTheory Require Import edone preliminaries digraph sgraph.
+Require Import aux spath edge_coloring fans.
+From Equations Require Import Equations.
+
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Section KempeGraph.
+  Variables (G : sgraph) (ColorType : finType) 
+            (c : edgeColoringType G ColorType) (ca cb : ColorType).
+  Implicit Types (x y : G) (e : {set G}).
+
+  (* A Kempe graph will consist of all ca-cb kempe chains in the graph *)
+  Definition kempe_rel := 
+    [rel x y : G | x -- y && ((c [set x; y] == ca) || (c [set x; y] == cb))].
+
+  Lemma kempe_sym : symmetric kempe_rel.  
+  Proof. by move=> x y /=; by rewrite sgP setUC. Qed. 
+         
+  Lemma kempe_irrefl : irreflexive kempe_rel.  
+  Proof. by move => x /=; rewrite sgP. Qed.
+
+  Definition kempe_graph := @SGraph G kempe_rel kempe_sym kempe_irrefl.
+
+  Lemma mem_kempe e : e \in E(kempe_graph) = (e \in E(G)) && ((c e == ca) || (c e == cb)).
+  Proof.
+    apply/edgesP/andP => [[x] [y] [-> /andP[xy xyc]]|[]]; first by rewrite in_edges.
+    by move/edgesP => [x] [y] [-> xy xyNA]; exists x,y; split => //; apply/andP.  
+  Qed.
+
+  Lemma kempe_opn x z : 
+    z \in N(kempe_graph;x) = (z \in N(G;x)) && ((c [set x; z] == ca) || (c [set x; z] == cb)).
+  Proof. by rewrite !inE -in_edges mem_kempe in_edges. Qed.
+
+  Lemma kempe_sub : E(kempe_graph) \subset E(G).
+  Proof. by apply/subsetP=> e; rewrite mem_kempe => /andP[]. Qed.
+
+  Lemma kempe_edgeN e : (c e != ca) -> (c e != cb) -> e \notin E(kempe_graph).
+  Proof. by rewrite mem_kempe negb_and negb_or=> -> ->. Qed.
+    
+  (* A kempe chain is a single component of a kempe graph containing a given vertex *)
+  Definition kempe_chain x := @component_of kempe_graph x.
+
+  Lemma edge_in_component (H : sgraph) (u v : H) :
+    [set u; v] \in E(H) -> v \in component_of u.
+  Proof.
+    rewrite in_edges=> /edgep p.
+    by apply/components_pblockP; exists p.
+  Qed.
+
+End KempeGraph.
+
+Section InvertGraph.
+  Variables (G : sgraph) (ColorType : finType) 
+            (c : edgeColoringType G ColorType) (ca cb : ColorType).
+
+  Definition invertedKempeGraph (e : {set G}) :=
+    if (e \in E(kempe_graph c ca cb)) then 
+      if (c e == ca) then cb else ca
+    else c e.
+  
+  Lemma mem_invert_ab : 
+    (ca \in c[E(G)] <-> cb \in invertedKempeGraph[E(G)]) /\
+    (cb \in c[E(G)] <-> ca \in invertedKempeGraph[E(G)]).
+  Proof.
+    rewrite/invertedKempeGraph.
+    split;
+    (split=> [/in_c_all_edgeP [e] in_e ce_abP|/in_c_all_edgeP [e]];
+    [
+      (* forward direction *)
+      move/eqP: (ce_abP)=> ce_ab;
+      apply/in_c_all_edgeP; exists e; first by [];
+      have ->: e \in E(kempe_graph c ca cb) by rewrite mem_kempe in_e ce_ab
+    |
+      (* reverse direction *)
+      rewrite mem_kempe=> in_e; rewrite in_e /=;
+      case ce_a: (c e == ca)=> /=; move/eqP: ce_a=> ce_a;
+      case ce_b: (c e == cb)=> /=; move/eqP: ce_b=> ce_b;
+      move=> contra; apply/in_c_all_edgeP; exists e=> //
+    ]);
+    first by rewrite ce_ab.
+    - rewrite contra in ce_a; contradiction.
+    - by case ce_a: (c e == ca)=> /=; move/eqP: ce_a=> ce_a; rewrite ce_abP in ce_a.
+    - by rewrite contra.
+  Qed.
+
+End InvertGraph. 
+
+Section InvertChain.
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType)
+            (ca cb : ColorType) (x : G) (chain : {set kempe_graph c ca cb}) (u : G).
+  Hypothesis chain_x : chain = kempe_chain c ca cb x.
+
+  (* techincally, e \in subset kc could be enough, but this will be easier to reason with *)
+  Definition invertedChain (e : {set G}) :=
+    if ((e \in E(kempe_graph c ca cb)) && (e \subset chain)) then 
+      if (c e == ca) then cb else ca
+    else c e.
+
+  Lemma imset_invert_sub : 
+    ca \in c[E(G)] -> 
+    cb \in c[E(G)] ->
+    invertedChain[E(G)] \subset c[E(G)].
+  Proof.
+    rewrite /invertedChain
+        => /in_c_all_edgeP [ea] ea_in_e ea_ca /in_c_all_edgeP [eb] eb_in_e eb_cb.
+    apply/subsetP=> c0 /in_c_all_edgeP [e] e_in_e <-. 
+    apply/in_c_all_edgeP.
+    case e_in_chain: ((e \in E(kempe_graph c ca cb)) && (e \subset chain)); 
+    last by exists e; rewrite // e_in_chain.
+    move: e_in_chain; rewrite mem_kempe=> /andP[/andP[_ /orP[/eqP ->|/eqP ->]] e_in_chain];
+    [rewrite eq_refl | case ca_cb : (cb == ca); last by exists ea]; by exists eb.
+  Qed.
+
+  Lemma not_kempe_edge e :
+    (e \notin E(kempe_graph c ca cb)) \/ ~ (e \subset chain) ->
+    c e = invertedChain e.
+  Proof.
+    by case=> [|/negP] not_in; rewrite /invertedChain (negbTE not_in).
+  Qed.
+
+  Lemma is_kempe_edge e : 
+    (e \in E(kempe_graph c ca cb)) -> 
+    (e \subset chain) -> 
+    (c e = ca <-> invertedChain e = cb) /\
+    (c e = cb <-> invertedChain e = ca).
+  Proof.
+    rewrite /invertedChain mem_kempe=> /andP[-> /orP[e_c | e_c]] ->;
+    split; split; move/eqP: (e_c)=> ->; rewrite eq_refl //= orbT /=;
+    first by move=> ->; rewrite eq_refl.
+    all: case eq_ab: (cb == ca); by move/eqP: eq_ab.
+  Qed.
+
+  Lemma in_inverted_absent :
+    u \in chain -> 
+    (ca \in absent_set c u <-> cb \in absent_set invertedChain u) /\
+    (cb \in absent_set c u <-> ca \in absent_set invertedChain u).
+  Proof.
+  Admitted.
+
+  Lemma notin_inverted_absent :
+    u \notin chain -> 
+    c[E(G)] = invertedChain[E(G)] ->
+    absent_set c u = absent_set invertedChain u.
+  Proof.
+  Admitted.
+
+  Lemma w0_inverted (w0 : G) :
+    c [set u; w0] != ca -> c [set u; w0] != cb ->
+    w0_prop c [set u; w0] -> w0_prop invertedChain [set u; w0].
+  Proof.
+    rewrite /w0_prop /coloring_image=> /negbTE cNa /negbTE cNb /negP c_nin_E.
+    apply/negP=> /imsetP [e] e_in_E eq_i.
+    apply: c_nin_E; apply/imsetP.
+    exists e=> //.
+    have cEi : c [set u; w0] = invertedChain [set u; w0].
+    {
+      apply/not_kempe_edge; left. 
+      apply/negP=> +. 
+      by rewrite (@mem_kempe G _ c ca cb [set u; w0]) cNa cNb /= andbF.
+    }
+    move: (eq_i).
+    rewrite -cEi /invertedChain.
+    case: (boolP ((e \in E(kempe_graph c ca cb)) && (e \subset chain)))=> //.
+    case: ifP=> _ _ contra; by move: cNa cNb; rewrite contra eq_refl.
+  Qed.
+
+End InvertChain.
+
+Section KempeProper.
+  Variables (G : sgraph) (ColorType : finType) (pc : properEdgeColoringType G ColorType) 
+            (ca cb : ColorType) (x : G) (chain : {set kempe_graph pc ca cb}).
+  Implicit Types (u : G).
+  Hypothesis chain_x : chain = kempe_chain pc ca cb x.
+
+  Lemma injective_in_kempe u :
+    {in E{kempe_graph pc ca cb;u} &, injective (proj1_sig pc)}.
+  Proof.
+    move=> e1 e2; move: ((proj2_sig pc) u e1 e2).
+    rewrite 4!mem_edge_graph 2!(@mem_kempe G _ pc ca cb _) 
+      => Hc /andP[/andP[? ?] ?] /andP[/andP[? ?] ?].
+    exact: Hc.
+  Qed.
+
+  Lemma max_deg_kempe u : 
+    #|N(kempe_graph pc ca cb;u)| <= 2.
+  Proof.
+    rewrite -card_edge_neigh.
+    rewrite -(card_in_imset (@injective_in_kempe u)).
+    apply: (@leq_trans #|[set ca; cb]| _ _); last first.
+    - rewrite cards2; by case: (ca == cb).
+    apply/subset_leq_card/subsetP=> col /imsetP [e + ->].
+    by rewrite !inE mem_edge_graph (@mem_kempe G _ pc ca cb _)=> /andP[/andP[_ ->] _].
+  Qed.
+
+  Lemma min_deg_kempe u v :
+    u \in chain -> v \in chain -> u != v ->
+    0 < #|N(kempe_graph pc ca cb;u)| /\ 0 < #|N(kempe_graph pc ca cb;v)|.
+  Proof.
+    rewrite chain_x /kempe_chain=> /same_component comp_u v_in uNv.
+    have u_connect : connected (@component_of (kempe_graph pc ca cb) u) := 
+      @connected_component_of (kempe_graph pc ca cb) u.
+    have u_in_u : u \in @component_of (kempe_graph pc ca cb) u :=
+      @in_component_of (kempe_graph pc ca cb) u.
+    have v_in_u : v \in @component_of (kempe_graph pc ca cb) u by rewrite -comp_u in v_in.
+    case: (path_in_connected u_connect u_in_u v_in_u)=> p Ip _.
+    split; apply/card_gt0P.
+    - case: (splitL p uNv)=> w [+] _.
+      by exists w; rewrite in_opn.
+    - case: (splitR p uNv) => w [_] [wv] _.
+      by exists w; rewrite in_opn sg_sym.
+  Qed.
+
+  Lemma inverted_proper : 
+    is_proper_edge_coloring (invertedChain chain).
+  Proof.
+    have := proj2_sig pc.
+    rewrite /is_proper_edge_coloring /invertedChain => is_pc u e1 e2 e1_in_e e2_in_e.
+    specialize (is_pc u e1 e2 e1_in_e e2_in_e);
+    case e1_in_K: (e1  \in E(kempe_graph pc ca cb)); case e1_in_C: (e1 \subset chain);
+    case e2_in_K: (e2  \in E(kempe_graph pc ca cb)); case e2_in_C: (e2 \subset chain)=> /=;
+    try by exact: is_pc.
+    - move: e1_in_K e2_in_K; rewrite 2!mem_kempe.
+      case: ifP=> /eqP c_e1 /andP[e1_in_G /= /eqP ca_cb_e1]; [move: c_e1 | move: ca_cb_e1];
+      case: ifP=> /eqP c_e2 + /andP[e2_in_G /= /eqP ca_cb_e2] ca_cb;
+      rewrite -?ca_cb -?ca_cb_e2 -?c_e2; exact: is_pc.
+    - have contra : e2 \subset chain.
+      {
+        move: e1_in_e e2_in_e e1_in_K e2_in_K e1_in_C e2_in_C
+          => /edgesSetP [y1] [uy1 _] /edgesSetP [y2] [uy2 _].
+        rewrite uy1 uy2 2!subUset 3!sub1set chain_x /kempe_chain
+          => /edge_in_component _ /edge_in_component y2_in_u /andP[u_in_x _] _.
+        have <- := (@same_component (kempe_graph pc ca cb) u x u_in_x).
+        by rewrite (@in_component_of (kempe_graph pc ca cb) u) y2_in_u.
+      }
+      by rewrite contra in e2_in_C.
+    1,2: 
+      move: e2_in_e e2_in_K;
+      rewrite mem_kempe mem_edge_graph=> /andP[-> _] /negbT;
+      rewrite /= negb_or=> /andP[ca_e2 cb_e2];
+      case: ifP=> _ contra; move: ca_e2 cb_e2; by rewrite contra eq_refl.
+    - have contra : e1 \subset chain.
+      {
+        move: e1_in_e e2_in_e e1_in_K e2_in_K e1_in_C e2_in_C
+          => /edgesSetP [y1] [uy1 _] /edgesSetP [y2] [uy2 _].
+        rewrite uy1 uy2 2!subUset 3!sub1set chain_x /kempe_chain
+          => /edge_in_component y1_in_u /edge_in_component _ _ /andP[u_in_x _].
+        have <- := (@same_component (kempe_graph pc ca cb) u x u_in_x).
+        by rewrite (@in_component_of (kempe_graph pc ca cb) u) y1_in_u.
+      }
+      by rewrite contra in e1_in_C.
+    all:
+      move: e1_in_e e1_in_K;
+      rewrite mem_kempe mem_edge_graph=> /andP[-> _] /negbT;
+      rewrite /= negb_or=> /andP[ca_e1 cb_e1];
+      case: ifP=> _ contra; move: ca_e1 cb_e1; by rewrite contra eq_refl.
+  Qed.
+
+  Definition chain_endpt u :=
+    (ca \in absent_set pc u) \/ (cb \in absent_set pc u).
+
+  Lemma chain_endptP u :
+    (ca \in absent_set pc u) \/ (cb \in absent_set pc u) -> chain_endpt u.
+  Proof. by []. Qed.
+
+  Lemma deg_chain_endpt u :
+    chain_endpt u -> #|N(kempe_graph pc ca cb;u)| <= 1.
+  Proof.
+    rewrite -card_edge_neigh /chain_endpt -(card_in_imset (@injective_in_kempe u));
+    case=> /absent_edge abs; [set cset := [set cb] | set cset := [set ca]];
+    (apply: (@leq_trans #|cset| _ _); last by rewrite cards1);
+    apply/subset_leq_card/subsetP=> col /imsetP [e + ->];
+    rewrite mem_edge_graph (@mem_kempe G _ pc ca cb _)
+      => /andP[/andP[/edgesP [y] [z] [def_e yz] /orP[+|//]]];
+    move: (yz); rewrite sg_sym -in_opn=> zy; rewrite -in_opn in yz;
+    rewrite def_e=> /eqP ce /set2P[eq_u | eq_u];
+    rewrite -eq_u in yz zy; 
+    try by rewrite inE -ce.
+    - have := abs z yz; by rewrite -ce eq_u eq_refl.
+    - have := abs y zy; by rewrite -ce eq_u setUC eq_refl.
+    - have := abs z yz; by rewrite -ce eq_u eq_refl.
+    - have := abs y zy; by rewrite -ce eq_u setUC eq_refl.
+  Qed.
+
+  Proposition chain_two_endpts (u v w : G) :
+    u != v -> v != w -> u != w ->
+    chain_endpt u /\ chain_endpt v /\ chain_endpt w ->
+    (u \notin chain) \/ (v \notin chain) \/ (w \notin chain).
+  Proof.
+    case: (boolP (u \in chain)) => [u_in|u_nin]; last by left.
+    case: (boolP (v \in chain)) => [v_in|v_nin]; last by right; left.
+    case: (boolP (w \in chain)) => [w_in|w_nin]; last by right; right.
+    move=> uNv vNw uNw [/deg_chain_endpt + [/deg_chain_endpt + /deg_chain_endpt +]].
+    rewrite leq_eqVlt (@leq_eqVlt #|N(kempe_graph pc ca cb;v)| _)
+            (@leq_eqVlt #|N(kempe_graph pc ca cb;w)| _ ) 
+            ltnNge (@ltnNge #|N(kempe_graph pc ca cb;v)| _) 
+            (@ltnNge #|N(kempe_graph pc ca cb;w)| _ ). 
+    have [[-> ->] [_ ->]] := 
+      conj (min_deg_kempe u_in v_in uNv) (min_deg_kempe u_in w_in uNw).
+    move: (u_in) (v_in) (w_in); rewrite chain_x /kempe_chain 3!orbF 
+      => /same_component comp_u + + /eqP degu /eqP degv /eqP degw.
+    have u_in_u : u \in (@component_of (kempe_graph pc ca cb)) u 
+      by exact: (@in_component_of (kempe_graph pc ca cb) u).
+    have u_connect : connected (@component_of (kempe_graph pc ca cb) u)
+      by exact: connected_component_of.
+    rewrite -comp_u=> v_in_u w_in_u.
+    have [p Ip p_in_u] := path_in_connected u_connect u_in_u v_in_u.
+    have [q Iq q_in_u] := path_in_connected u_connect u_in_u w_in_u.
+    have [y /ltn_geF] :=
+      @shared_interior3 (kempe_graph pc ca cb) _ _ _ _ _ degu degv degw uNv vNw uNw Ip Iq.
+    by have -> := max_deg_kempe y.
+  Qed.
+
+  (* 
+    Technically, the following is also true less hypotheses. 
+    But since we only use this in the proof of vizing's theorem,
+    we make this more specific (to not repeat our work from there)
+  *)
+
+  Proposition inverted_fan 
+    {w0 wi wj w : G} {f1 f2 : seq G} 
+    (imset_pc_ic : pc [E(G)] = (invertedChain chain) [E(G)])
+    (fan : Fan pc x w0 w) 
+    (fsplit : w :: \val fan = f1 ++ [:: wj,  wi  & f2])
+    (jN0 : wj != w0)
+    (pc_xa_cb : cb \in absent_set pc x)
+    (pc_wia_ca : ca \in absent_set pc wi)
+    (pc_wa_ca : ca \in absent_set pc w)
+    (pc_xwj_ca : (sval pc) [set x; wj] = ca)
+  : 
+    exists (w' : G) (ifan : Fan (invertedChain chain) x w0 w'),
+    (ca \in absent_set (invertedChain chain) w').
+  Proof.
+    rewrite -[wj :: wi :: f2]cat1s catA in fsplit.
+    have wj_at_x : wj \in N(x).
+    {
+      apply/(@in_neigh _ _ _ _ _ _ fan); rewrite fsplit.
+      by rewrite mem_cat cats1 mem_rcons in_cons eq_refl.
+    }
+    have w0_at_x : w0 \in N(x).
+    {
+      apply/(@in_neigh _ _ _ _ _ _ fan).
+      by have := mem_last w (\val fan); rewrite fan_last.
+    }
+    have w0_ifan : w0_prop (invertedChain chain) [set x; w0].
+    {
+      apply/(w0_inverted _ _ _ (fan_w0_prop fan)).
+      - rewrite -pc_xwj_ca. move: (wj_at_x). 
+        suff : (sval pc [set x; w0]) \in absent_set pc wj;
+        first by exact: absent_edge_sym.
+        rewrite eq_sym in jN0.
+        apply/(absent_del_edge _ _ (jN0)); first by rewrite in_edges -in_opn.
+        + move: wj_at_x; by rewrite in_opn=> /sg_edgeNeq /negbT.
+        exact: (fan_w0_prop fan).
+      - rewrite eq_sym. apply/(absent_edge pc_xa_cb w0_at_x). 
+    }
+    case: (boolP (wi \in chain))=> wi_in_x.
+    - have /andP[xNwi /andP[wiNw xNw]] : [&& x != wi, wi != w & x != w].
+      {
+        have w_in_f : w \in w::val fan by rewrite in_cons eq_refl.  
+        have eq_fmax : val fan = behead ((f1 ++ [:: wj]) ++ wi :: f2) by rewrite -fsplit.
+        have wi_in_fmax : wi \in val fan. 
+        {
+          rewrite eq_fmax; case: f1 fsplit eq_fmax=> [|hd tl] _; 
+          first by rewrite cat0s cat1s /behead in_cons eq_refl.
+          by rewrite -catA cat_cons /behead catA mem_cat in_cons eq_refl.
+        }
+        have wi_in_f : wi \in w::val fan by rewrite in_cons wi_in_fmax.
+        have := fan_uniq fan; rewrite cons_uniq=> /andP[w_nin_fmax _].
+        case: (boolP (x != wi))=> [xNwi|/negbNE /eqP xEwi];
+        [rewrite andTb; case: (boolP (wi != w))=> [wiNw|/negbNE /eqP wiEw];
+          [rewrite andTb; case: (boolP (x != w))=> [xNw|/negbNE /eqP xEw]=> //;
+            have := in_neigh w_in_f;
+            rewrite in_opn xEw=> /sg_edgeNeq /eqP; contradiction
+          | rewrite andFb; rewrite wiEw in wi_in_fmax; by rewrite (wi_in_fmax) in w_nin_fmax]
+        |
+          rewrite andFb; have := in_neigh wi_in_f;
+          rewrite in_opn xEwi=> /sg_edgeNeq /eqP; contradiction
+        ].
+      }
+      have x_in_x := (@in_component_of (kempe_graph pc ca cb) x).
+      have w_nin_x : w \notin chain by
+        case
+          (@chain_two_endpts x wi w xNwi wiNw xNw
+            (conj (chain_endptP (or_intror pc_xa_cb))
+            (conj (chain_endptP (or_introl pc_wia_ca))
+                  (chain_endptP (or_introl pc_wa_ca)))
+          ));
+        [rewrite chain_x /kempe_chain x_in_x | case; [rewrite wi_in_x|]].
+      
+      have ifan : fanp (invertedChain chain) (\val fan) x w0 w.
+      {
+        rewrite /fanp fan_last eq_refl fan_uniq fan_neigh w0_ifan //=.
+        admit.
+      }
+      exists w, (Build_Fan ifan).
+      by rewrite (notin_inverted_absent chain_x w_nin_x imset_pc_ic) in pc_wa_ca.
+    - rewrite (notin_inverted_absent chain_x wi_in_x imset_pc_ic) in pc_wia_ca.
+      have fsmaller := sub_fan fsplit.
+      have ifan : fanp (invertedChain chain) (\val fsmaller) x w0 wi.
+      {
+        rewrite /fanp fan_last eq_refl fan_uniq fan_neigh w0_ifan //=.
+        admit.
+      }
+      by exists wi, (Build_Fan ifan).
+    Admitted.
+
+End KempeProper.  
+\end{minted}
+
+\section{Alternating Paths}\label{apdx:alt}
+\begin{minted}[linenos]{coq}
+From HB Require Import structures.
+From mathcomp Require Import all_boot.
+From GraphTheory Require Import edone preliminaries digraph sgraph.
+Require Import aux spath edge_coloring fans.
+From Equations Require Import Equations.
+
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Section AltPathOps.
+  Variables (G : sgraph) (ColorType : finType).
+  Implicit Types (c : edgeColoringType G ColorType) (ca cb : ColorType) (s : seq G).
+
+  Fixpoint alternates c ca cb s : bool := 
+    match s with 
+    | x :: ((y :: tl) as s') =>
+      (c [set x; y] == ca) && alternates c cb ca s'
+    | _ => true
+    end.
+
+  Fixpoint next_col c ca cb s : ColorType := 
+    match s with 
+    | _ :: s' => next_col c cb ca s'
+    | _ => cb
+    end.
+
+  Fixpoint alternates_invert c ca cb s : edgeColoringType G ColorType :=
+    match s with
+    | x :: ((y::tl) as s') =>
+        alternates_invert
+            (recolor_edge c [set x; y] ca)
+            cb ca s'
+    | _ => c
+    end.
+End AltPathOps.
+  
+Section AltPath.
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType) (x y z : G).
+  Implicit Types (ca cb : ColorType) (s : seq G) (p : Path x y) (zx: z -- x) (yz: y -- z).
+  
+  Lemma alternates_rcons ca cb yz p : 
+    alternates c ca cb (nodes (pcat p (edgep yz))) = 
+    alternates c ca cb (nodes p) && (c [set y; z] == next_col c ca cb (nodes p)).
+  Proof.
+    elim: p yz.
+  Admitted.
+
+  Lemma alternate_cons ca cb zx p :
+    alternates c ca cb (nodes (pcat (edgep zx) p)) = 
+    (c [set z; x] == ca) && alternates c cb ca (nodes p).
+  Proof.
+    rewrite nodes_pcat !nodesE.
+    by case: (val p).
+  Qed.
+
+  Lemma alternates_ca_cb ca cb p :
+    ((alternates c ca cb (nodes p)) && (alternates c cb ca (nodes p))) -> 
+    ((ca == cb) || (x == y)).
+  Proof.
+  Admitted.
+    (* move: x; elim p=> [//| y p'] IH. 
+    rewrite -{3}cat1s cat_nilp=> x.
+    rewrite 2!alternate_cons=> /andP[/andP[/eqP Hca Hab] /andP[/eqP Hcb Hac]].
+    by have ->: (ca == cb) by rewrite -Hca Hcb.
+  Qed. *)
+
+  Definition altpath ca cb {u v : G} (p0 : Path u v) := 
+    alternates c ca cb (nodes p0) && (irred p0).
+
+  Lemma altpathE ca cb {u v : G} (p0 : Path u v) : 
+    altpath ca cb p0 = alternates c ca cb (nodes p0) && (irred p0).
+  Proof. by []. Qed.
+
+  Definition altpath_next_col {ca cb p} (ap : altpath ca cb p) : ColorType :=
+    next_col c ca cb (nodes p).
+
+  Lemma altpath_idp ca cb : altpath ca cb (idp x).
+  Proof. by rewrite altpathE nodesE irred_idp. Qed.
+
+  Lemma altpath_edge ca cb xy : (@altpath ca cb x y (edgep xy)) = (c [set x; y] == ca).
+  Proof. by rewrite altpathE nodesE irred_edge /=. Qed.
+
+  Lemma altpath_edgeL ca cb zx p : 
+    altpath ca cb (pcat (edgep zx) p) = 
+    (z \notin p) && (c [set z; x] == ca) && (altpath cb ca p).
+  Proof.
+    case: p=> p pth_p.
+    rewrite !altpathE irred_edgeL mem_path !nodesE /=.
+    by rewrite !andbA (andbAC _ _ (z  \notin x :: p)) (andbC _ (z  \notin x :: p)).
+  Qed.
+  
+  Lemma altpath_edgeR ca cb p yz :
+    altpath ca cb (pcat p (edgep yz)) = 
+    (z \notin p) && (c [set y; z] == next_col c ca cb (nodes p)) && altpath ca cb p.
+  Proof.
+    by rewrite !altpathE irred_edgeR alternates_rcons !andbA 
+               (andbC (alternates c ca cb (nodes p)) _) 
+               (andbAC _ _ (z  \notin p)) (andbC _ (z  \notin p)).
+  Qed.
+
+  Definition altpath_endpt {ca cb p} (ap : altpath ca cb p) (u : G) :=
+    (ca \in absent_set c u) \/ (cb \in absent_set c u). 
+
+  Lemma altpath_endptP {ca cb p} (ap : altpath ca cb p) (u : G) :
+    (ca \in absent_set c u) \/ (cb \in absent_set c u) -> altpath_endpt ap u.
+  Proof. by []. Qed.
+
+  Lemma altpath_two_endpts {ca cb p} (ap : altpath ca cb p) (u v : G) :
+    altpath_endpt ap z /\ altpath_endpt ap u /\ altpath_endpt ap v ->
+    (z \notin p ) \/ (u \notin p) \/ (v \notin p).
+  Proof.
+  Admitted.
+
+End AltPath.
+  
+Lemma altpath_mem 
+  {G : sgraph} {ColorType : finType} 
+  (c : edgeColoringType G ColorType) 
+  (ca cb : ColorType)
+  (x y u v : G)
+  (p : Path x y) :
+  altpath c ca cb p ->
+  Path_edge p u v -> 
+  (c [set u; v] == ca) || (c [set u; v] == cb).
+Proof.
+  elim: p ca cb=> [_ _ _ /idp_path_edge //|x0 z0 p xz0 IH] ca cb.
+  rewrite altpath_edgeL=> /andP[/andP[Hnin Hc0] Hap] /cat_path_edge.
+  case=> [/edgep_path_edge /andP[/eqP <- /eqP <-]|He]; first by rewrite Hc0.
+  by move/orP: (IH cb ca Hap He)=> [->|->].
+Qed.
+  
+Section AltMax.
+  Variables (G : sgraph) (ColorType : finType) (pc : properEdgeColoringType G ColorType) 
+            (ca cb : ColorType) (x : G). 
+  Implicit Types (y : G).
+  Hypothesis start_abs : cb \in absent_set pc x.
+  
+  Definition valid_altpath_vertex {y} {p : Path x y} (ap : altpath pc ca cb p) (z : G) :=
+    (z \in N(y)) && ((proper_to_edge_coloring pc) [set y; z] == altpath_next_col ap).
+
+  Lemma valid_altpath_edge 
+    {y z} {p : Path x y} 
+    {ap : altpath pc ca cb p}
+  : valid_altpath_vertex ap z -> y -- z.
+  Proof. 
+    by rewrite/valid_altpath_vertex in_opn=> /andP[-> _].
+  Qed.
+  
+  Lemma altpath_rcons 
+    {y} {p : Path x y} 
+    (ap : altpath pc ca cb p) 
+    (z : G) 
+    (Pz : valid_altpath_vertex ap z) 
+  : altpath pc ca cb (pcat p (edgep (valid_altpath_edge Pz))).
+  Proof.
+    rewrite altpath_edgeR. move: Pz=> /andP[Hn Hc].
+  Admitted.
+  
+  Definition is_apmax {y} {p : Path x y} (ap : altpath pc ca cb p) : Prop :=
+    altpath_next_col ap \in absent_set pc y.
+
+  Equations apmax {y} {p : Path x y} (ap : altpath pc ca cb p) 
+  : {z & {q : Path x z & altpath pc ca cb q}} by wf #|[set: G] :\: ([set v in p])| lt :=
+    apmax ap := 
+    match pickP (valid_altpath_vertex ap) with
+      | Pick z Pz => apmax (altpath_rcons Pz)
+      | Nopick _ => existT _ y (existT _ p ap)
+    end.
+  Next Obligation.
+    apply/ltP/proper_card/properP.
+    (* rewrite mem_pcat_edgeR.
+    split.
+    - apply/setDS.  *)
+  Admitted.
+
+  Lemma apmax_is_max {y} {p : Path x y} (ap : altpath pc ca cb p)
+  : is_apmax (projT2 (projT2 (apmax ap))).
+  Proof.
+  Admitted.
+
+  Lemma apmax_pcat {y} {p : Path x y} (ap : altpath pc ca cb p) :
+    exists q, projT1 (projT2 (apmax ap)) = pcat p q.
+  Proof.
+  Admitted.
+
+End AltMax.
+
+Section Invert.
+  Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType).
+  Implicit Types (ca cb : ColorType) (x y : G).
+
+  Definition invert 
+    {ca cb x y} 
+    {p : Path x y} 
+    (ap : altpath c ca cb p) 
+  : edgeColoringType G ColorType :=
+    alternates_invert c ca cb (nodes p).
+
+  Lemma invert_proper 
+    {ca cb x y} 
+    {p : Path x y} 
+    (ap : altpath c ca cb p) 
+  : 
+    is_proper_edge_coloring c -> 
+    is_proper_edge_coloring (invert ap).
+  Proof.
+  Admitted.
+
+  Lemma imset_invert 
+    {ca cb x y} 
+    {p : Path x y} 
+    (ap : altpath c ca cb p)
+  : ca \in c[E(G)] -> (invert ap) [E(G)] \subset c [E(G)].
+  Proof.
+    rewrite/invert.
+    elim: p ca cb c ap => [|u v q uv IH] ca cb d; 
+    [|rewrite nodes_pcat /edgep]; 
+    rewrite !nodesE // -[val (edgep uv)]/[:: v] /behead altpath_edgeL.
+    (* manually rewrite, otherwise unfolds too far *)
+    rewrite -[alternates_invert d ca cb ([:: u;  v] ++ \val q)]
+            /(alternates_invert (recolor_edge d [set u; v] ca) cb ca (v::val q)).
+    elim: q IH=> [/= _|w z q' wz _] IH; first by exact: imset_recolor.
+    move=>/andP[/andP[Hnu tmp0] Hap]; move: (Hap). 
+    rewrite -nodesE altpath_edgeL=>/andP[/andP[tmp1 /eqP Hwzb] Hap'].
+    have Hcb : cb \in (recolor_edge d [set u; w] ca)[E(G)].
+    {
+      have Hnwz : w != z by move/sg_edgeNeq: (wz); rewrite eq_sym=> /negbT.
+      have : [set w; z] != [set u; w].
+      {
+        apply/eqP; rewrite doubleton_eq_iff; case.
+        - by move=> [_ Hwz]; rewrite Hwz eq_refl in Hnwz.
+        - (* use Hnu and mem lemmas to say u != w *)
+          admit.
+      }  
+    (* have : recolor_neq ([set w; z] != [set u; w]).  
+    have : cb \in d [E(G)] by apply/imsetP; exists [set w; z];
+    move: (wz); rewrite //= in_edges. *)
+      admit.
+    }
+    move: (IH cb ca (recolor_edge d [set u; w] ca)).
+  Admitted.
+
+  Lemma card_invert 
+    {ca cb x y} 
+    {p : Path x y} 
+    (ap : altpath c ca cb p)
+  :
+    ca \in c[E(G)] -> #|(invert ap) [E(G)]| <= #|c [E(G)]|.
+  Proof.
+  Admitted.
+
+End Invert.
+
+Section InvertProp.
+  Variables (G : sgraph) (ColorType : finType) (pc : properEdgeColoringType G ColorType) 
+            (ca cb : ColorType) (x y : G) (p : Path x y) (ap : altpath pc ca cb p).
+  Implicit Types (u v : G).
+  Hypothesis Ha : is_apmax ap.
+
+  Definition not_mem_inverted : Prop := 
+    forall u v, ~ Path_edge p u v -> 
+    (proper_to_edge_coloring pc) [set u; v] = (invert ap) [set u; v].
+  
+  Definition mem_inverted : Prop :=
+    forall u v, Path_edge p u v ->
+    (((proper_to_edge_coloring pc) [set u; v] = ca) <-> ((invert ap) [set u; v] = cb)) /\
+    (((proper_to_edge_coloring pc) [set u; v] = cb) <-> ((invert ap) [set u; v] = ca)).
+
+  Lemma invert_is_inverted : not_mem_inverted /\ mem_inverted.
+  Proof.
+    rewrite/not_mem_inverted/mem_inverted; split=> u v Hp.
+  Admitted.
+
+  Lemma invert_absent_not_mem {u} (Hu : u \notin p) :
+    (invert ap)[E(G)] = pc[E(G)] -> absent_set pc u = absent_set (invert ap) u.
+  Proof. 
+    have : pc [E{G;u}] = invert ap [E{G;u}].
+    {
+      apply/setP=> c0.
+      apply/imsetP/imsetP; move=> [e Hin ->]; exists e=> //;
+      move: Hin; rewrite/edge_neigh=> /imsetP [v] Hn ->;
+      have Hp := (vert_not_in_path (or_introl Hu));
+      move: invert_is_inverted=> [+ _];
+      rewrite/not_mem_inverted=> Hnm;
+      by have := Hnm u v (Hp v).  
+    }
+    by rewrite/absent_set=> -> ->.
+  Qed.
+
+  Lemma invert_absent_ca {u}
+    (Hu : u \in p)
+    (Habu : cb \in absent_set pc u)
+  : ca \in absent_set (invert ap) u.
+  Proof.
+  Admitted.
+
+  Lemma invert_absent_cb {u}
+    (Hz : u \in p)
+    (Habu : ca \in absent_set pc u)
+  : cb \in absent_set (invert ap) u.
+  Proof.
+  Admitted.
+
+  Lemma invert_fan_nodes {u v : G} (f1 : Fan pc x v u) (f2 : Fan (invert ap) x v u):
+    (u :: val f1) = (u :: val f2).
+  Proof.
+  Admitted.
+
+  Lemma invert_fan {u v : G} (f : Fan pc x v u) : 
+    cb \in absent_set pc x -> Fan (invert ap) x v u.
+  Proof.
+  Admitted.
+
+End InvertProp.
+\end{minted}
+
+\section{Vizing's Theorem}\label{apdx:viz}
+\begin{minted}[linenos]{coq}
+From HB Require Import structures.
+From mathcomp Require Import all_boot.
+From GraphTheory Require Import edone preliminaries digraph sgraph.
+Require Import aux spath edge_coloring fans alternate_path kempe.
+From Equations Require Import Equations.
+
+Set Warnings "-notation-overridden, -notation-incompatible-prefix".
+
+Set Implicit Arguments.
+Unset Strict Implicit.
+Unset Printing Implicit Defensive.
+
+Lemma smaller_coloring
+  {G : sgraph} {v w0 wj : G} {k}
+  {c : kEdgeColoringType G k} 
+  (f : Fan c v w0 wj) (cj : projT1 c) :
+  k = max_degree G + 1 + 1 ->
+  cj \in (absent_set c v :&: absent_set c wj) ->
+  k_edge_colorable G (max_degree G + 1).
+Proof.
+  move=> Hk Hcvw.
+  have Hneigh : wj \in N(v) := (in_neigh (mem_head wj (val f))).
+  have Hvw : [set v; wj] \in E(G).
+  { by move: Hneigh; rewrite in_opn in_edges. }
+  pose c' := rotateF f.
+  have Hprop' : is_proper_edge_coloring c' := 
+    rot_proper (proj2_sig (k_to_proper_coloring c)).
+  have Hin' : cj \in c'[E(del_edges [set v; wj])].
+  { 
+    rewrite in_setI in Hcvw; move/andP: (Hcvw)=> [Hcv _]; move: (Hcv).
+    rewrite /absent_set (imset_rot f) (imset_rot_vertex f) /coloring_image/c'
+      => /setDP[/imsetP [ej Hej] Hcj _].
+    rewrite (del_edges1 Hvw) in_setU1 in Hej; rewrite (rot_absent_center f) in Hcv.
+    have Hneq: ej != [set v; wj] by move: (absent_edge Hcv Hneigh); rewrite Hcj; 
+    apply contra_neq=> ->.
+    rewrite (negbTE Hneq) orFb in Hej.
+    by apply/imsetP; exists ej.
+  }
+  have Hnotin': c'[set v; wj] \notin c'[E(del_edges [set v; wj])] by exact: rot_w0_prop.
+  pose c'' := recolor_edge c' [set v; wj] cj.
+  have Hprop'' := recolor_proper Hprop' (rot_absent_fan (mem_head wj (val f)) Hcvw).
+  move: (replace_col Hvw Hin' Hnotin').
+  rewrite -card_rot (card_k_col c).
+  have ->: k - 1 = max_degree G + 1 by rewrite Hk addn1 subn1.
+  move=> Hcard''.
+  by constructor; exists (projT1 c), (exist _ c'' Hprop''); rewrite Hcard''.
+Qed.
+
+Lemma base_case (G : sgraph) (no_edges : E(G) = set0) :
+  k_edge_colorable G 0 /\ 0 <= max_degree G + 1.
+Proof.
+  split; last by []. 
+  move/eqP: no_edges; rewrite -cards_eq0=> /eqP <-.
+  exact/inj_chrom.
+Qed.
+
+Theorem Vizings_altpath (G : sgraph) (chi : nat): 
+  is_chromatic_index G chi -> 
+  max_degree G <= chi <= max_degree G + 1.
+Proof.
+  move=> is_chi; 
+  rewrite chi_lower_bound //=.
+  apply (chi_upper_bound_trans is_chi)=> {is_chi} {chi}.
+  (* Induction on # of edges *)
+  elim/(size_ind (fun G => #|E(G)|)) : G=> G IH.
+  case: (set_0Vmem E(G))=> [/base_case|[e Ein0]]; first by exists 0.
+  have [v [w0] [Edef0 _]] := 
+    edgesP _ Ein0; rewrite {}Edef0 in Ein0; set G' := del_edges [set v; w0].
+  have leq_gg': max_degree G' + 1 <= max_degree G + 1
+    by rewrite leq_add2r; exact: del_edges_max_deg. 
+  have{}/IH [k' [[kc'] leq_kg']] : #|E(G')| < #|E(G)| 
+    by apply: proper_card; exact: del_edges_proper Ein0 _.
+  have: k' <= max_degree G + 1 by exact: (leq_trans leq_kg' leq_gg').
+  rewrite leq_eqVlt=> /orP[/eqP eq_kg|] {leq_kg'}; first last.
+  - (* if k' < max_degree G + 1, then we are done *) 
+    pose kc := k_extended_col Ein0 kc'.
+    exists (k' + 1); by split; [|rewrite addn1].
+  (* now, k' = max_degree G + 1 *)
+  rewrite {}eq_kg in kc'; pose kc := k_extended_col Ein0 kc'.
+  (* create a maximal fan from w0 to w *)
+  pose f0: Fan kc v w0 w0 := k_Fan_of_del_edges Ein0 kc'.
+  case Hfmax: (fanmax f0) => [w fmax].
+  have is_fmax: is_fanmax fmax by move: (fanmax_is_max f0); rewrite {}Hfmax /=.
+  (* there exists some color c0 absent at w *)
+  move: (exists_absent_color kc' leq_gg' w)=> [c0] Habw0' {leq_gg'}.
+  have{Habw0'} Habw0 := extended_absent Ein0 Habw0'.
+  case: (boolP (Some c0 \in absent_set kc v))=> [Habv0 | Hnabv0].
+  - (* if c0 is absent at v, we can replace extra color with c0 *)
+    have Hcap: (Some c0 \in absent_set kc v :&: absent_set kc w) 
+      by apply/setIP/(conj Habv0 Habw0).
+    by exists (max_degree G + 1); move: (smaller_coloring fmax erefl Hcap).
+  (* Otherwise, we will need to create a fan and rotate *)
+  move: (exists_absent_color kc (leq_addr _ (max_degree G + 1)) v) => [c1] Habv1. 
+  (* There also exists an edge v--wj colored c0, where wj != w0 is in the fan *)
+  have := (fanmax_present is_fmax Hnabv0 Habw0)
+    => [[wj] /andP[Einj /andP[/eqP Hkcj Hfanj]]] {is_fmax Hnabv0}.
+  have Evj : v -- wj by rewrite in_edges in Einj.
+  (* split fan at wj as f1 and (wj::f2) *)
+  case/splitPr fsplit: (w::val fmax)/Hfanj => [f1 f2 _].
+  case: f2 fsplit=> [|wi f2'] fsplit.
+  - (* contradiction if f2 is empty *)
+    have Hneqj0 : wj != w0.
+    { 
+      apply: (@contra_neq _ _ ((sval (k_to_proper_coloring kc)) [set v; wj]) 
+             ((sval (k_to_proper_coloring kc)) [set v; w0]) _ _)=> [-> //|];
+      have /eqP -> : 
+        (sval (k_to_proper_coloring kc)) [set v; w0] == None 
+        by move/eqP: (w0_col_extended kc').
+      by rewrite Hkcj.
+    }
+    by rewrite -(fan_last fmax) -(last_cons w w) fsplit cats1 last_rcons eq_refl in Hneqj0.
+  (* so f2 is non-empty, i.e. wi != w0 *)
+  have Habwi0 : Some c0 \in absent_set kc wi.
+  { 
+    move: fsplit. 
+    by case: f1=> [|wk f1']; [rewrite cat0s|]; 
+    case=> Hw Hfval; have := fanW fmax;
+    rewrite Hfval /absent_prop; [rewrite Hw | rewrite -cat_rcons cat_path last_rcons];
+    rewrite /path Hkcj=> /andP[_ +] //; move=> /andP[-> _]. 
+  }
+  rewrite -[wj :: wi :: f2']cat1s catA in fsplit.
+  have fsmallest := sub_fan fsplit.
+  (* Construct c0 c1 Kempe Chain starting with v--wj *)
+  move/eqP: (Hkcj); rewrite -(altpath_edge kc _ c1)=> ap0.
+  case Hapmax: (apmax Habv1 ap0) => [z [pth apm]].
+  have Hpv : v \in pth by exact: path_begin.
+  have := apmax_pcat Habv1 ap0; rewrite Hapmax /= => [[q] Hq].
+  have HaisMax : is_apmax apm by move: (apmax_is_max Habv1 ap0); rewrite {}Hapmax /=. 
+  have /(imset_invert apm) /eqVproper : Some c0 \in kc[E(G)]
+    by apply/in_c_all_edgeP; exists [set v; wj].
+  pose Hkcp : properEdgeColoringType G (projT1 kc) :=  
+    (exist _ (invert apm) (@invert_proper _ _ _ _ _ _ _ _ apm
+          (proj2_sig (k_to_proper_coloring kc)))).
+  case=> Hsi; first last.
+  - exists #|Hkcp [E(G)]|.
+    split; first by constructor; exact (proper_to_k_coloring Hkcp).
+    move/proper_card: Hsi. 
+    rewrite card_k_col -[#|Hkcp [E(G)]|]/(#|invert apm [E(G)]|)=> Hsi.
+    by rewrite -(leq_add2r 1); rewrite -addn1 in Hsi.
+  have card_ic : #|Hkcp [E(G)]| == (max_degree G  + 1 + 1) by rewrite Hsi card_k_col.
+  pose ikc : kEdgeColoringType G (max_degree G + 1 + 1) := 
+    existT _ (projT1 kc) (exist _ Hkcp card_ic).
+  (* v is an endpint because c1 was absent here *)
+  have Hcj : (invert apm) [set v; wj] = c1.
+  {
+    have Hp : Path_edge pth v wj 
+        by rewrite Hq; apply cat_path_edge; left; apply edgep_path_edge.
+    move: (proj2 (invert_is_inverted HaisMax) v wj Hp)=> [/iffLR H _]; exact: H Hkcj.
+  }
+  have Hkci_fmax : Fan ikc v w0 w := invert_fan HaisMax fmax Habv1.
+  have Habv0 : Some c0 \in absent_set ikc v := invert_absent_ca HaisMax Hpv Habv1.
+  case: (boolP (wi \in pth))=> Hpwi; exists (max_degree G + 1).
+  - (* wi is in the path of apm *)
+    have Hpw : w \notin pth by 
+      case
+        (altpath_two_endpts
+          (conj (altpath_endptP apm (or_intror Habv1))
+          (conj (altpath_endptP apm (or_introl Habwi0))
+                (altpath_endptP apm (or_introl Habw0)))
+        )); 
+      [rewrite Hpv | case; [rewrite Hpwi|]].
+    rewrite (invert_absent_not_mem HaisMax Hpw Hsi) in Habw0.
+    have Hcap : (Some c0 \in absent_set ikc v :&: absent_set ikc w) 
+      by apply/setIP/(conj Habv0 Habw0).
+    by have := (smaller_coloring Hkci_fmax erefl Hcap).
+  - (* wi is not in the alternating path *)
+    rewrite (invert_absent_not_mem HaisMax Hpwi Hsi) in Habwi0.
+    rewrite {}(invert_fan_nodes HaisMax fmax Hkci_fmax) in fsplit.
+    have Hkci_fsmallest : Fan ikc v w0 wi := sub_fan fsplit.
+    have Hcap : (Some c0 \in absent_set ikc v :&: absent_set ikc wi) 
+      by apply/setIP/(conj Habv0 Habwi0).
+    by have := (smaller_coloring Hkci_fsmallest erefl Hcap).
+Qed.
+
+Theorem Vizings_kempe (G : sgraph) (chi : nat): 
+  is_chromatic_index G chi -> 
+  max_degree G <= chi <= max_degree G + 1.
+Proof.
+  move=> is_chi; 
+  rewrite chi_lower_bound //=.
+  apply (chi_upper_bound_trans is_chi)=> {is_chi} {chi}.
+  (* Induction on # of edges *)
+  elim/(size_ind (fun G => #|E(G)|)) : G=> G IH.
+  case: (set_0Vmem E(G))=> [/base_case|[e Ein0]]; first by exists 0.
+  have [v [w0] [Edef0 _]] := 
+    edgesP _ Ein0; rewrite {}Edef0 in Ein0; set G' := del_edges [set v; w0].
+  have leq_gg': max_degree G' + 1 <= max_degree G + 1 
+    by rewrite leq_add2r; exact: del_edges_max_deg. 
+  have{}/IH [k' [[kc'] leq_kg']] : #|E(G')| < #|E(G)| 
+    by apply: proper_card; exact: del_edges_proper Ein0 _.
+  have: k' <= max_degree G + 1 by exact: (leq_trans leq_kg' leq_gg').
+  rewrite leq_eqVlt=> /orP[/eqP eq_kg|] {leq_kg'}; first last.
+  - (* if k' < max_degree G + 1, then we are done *) 
+    pose kc := k_extended_col Ein0 kc'.
+    exists (k' + 1); by split; [|rewrite addn1].
+  (* now, k' = max_degree G + 1 *)
+  rewrite {}eq_kg in kc'; pose kc := k_extended_col Ein0 kc'.
+  (* create a maximal fan from w0 to w *)
+  pose f0: Fan kc v w0 w0 := k_Fan_of_del_edges Ein0 kc'.
+  case Hfmax: (fanmax f0) => [w fmax].
+  have is_fmax: is_fanmax fmax by move: (fanmax_is_max f0); rewrite {}Hfmax /=.
+  (* there exists some color ck absent at w *)
+  move: (exists_absent_color kc' leq_gg' w)=> [ck] Habw0' {leq_gg'}.
+  have{Habw0'} Habw0 : Some ck \in absent_set kc w := extended_absent Ein0 Habw0'.
+  case: (boolP (Some ck \in absent_set kc v))=> [Habv0 | Hnabv0].
+  - (* if ck is absent at v, we can replace extra color with ck *)
+    have Hcap: (Some ck \in absent_set kc v :&: absent_set kc w) 
+        by apply/setIP/(conj Habv0 Habw0).
+    by exists (max_degree G + 1); move: (smaller_coloring fmax erefl Hcap).
+  (* Otherwise, we will need to create a fan and rotate *)
+  move: (exists_absent_color kc (leq_addr _ (max_degree G + 1)) v) => [cv] Habv1. 
+  (* There also exists an edge v--wj colored ck, where wj != w0 is in the fan *)
+  have := (fanmax_present is_fmax Hnabv0 Habw0)
+    => [[wj] /andP[Einj /andP[/eqP Hkcj Hfanj]]] {is_fmax Hnabv0}.
+  have Evj : v -- wj by rewrite in_edges in Einj.
+  (* split fan at wj as f1 and (wj::f2) *)
+  case/splitPr fsplit: (w::fval fmax)/Hfanj=> [f1 f2 _].
+  have Hneqj0 : wj != w0.
+  { 
+    apply: (@contra_neq _ _ ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; wj]) 
+        ((proper_to_edge_coloring (k_to_proper_coloring kc)) [set v; w0]) _ _)=> [-> //|];
+    have /eqP -> : 
+        (proper_to_edge_coloring (k_to_proper_coloring kc)) 
+        [set v; w0] == None by move/eqP: (w0_col_extended kc').
+    by rewrite Hkcj.
+  }
+  case: f2 fsplit=> [|wi f2'] fsplit.
+  - (* contradiction if f2 is empty *)
+    by rewrite -(fan_last fmax) -(last_cons w w) fsplit cats1 last_rcons eq_refl in Hneqj0.
+  (* so f2 is non-empty, i.e. wi != w0 *)
+  have kc_wia_ck : Some ck \in absent_set kc wi.
+  { 
+    move: fsplit. 
+    by case: f1=> [|wk f1']; [rewrite cat0s|]; 
+    case=> Hw Hfval; have := fanW fmax;
+    rewrite Hfval /absent_prop; [rewrite Hw | rewrite -cat_rcons cat_path last_rcons];
+    rewrite /path Hkcj=> /andP[_ +] //; move=> /andP[-> _]. 
+  }
+
+  (* Construct ck cv Kempe Chain containing v *)
+  pose chain := kempe_chain kc (Some ck) cv v.
+  have chain_refl : chain = kempe_chain kc (Some ck) cv v by [].
+  set ic := invertedChain (kempe_chain kc (Some ck) cv v).
+  set ipc : properEdgeColoringType G (projT1 kc) :=  
+    (exist _ (ic) (inverted_proper chain_refl)).
+  have /eqVproper [/esym imset_kc_ic | imset_kc_ic] : ic[E(G)] \subset kc[E(G)] := 
+    imset_invert_sub chain (absent_in_imset kc_wia_ck) (absent_in_imset Habv1); first last.
+  - exists #|ipc [E(G)]|.
+    split; first by constructor; exact (proper_to_k_coloring ipc).
+    move/proper_card: imset_kc_ic. 
+    rewrite card_k_col -[#|ipc [E(G)]|]/(#|ic [E(G)]|)=> card_ic.
+    by rewrite -(leq_add2r 1); rewrite -addn1 in card_ic.
+  have card_ic : #|ic[E(G)]| == (max_degree G  + 1 + 1) by rewrite -imset_kc_ic card_k_col.
+  pose ikc : kEdgeColoringType G (max_degree G + 1 + 1) := 
+    existT _ (projT1 kc) (exist _ ipc card_ic).
+  have v_in_v := (@in_component_of (kempe_graph kc (Some ck) cv) v).
+  have ic_va_ck : Some ck \in absent_set ikc v.
+  {
+    have [_ H] := in_inverted_absent chain_refl v_in_v.
+    by apply H.
+  }
+  have [u [ikc_fan ic_ua_ck]] : (exists _ : _, exists _ : Fan ikc v w0 _, _)
+    := inverted_fan chain_refl imset_kc_ic fsplit Hneqj0 Habv1 kc_wia_ck Habw0 Hkcj.
+  have Hcap : (Some ck \in absent_set ikc v :&: absent_set ikc u) 
+    by apply/setIP/(conj ic_va_ck ic_ua_ck).
+  by exists (max_degree G + 1); have := smaller_coloring ikc_fan erefl Hcap.
+Qed.
+\end{minted}

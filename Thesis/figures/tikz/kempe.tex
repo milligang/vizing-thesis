@@ -1,0 +1,37 @@
+\begin{tikzpicture}[scale=0.9]
+
+% main chain, with v in it
+\node[vertex] (v) at (-1,0) {$v$};
+\node[vertex] (a) at (1,1) {};
+\node[vertex] (b) at (3,0) {};
+\node[vertex] (c) at (5,1) {};
+
+\draw[rededge]  (v) -- (a);
+\draw[blueedge] (a) -- (b);
+\draw[rededge]  (b) -- (c);
+
+% 2nd comp.
+\node[vertex] (u1) at (2.5,-1) {};
+\node[vertex] (u2) at (4.5,-1.5) {};
+\node[vertex] (u3) at (6.5,-1) {};
+
+\draw[blueedge] (u1) -- (u2);
+\draw[rededge]  (u2) -- (u3);
+
+% single edge
+\node[vertex] (t1) at (6,2) {};
+\node[vertex] (t2) at (7,1) {};
+
+\draw[blueedge] (t1) -- (t2);
+
+\node[vertex] (x1) at (3,2) {};
+\draw[greyedge] (v) -- (b);
+\draw[greyedge] (a) -- (u1);
+\draw[greyedge] (c) -- (x1);
+\draw[greyedge] (c) -- (t1);
+\draw[greyedge] (t2) -- (u2);
+\draw[greyedge] (t2) -- (u2);
+\draw[greyedge] (t2) -- (u3);
+\draw[greyedge] (x1) -- (a);
+
+\end{tikzpicture}

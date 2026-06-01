@@ -1,0 +1,54 @@
+\usepackage{listings}
+\lstset{
+  mathescape
+}
+\usepackage{minted}
+\usemintedstyle{tango}
+\usepackage{amsthm, amsmath, algorithm, algorithmicx, algpseudocode, etoolbox, tikz}
+\usetikzlibrary{positioning,calc,graphs.standard}
+
+\theoremstyle{remark}
+\newtheorem*{remark}{Remark}
+
+\theoremstyle{definition}
+\newtheorem{problem}{Problem}
+\newtheorem{exercise}{Exercise}
+\newtheorem{definition}{Definition}[chapter]
+\newtheorem{theorem}[definition]{Theorem}
+\newtheorem{lemma}[definition]{Lemma}
+\newtheorem{conjecture}[definition]{Conjecture}
+\newtheorem{example}[definition]{Example}
+\newtheorem{prop}[definition]{Proposition}
+\newtheorem{cor}[definition]{Corollary}
+
+\newtheorem{question}[definition]{Question}
+\newtheorem*{answer}{Answer}
+\newtheorem*{claim}{Claim}
+
+\newcommand{\ci}{\,\chi\,'\,}
+\newcommand{\todo}[1]{\textbf{\color{red}#1}}
+\newcommand{\note}[1]{{\color{Orchid}#1}}
+\newcommand{\la}{\langle}
+\newcommand{\ra}{\rangle}
+\newcommand{\fxn}[1]{\texttt{#1}}
+\newcommand{\e}[2]{(#1, #2)}
+
+\newcounter{case}[definition]
+\newcounter{subcase}[case]
+\AtBeginEnvironment{proof}{\setcounter{case}{0}}
+\newcommand{\case}[1]{%
+  \refstepcounter{case}%
+  \medskip
+  \noindent\emph{Case \thecase.}\quad #1\par
+}
+\newcommand{\subcase}[1]{%
+  \refstepcounter{subcase}%
+  \medskip
+  \noindent\hspace{1em}\emph{Case \thecase.\thesubcase.}\quad #1\par
+}
+
+\newtheoremstyle{notationstyle}
+  {6pt}{6pt}{\itshape}{}{\bfseries}{.}{0.5em}{}
+
+\theoremstyle{notationstyle}
+\newtheorem*{notation}{Notation}

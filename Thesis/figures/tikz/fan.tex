@@ -1,0 +1,22 @@
+\begin{tikzpicture}[scale=0.9]
+
+\node[vertex] (x) at (0,0) {$x$};
+
+\node[vertex] (w0) at (2,2) {$w_1$};
+\node[vertex] (w1) at (3,0.8) {$w_2$};
+\node[vertex] (w2) at (3,-0.8) {$w_3$};
+\node[vertex] (w3) at (2,-2) {$w_4$};
+\node[vertex] (w4) at (-3,-0.8) {};
+\node[vertex] (w5) at (-2,-2) {};
+\node[vertex] (w6) at (0,2.6) {};
+
+% fan edges
+\draw[edge] (x) -- node[midway, above] {$c_1$} (w0);
+\draw[edge] (x) -- node[midway, above] {$c_2$} (w1);
+\draw[edge] (x) -- node[midway, above] {$c_3$} (w2);
+\draw[edge] (x) -- node[midway, above] {$c_4$} (w3);
+\draw[greyedge] (x) -- (w4);
+\draw[greyedge] (x) -- (w5);
+\draw[greyedge] (x) -- (w6);
+
+\end{tikzpicture}
