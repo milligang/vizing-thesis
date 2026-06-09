@@ -123,11 +123,52 @@ Section Fan.
       by rewrite -cat_rcons cat_path last_rcons=> /andP[_ ->].
   Qed.
 
-  Lemma swap_fanp c f v w0 wk : 
+  Lemma fanp_edge c f v w0 wk w : 
     fanp c f v w0 wk -> 
-    fanp (swap_edge c [set v; w0] [set v; last wk (belast wk f)]) (behead (belast wk f)) v (last wk (belast wk f)) wk.
+    w \in wk::f ->
+    [set v; w] \in E(G).
   Proof.
-    rewrite/fanp=> /andP[/andP[/andP[/andP[Hlast Huniq] Hneigh] Hw0] Hpath].
+    rewrite in_edges -in_opn.
+    rewrite/fanp=> /andP[/andP[/andP[/andP _ /allP neigh] _] _].
+    exact: neigh.
+  Qed.
+
+  Lemma fanp_swap_w0 c f v w0 wk :
+    let f1 := belast wk f in
+    let w1 := last wk f1 in
+    fanp c f v w0 wk ->
+    w0_prop (swap_edge c [set v; w0] [set v; w1]) [set v; w1].
+  Proof.
+    (* simpl removes let bindings for proof *)
+    simpl.
+    case: f=> [/andP[/andP[/andP[/andP[+ _] _] w0_p] _]| w1 ws fan]. 
+    - simpl=> /eqP ->. 
+      move: w0_p; congr w0_prop.
+      apply/functional_extensionality=> x.
+      by have /(swap_edge_eq c) ->: [set v; w0] == [set v; w0] by trivial.
+    apply swap_w0; last by exact (fanp_w0_prop fan).
+    all: apply (fanp_edge fan).
+    - rewrite -(fanp_last fan); exact: mem_last.
+    - rewrite (@lastI _ wk _) -cats1 mem_cat. apply/orP/or_introl/last_mem.
+      exact/mem_head.
+  Qed.
+
+  Lemma fanp_swap c f v w0 wk : 
+    let f1 := belast wk f in
+    let w1 := last wk f1 in
+    fanp c f v w0 wk -> 
+    fanp (swap_edge c [set v; w0] [set v; w1]) (behead f1) v w1 wk.
+  Proof.
+    simpl; case: f=> [|wk1 ws] fan; move: (fan);
+    rewrite/fanp=> /andP[/andP[/andP[/andP[/eqP Hlast Huniq] Hneigh] Hw0] Hpath];
+    first by move: Hneigh; rewrite (fanp_swap_w0 fan) /neigh_prop eqxx /= => /andP[-> _].
+    (* have rcons_f : wk::f = rcons (belast wk f) w0 by rewrite -Hlast; apply lastI.
+    have : wk :: behead (belast wk f) = belast wk f.
+    {
+      Search belast.
+    }
+    apply/andP; split; [apply /andP; split|]. apply/andP; split. apply/andP; split.
+    have : wk::f = rcons (belast wk f) w0 by admit.
     have w0_in_G: [set v; w0] \in E(G).
     {
       rewrite in_edges -in_opn.
@@ -138,13 +179,7 @@ Section Fan.
     }
     move: Hneigh=> /andP[Hwk Hneigh].
     have wk_in_G: [set v; wk] \in E(G) by rewrite in_edges -in_opn.
-    have := lastI wk f.
-    (* elim: f1=> [|w1 ws IH] /=;
-    first by rewrite Hwk eq_refl (swap_w0 w0_in_G wk_in_G Hw0). 
-    have fcat : f = behead f1 ++ [::w0] by admit.
-    rewrite/fanp.
-    rewrite fcat.
-    move=> /andP[/andP[/andP[/andP[A B] C] L] H]. *)
+    have := lastI wk f. *)
   Admitted.
 
 End Fan.
@@ -246,9 +281,11 @@ Section Rotation.
     move: (valP f)=> Hf. exact: (Build_Fan (sub_fanp Hcat Hf)). 
   Qed.
 
-  Lemma swap_fan : 
-    Fan (swap_edge c [set v; w0] [set v; last wk (belast wk (val f))]) v (last wk (belast wk (val f))) wk.
-  Proof. move: (valP f)=> Hf; exact: (Build_Fan (swap_fanp Hf)). Qed.
+  Lemma fan_swap : 
+    let f1 := belast wk (val f) in
+    let w1 := last wk f1 in
+    Fan (swap_edge c [set v; w0] [set v; w1]) v w1 wk.
+  Proof. move: (valP f)=> Hf; exact: (Build_Fan (fanp_swap Hf)). Qed.
 
   Definition rotateF : edgeColoringType G ColorType :=
     rotate c (rev (wk::val f)) v.

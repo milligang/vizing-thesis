@@ -6,3 +6,13 @@ tmp.v
 .tmp.aux
 COQAUX*
 CoqMakefile
+*.aux
+*.log
+*.out
+*.xdv
+*.blg
+*.bbl
+*.toc
+*.fls
+*.fdb_latexmk
+_minted/

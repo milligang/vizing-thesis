@@ -360,11 +360,18 @@ Section Recolor.
   Variables (G : sgraph) (ColorType : finType) (c : edgeColoringType G ColorType).
   Implicit Types (e f : {set G}).
 
-  Definition recolor_edge e c0 : edgeColoringType G ColorType :=
-    fun edge => if edge == e then c0 else c edge.
+  Definition recolor_edge e c0 
+  : edgeColoringType G ColorType :=
+    fun edge => 
+      if edge == e 
+        then c0 
+      else c edge.
 
-  Lemma recolor_eq e c0 : (recolor_edge e c0) e = c0.
-  Proof. by rewrite /recolor_edge eqxx. Qed.
+  Lemma recolor_eq e c0 
+  : (recolor_edge e c0) e = c0.
+  Proof. 
+    by rewrite /recolor_edge eqxx. 
+  Qed.
 
   Lemma recolor_neq e f c0 : f != e -> (recolor_edge e c0) f = c f.
   Proof. by rewrite /recolor_edge=> /negPf ->. Qed.
