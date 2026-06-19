@@ -350,8 +350,14 @@ Section ExtendCol.
     {x : G}
   : c0 \in absent_set kc x -> Some c0 \in absent_set (k_extended_col kc) x.
   Proof.
-    rewrite/absent_set=> /setDP[c0_in_kc c0_nin_kc].
-    apply/setDP.
+    rewrite/absent_set=> /setDP[/imsetP [e] e_in_del e_c0 c0_nin_kc].
+    apply/setDP; split.
+    - apply/imsetP; exists e.
+      + by move: e_in_del; rewrite (@mem_del_edges G _ _)=> /andP[-> _].
+      + simpl; unfold extendedColType.
+        rewrite ifF; first by rewrite e_c0.
+        by have /negPf -> := del_edges1_neq e_in_del.
+    apply/negP=> /imsetP [e'] e_at_x. simpl.
   Admitted.
   
 End ExtendCol.

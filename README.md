@@ -16,7 +16,7 @@ Clone the repository. In your terminal, run 'make -f CoqMakefile' to build.
 - kempe.v: Defines a kempe chain as a component of a subgraph of G in which all edges are one of two colors
 - spath.v: Results about paths as defined in the graph theory library. Similar to aux.v, this material supports the proof of Vizing's Theorem but also has independent applications.
 - vizing.v: Contains the proof of Vizing's Theorem. There are two complete proofs in this file. Theorem Vizings_altpath utilizes the material in alternate_path.v while Theorem Vizings_kempe utilizes the material in kempe.v.
-  
+- Thesis: contains the written copy of the thesis (dissertation.pdf) which is compiled with xelatex.  
 ## Requirements
 
 The code in this repository requires the dependencies of package [_graph-theory 0.8_](https://github.com/coq-community/graph-theory):
